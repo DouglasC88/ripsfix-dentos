@@ -870,101 +870,141 @@ async function startProcessing(){
 async function startZipProcessing(input) {
   const file = input.files[0];
   if (!file) return;
-  // Reset input para permitir cargar mismo archivo de nuevo
   input.value = '';
 
   const zipName = file.name.replace(/\.zip$/i, '');
-  stats = {total:0,fmt:0,cie:0,cob:0,vr:0,err:0}; allDetails = [];
-  document.getElementById('proc-log').innerHTML = '';
-  hide('step-select'); show('step-progress');
-  document.getElementById('prog-title').textContent = 'Leyendo ZIP...';
-  document.getElementById('pbar-label').textContent = 'Descomprimiendo archivos...';
 
+  // Leer ZIP primero
   let zip;
   try {
     zip = await JSZip.loadAsync(file);
   } catch(e) {
-    alert('Error al leer el ZIP: ' + e.message);
-    hide('step-progress'); show('step-select');
-    return;
+    alert('Error al leer el ZIP: ' + e.message); return;
   }
 
-  // Recopilar todos los archivos del ZIP
   const allFiles = {};
-  zip.forEach((path, zipEntry) => { allFiles[path] = zipEntry; });
+  zip.forEach((path, entry) => { allFiles[path] = entry; });
 
-  // Encontrar archivos JSON válidos
   const jsonPaths = Object.keys(allFiles).filter(p =>
     p.toLowerCase().endsWith('.json') && !allFiles[p].dir
   );
 
-  stats.total = jsonPaths.length;
   if (!jsonPaths.length) {
-    document.getElementById('prog-title').textContent = 'No se encontraron archivos JSON';
-    document.getElementById('pbar-label').textContent = 'Verifique que el ZIP sea de DentOS.';
+    alert('No se encontraron archivos JSON en el ZIP.');
     return;
   }
 
-  setProgress(0, jsonPaths.length);
-
-  // Crear ZIP de salida
-  const outZip = new JSZip();
-
-  // Copiar TODOS los archivos al ZIP de salida primero (incluyendo XMLs, carpetas, etc.)
-  for (const [path, entry] of Object.entries(allFiles)) {
-    if (!entry.dir && !path.toLowerCase().endsWith('.json')) {
-      const content = await entry.async('uint8array');
-      outZip.file(path, content);
-    }
+  // Pedir carpeta destino ANTES de procesar
+  let outDir;
+  try {
+    outDir = await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch(e) {
+    if (e.name !== 'AbortError') alert('Error: ' + e.message);
+    return;
   }
 
-  // Procesar cada JSON
+  // Crear carpeta con nombre del ZIP
+  let rootDir;
+  try {
+    rootDir = await outDir.getDirectoryHandle(zipName, { create: true });
+  } catch(e) {
+    alert('Error al crear carpeta: ' + e.message); return;
+  }
+
+  // Helper para crear subcarpetas anidadas
+  async function mkdirp(base, path) {
+    const parts = path.split('/').filter(Boolean);
+    let cur = base;
+    for (const part of parts) cur = await cur.getDirectoryHandle(part, { create: true });
+    return cur;
+  }
+
+  // Helper para escribir archivo
+  async function writeFile(dir, name, content) {
+    const fh = await dir.getFileHandle(name, { create: true });
+    const wr = await fh.createWritable();
+    await wr.write(content);
+    await wr.close();
+  }
+
+  stats = {total:0,fmt:0,cie:0,cob:0,vr:0,err:0}; allDetails = [];
+  document.getElementById('proc-log').innerHTML = '';
+  hide('step-select'); show('step-progress');
+  stats.total = jsonPaths.length;
+  setProgress(0, jsonPaths.length);
+
+  // Copiar primero todos los archivos no-JSON (XMLs, etc.)
+  document.getElementById('prog-title').textContent = 'Copiando archivos...';
+  for (const [path, entry] of Object.entries(allFiles)) {
+    if (entry.dir || path.toLowerCase().endsWith('.json')) continue;
+    try {
+      const parts = path.split('/');
+      const fileName = parts.pop();
+      const dirPath = parts.join('/');
+      const targetDir = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
+      const content = await entry.async('uint8array');
+      await writeFile(targetDir, fileName, content);
+    } catch(e) {}
+  }
+
+  // Procesar y escribir JSONs corregidos
+  document.getElementById('prog-title').textContent = 'Procesando RIPS...';
   for (let i = 0; i < jsonPaths.length; i++) {
     const jsonPath = jsonPaths[i];
-    const name = jsonPath.split('/').pop();
+    const parts = jsonPath.split('/');
+    const name = parts.pop();
+    const dirPath = parts.join('/');
     const dir = jsonPath.includes('/') ? jsonPath.substring(0, jsonPath.lastIndexOf('/') + 1) : '';
 
     try {
       const jsonText = await allFiles[jsonPath].async('string');
       let json;
       try { json = JSON.parse(jsonText); }
-      catch { logItem(name, 'JSON inválido', 'err'); stats.err++; setProgress(i+1,jsonPaths.length); await tick(); continue; }
-
-      if (!json.numFactura && !json.numDocumentoIdObligado) {
-        logItem(name, 'Omitido', 'skip');
-        outZip.file(jsonPath, jsonText); // conservar original
+      catch {
+        logItem(name, 'JSON inválido', 'err'); stats.err++;
+        const td = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
+        await writeFile(td, name, jsonText);
         setProgress(i+1,jsonPaths.length); await tick(); continue;
       }
 
-      // Buscar XML correspondiente en el mismo directorio del ZIP
+      if (!json.numFactura && !json.numDocumentoIdObligado) {
+        logItem(name, 'Omitido', 'skip');
+        const td = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
+        await writeFile(td, name, jsonText);
+        setProgress(i+1,jsonPaths.length); await tick(); continue;
+      }
+
+      // Buscar XML en el ZIP
       let xml = {issueDate:null,periodStart:null,periodEnd:null,coberturaId:null,payableAmount:null};
       const base = name.replace(/\.json$/i, '');
-      const xmlPath = dir + base + '.xml' in allFiles ? dir + base + '.xml' :
-                      dir + base + '.XML' in allFiles ? dir + base + '.XML' :
-                      Object.keys(allFiles).find(p => p.startsWith(dir) && p.toLowerCase().endsWith('.xml') && !allFiles[p].dir);
-      if (xmlPath && allFiles[xmlPath]) {
-        try {
-          const xmlText = await allFiles[xmlPath].async('string');
-          xml = parseXML(xmlText);
-        } catch(e) {}
+      const xmlKey = [dir+base+'.xml', dir+base+'.XML']
+        .find(k => allFiles[k]) ||
+        Object.keys(allFiles).find(p => p.startsWith(dir) && p.toLowerCase().endsWith('.xml') && !allFiles[p].dir);
+      if (xmlKey && allFiles[xmlKey]) {
+        try { xml = parseXML(await allFiles[xmlKey].async('string')); } catch(e) {}
       }
 
       const {data, fC, cC, cobC, vC, invC, cobL, docL} = fixJson(json, xml);
-      outZip.file(jsonPath, JSON.stringify(data, null, 2));
 
-      stats.fmt += fC; stats.cie += cC; stats.cob += cobC; stats.vr += vC;
+      const targetDir = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
+      await writeFile(targetDir, name, JSON.stringify(data, null, 2));
+
+      stats.fmt+=fC; stats.cie+=cC; stats.cob+=cobC; stats.vr+=vC;
       await saveToHistorial(name, json.numFactura||'', fC, cC, cobC, vC, invC.length);
 
-      const parts = [];
-      if(fC) parts.push(`${fC} formato`);
-      if(cC) parts.push(`${cC} CIE-10`);
-      if(cobC) parts.push(`${cobC} tipo usuario`);
-      if(vC) parts.push(`${vC} valor servicio`);
-      if(invC.length) parts.push(`${invC.length} pendiente(s)`);
+      const ps = [];
+      if(fC) ps.push(`${fC} formato`);
+      if(cC) ps.push(`${cC} CIE-10`);
+      if(cobC) ps.push(`${cobC} tipo usuario`);
+      if(vC) ps.push(`${vC} valor servicio`);
+      if(invC.length) ps.push(`${invC.length} pendiente(s)`);
 
-      const hD = cobL.length || docL.length || invC.length;
-      if(hD) { allDetails.push({file:name,cobL,docL,invC}); logItem(name,parts.join(' · '),'warn'); }
-      else { logItem(name,parts.length?parts.join(' · '):'Sin cambios requeridos','ok'); }
+      if(cobL.length||docL.length||invC.length) {
+        allDetails.push({file:name,cobL,docL,invC});
+        logItem(name, ps.join(' · '), 'warn');
+      } else {
+        logItem(name, ps.length ? ps.join(' · ') : 'Sin cambios requeridos', 'ok');
+      }
 
     } catch(e) { logItem(name, e.message, 'err'); stats.err++; }
 
@@ -972,56 +1012,8 @@ async function startZipProcessing(input) {
     await tick();
   }
 
-  // Guardar archivos en carpeta seleccionada por el usuario
-  document.getElementById('prog-title').textContent = 'Selecciona carpeta de destino...';
-  let outDir;
-  try {
-    outDir = await window.showDirectoryPicker({ mode: 'readwrite' });
-  } catch(e) {
-    if (e.name !== 'AbortError') alert('Error al seleccionar carpeta: ' + e.message);
-    showResults(); return;
-  }
-
-  // Crear carpeta raíz con nombre del ZIP
-  let rootDir;
-  try {
-    rootDir = await outDir.getDirectoryHandle('RIPS_CORREGIDOS', { create: true });
-  } catch(e) {
-    alert('Error al crear carpeta: ' + e.message);
-    showResults(); return;
-  }
-
-  document.getElementById('prog-title').textContent = 'Guardando archivos corregidos...';
-
-  // Función para obtener/crear subcarpetas anidadas
-  async function getNestedDir(base, path) {
-    const parts = path.split('/').filter(Boolean);
-    let current = base;
-    for (const part of parts) {
-      current = await current.getDirectoryHandle(part, { create: true });
-    }
-    return current;
-  }
-
-  // Escribir todos los archivos del outZip en la carpeta destino
-  const zipFiles = [];
-  outZip.forEach((path, entry) => { if (!entry.dir) zipFiles.push({ path, entry }); });
-
-  for (const { path, entry } of zipFiles) {
-    try {
-      const parts = path.split('/');
-      const fileName = parts.pop();
-      const dirPath = parts.join('/');
-      const targetDir = dirPath ? await getNestedDir(rootDir, dirPath) : rootDir;
-      const fileHandle = await targetDir.getFileHandle(fileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      const content = await entry.async('uint8array');
-      await writable.write(content);
-      await writable.close();
-    } catch(e) { /* continuar si falla un archivo */ }
-  }
-
   showResults();
+}
 }
 
 function showResults(){
