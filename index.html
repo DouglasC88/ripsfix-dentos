@@ -972,19 +972,53 @@ async function startZipProcessing(input) {
     await tick();
   }
 
-  // Generar y descargar ZIP corregido
-  document.getElementById('prog-title').textContent = 'Generando ZIP corregido...';
+  // Guardar archivos en carpeta seleccionada por el usuario
+  document.getElementById('prog-title').textContent = 'Selecciona carpeta de destino...';
+  let outDir;
   try {
-    const blob = await outZip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'RIPS_CORREGIDOS.zip';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+    outDir = await window.showDirectoryPicker({ mode: 'readwrite' });
   } catch(e) {
-    alert('Error al generar ZIP: ' + e.message);
+    if (e.name !== 'AbortError') alert('Error al seleccionar carpeta: ' + e.message);
+    showResults(); return;
+  }
+
+  // Crear carpeta raíz con nombre del ZIP
+  let rootDir;
+  try {
+    rootDir = await outDir.getDirectoryHandle('RIPS_CORREGIDOS', { create: true });
+  } catch(e) {
+    alert('Error al crear carpeta: ' + e.message);
+    showResults(); return;
+  }
+
+  document.getElementById('prog-title').textContent = 'Guardando archivos corregidos...';
+
+  // Función para obtener/crear subcarpetas anidadas
+  async function getNestedDir(base, path) {
+    const parts = path.split('/').filter(Boolean);
+    let current = base;
+    for (const part of parts) {
+      current = await current.getDirectoryHandle(part, { create: true });
+    }
+    return current;
+  }
+
+  // Escribir todos los archivos del outZip en la carpeta destino
+  const zipFiles = [];
+  outZip.forEach((path, entry) => { if (!entry.dir) zipFiles.push({ path, entry }); });
+
+  for (const { path, entry } of zipFiles) {
+    try {
+      const parts = path.split('/');
+      const fileName = parts.pop();
+      const dirPath = parts.join('/');
+      const targetDir = dirPath ? await getNestedDir(rootDir, dirPath) : rootDir;
+      const fileHandle = await targetDir.getFileHandle(fileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      const content = await entry.async('uint8array');
+      await writable.write(content);
+      await writable.close();
+    } catch(e) { /* continuar si falla un archivo */ }
   }
 
   showResults();
