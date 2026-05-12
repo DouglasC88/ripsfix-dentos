@@ -431,11 +431,55 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
 
   <!-- RIPS SIN FACTURA -->
   <div class="panel" id="tab-sinfactura">
-    <div class="card">
-      <div class="coming-soon">
-        <div class="cs-icon">📄</div>
-        <h3>RIPS sin Factura</h3>
-        <p>Generación y envío de RIPS para prestaciones que no requieren factura electrónica. Próximamente disponible.</p>
+    <div class="card" id="step-select-sf">
+      <div class="card-title">📄 Procesamiento de RIPS sin Factura</div>
+      <p class="card-sub">Para servicios particulares (paciente paga en efectivo). Los archivos JSON se procesan sin XML de factura. Conforme a Resolución 2275 de 2023, Art. 4 — Parágrafo 1.</p>
+      <div class="patient-box">
+        <div>
+          <strong style="font-size:.81rem;font-weight:700;color:var(--gray-700)">👤 Lista de pacientes DentOS <span style="font-weight:400;color:var(--gray-400)">(opcional)</span></strong><br>
+          <span style="font-size:.74rem;color:var(--gray-500)">CSV exportado desde DentOS — completa <code>codSexo</code> automáticamente</span>
+        </div>
+        <label>
+          <input type="file" id="patient-file-sf" accept=".csv,.txt" style="display:none" onchange="loadPatientFile(this)">
+          <div class="upload-btn">📄 Cargar pacientes</div>
+        </label>
+      </div>
+      <div id="patient-status-sf" style="font-size:.71rem;color:var(--gray-500);font-style:italic;margin-top:6px">Sin archivo cargado</div>
+      <div class="rules-grid" style="margin-top:14px">
+        <div class="rule-item"><strong>📅 Formato de fechas</strong><span>Normaliza al formato SISPRO: <code>AAAA-MM-DD HH:MM</code></span></div>
+        <div class="rule-item"><strong>🔬 CIE-10 automático</strong><span>Asigna diagnóstico desde 2,786 mapeos cuando el campo es nulo</span></div>
+        <div class="rule-item"><strong>🪪 Tipo de usuario fijo</strong><span>Fuerza <code>tipoUsuario = "12"</code> (Particular) en todos los usuarios</span></div>
+        <div class="rule-item"><strong>💰 Valor de servicio fijo</strong><span>Fuerza <code>vrServicio = 0</code> (sin retribución monetaria)</span></div>
+        <div class="rule-item"><strong>👤 Tipo doc · sexo · edad</strong><span>Corrige documento por edad · <code>codSexo</code> desde CSV o nombre</span></div>
+        <div class="rule-item"><strong>📋 Sin factura</strong><span>No se requiere XML · <code>numFactura</code> se deja en null</span></div>
+      </div>
+      <button class="btn-primary" onclick="startProcessingSinFactura()">📂 Seleccionar carpeta y procesar</button>
+      <div class="warn-box" style="margin-top:10px;">⚠️ Requiere Chrome o Edge · Los archivos JSON se sobreescriben · Solo procesa archivos JSON (no busca XML)</div>
+    </div>
+    <div class="card hidden" id="step-progress-sf">
+      <div class="card-title">⏳ <span id="prog-title-sf">Procesando archivos...</span></div>
+      <div class="progress-section">
+        <div class="progress-label-row">
+          <span class="progress-label" id="pbar-label-sf">Buscando archivos...</span>
+          <span class="progress-pct" id="pbar-pct-sf">0%</span>
+        </div>
+        <div class="pbar-track"><div class="pbar-fill" id="pbar-sf"></div></div>
+      </div>
+      <div class="log" id="proc-log-sf"></div>
+    </div>
+    <div class="card hidden" id="step-results-sf">
+      <div class="card-title">✅ Proceso completado</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-icon">📄</div><div class="stat-num blue" id="r-total-sf">0</div><div class="stat-label">Archivos</div></div>
+        <div class="stat"><div class="stat-icon">🔧</div><div class="stat-num green" id="r-fmt-sf">0</div><div class="stat-label">Formato</div></div>
+        <div class="stat"><div class="stat-icon">🔬</div><div class="stat-num purple" id="r-cie-sf">0</div><div class="stat-label">CIE-10</div></div>
+        <div class="stat"><div class="stat-icon">🪪</div><div class="stat-num orange" id="r-cob-sf">0</div><div class="stat-label">Tipo Usr</div></div>
+        <div class="stat"><div class="stat-icon">💰</div><div class="stat-num yellow" id="r-vr-sf">0</div><div class="stat-label">Valor Serv</div></div>
+        <div class="stat"><div class="stat-icon">⚠️</div><div class="stat-num red" id="r-err-sf">0</div><div class="stat-label">Errores</div></div>
+      </div>
+      <div id="r-detail-sf"></div>
+      <div class="btn-row">
+        <button class="btn-secondary btn-outline" onclick="resetSinFactura()">↩ Procesar otra carpeta</button>
       </div>
     </div>
   </div>
@@ -626,7 +670,9 @@ let patientSexMap = new Map(), patientNameMap = new Map();
 function loadPatientFile(input) {
   const file = input.files[0]; if (!file) return;
   const status = document.getElementById('patient-status');
+  const statusSF = document.getElementById('patient-status-sf');
   status.className = ''; status.textContent = 'Cargando...';
+  if (statusSF) { statusSF.style.color = ''; statusSF.style.fontWeight = ''; statusSF.style.fontStyle = 'italic'; statusSF.textContent = 'Cargando...'; }
   const reader = new FileReader();
   reader.onload = e => {
     Papa.parse(e.target.result, {
@@ -644,8 +690,10 @@ function loadPatientFile(input) {
           else if (sexo==='masculino') { patientSexMap.set(doc,'M'); ok++; }
           else skip++;
         });
+        const msg = `✓ ${patientSexMap.size.toLocaleString()} pacientes cargados — ${file.name}`;
         status.className = 'loaded';
-        status.textContent = `✓ ${patientSexMap.size.toLocaleString()} pacientes cargados — ${file.name}`;
+        status.textContent = msg;
+        if (statusSF) { statusSF.style.color = 'var(--green)'; statusSF.style.fontWeight = '600'; statusSF.style.fontStyle = 'normal'; statusSF.textContent = msg; }
       }
     });
   };
@@ -858,6 +906,125 @@ async function startProcessing(){
 }
 
 function tick(){return new Promise(r=>setTimeout(r,0));}
+
+// ═══ RIPS SIN FACTURA ═══
+let statsSF={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};
+let allDetailsSF=[];
+
+function fixJsonSinFactura(data){
+  let fC=0,cC=0,cobC=0,vC=0; const cobL=[],docL=[],invC=[];
+  if(!Array.isArray(data.usuarios))return{data,fC,cC,cobC,vC,cobL,docL,invC};
+  // Forzar numFactura a null (sin FEV)
+  if(data.numFactura!==null){data.numFactura=null;fC++;}
+  data.usuarios.forEach((usr,ui)=>{
+    // Forzar tipoUsuario = "12" (Particular)
+    if(usr.tipoUsuario!=='12'){cobL.push({u:ui+1,antes:usr.tipoUsuario||'(vacío)',despues:'12',cob:'PARTICULAR',cobNom:'Particular (default sin FEV)'});usr.tipoUsuario='12';cobC++;}
+    const svc=usr.servicios||{};
+    const aS=[...(svc.procedimientos||[]),...(svc.consultas||[]),...(svc.urgencias||[]),...(svc.hospitalizacion||[])];
+    const rD=(aS.map(s=>s.fechaInicioAtencion).filter(Boolean)[0]||'').slice(0,10)||null;
+    const age=calcAge(usr.fechaNacimiento,rD);
+    const cD=correctDoc(usr.tipoDocumentoIdentificacion,age);
+    if(cD){docL.push({u:ui+1,antes:usr.tipoDocumentoIdentificacion,despues:cD,edad:age});usr.tipoDocumentoIdentificacion=cD;fC++;}
+    if(!usr.codSexo){const sx=getSexo(usr.numDocumentoIdentificacion);if(sx){usr.codSexo=sx;fC++;}else invC.push({campo:`U${ui+1}.codSexo`,valor:'(vacío)',tipo:'OBLIGATORIO'});}
+    function pS(arr,cf){
+      if(!Array.isArray(arr))return;
+      arr.forEach((s,i)=>{
+        fC+=aF(s,'fechaInicioAtencion',toSD);fC+=aF(s,'fechaFinAtencion',toSD);
+        if(cf&&s[cf]){const r=fCUPS(s[cf]);if(r.c){s[cf]=r.v;fC++;}}
+        ['codDiagnosticoPrincipal','codDiagnosticoRelacionado','codDiagnosticoRelacionado1','codDiagnosticoRelacionado2','codDiagnosticoRelacionado3','codComplicacion'].forEach(f=>{if(s[f]){const r=fCIE(s[f]);if(r.c){s[f]=r.v;fC++;}}});
+        // Forzar vrServicio = 0
+        if(s.vrServicio!==0&&s.vrServicio!=='0'){s.vrServicio=0;vC++;}
+        fC+=aF(s,'valorPagoModerador',dZ);fC+=aF(s,'codServicio',eInt);fC+=aF(s,'consecutivo',eInt);
+        if(!s.codDiagnosticoPrincipal){const c=getCie10(cf?s[cf]:null);if(c){s.codDiagnosticoPrincipal=c;cC++;}}
+        if(s.codDiagnosticoPrincipal&&!CIE10_DATA[s.codDiagnosticoPrincipal])invC.push({campo:`[${i+1}].codDiag`,valor:s.codDiagnosticoPrincipal,tipo:'CIE-10'});
+      });
+    }
+    pS(svc.procedimientos,'codProcedimiento');pS(svc.consultas,'codConsulta');
+    pS(svc.urgencias,null);pS(svc.hospitalizacion,null);pS(svc.otrosServicios,'codTecnologiaSalud');
+    if(Array.isArray(svc.recienNacidos)){svc.recienNacidos.forEach(r=>{fC+=aF(r,'fechaNacimiento',toDO);if(r.codDiagnosticoPrincipal){const f=fCIE(r.codDiagnosticoPrincipal);if(f.c){r.codDiagnosticoPrincipal=f.v;fC++;}}if(!r.codDiagnosticoPrincipal){r.codDiagnosticoPrincipal='K089';cC++;}if(r.vrServicio!==0&&r.vrServicio!=='0'){r.vrServicio=0;vC++;}fC+=aF(r,'valorPagoModerador',dZ);fC+=aF(r,'consecutivo',eInt);});}
+    if(Array.isArray(svc.medicamentos)){svc.medicamentos.forEach(m=>{fC+=aF(m,'fechaDispensAdmon',toSD);if(m.vrServicio!==0&&m.vrServicio!=='0'){m.vrServicio=0;vC++;}fC+=aF(m,'valorPagoModerador',dZ);fC+=aF(m,'cantidadMedicamento',eNum);fC+=aF(m,'vrUnitMedicamento',eNum);fC+=aF(m,'consecutivo',eInt);});}
+  });
+  return{data,fC,cC,cobC,vC,cobL,docL,invC};
+}
+
+function logItemSF(name,meta,cls=''){
+  const el=document.createElement('div');el.className='log-item '+cls;
+  el.innerHTML=`<div class="log-dot"></div><span class="log-name">${name}</span><span class="log-meta">${meta}</span>`;
+  document.getElementById('proc-log-sf').appendChild(el);el.scrollIntoView({block:'nearest'});
+}
+function setProgressSF(cur,tot){
+  const p=tot?Math.round(cur/tot*100):0;
+  document.getElementById('pbar-sf').style.width=p+'%';
+  document.getElementById('pbar-label-sf').textContent=`${cur} de ${tot} archivos procesados`;
+  document.getElementById('pbar-pct-sf').textContent=p+'%';
+}
+
+async function startProcessingSinFactura(){
+  if(!window.showDirectoryPicker){alert('Esta función requiere Google Chrome o Microsoft Edge.');return;}
+  let dh;try{dh=await window.showDirectoryPicker({mode:'readwrite'});}catch(e){if(e.name!=='AbortError')alert('Error: '+e.message);return;}
+  statsSF={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};allDetailsSF=[];
+  document.getElementById('proc-log-sf').innerHTML='';
+  document.getElementById('step-select-sf').classList.add('hidden');
+  document.getElementById('step-progress-sf').classList.remove('hidden');
+  document.getElementById('step-results-sf').classList.add('hidden');
+  const files=await findJsonFiles(dh);statsSF.total=files.length;
+  if(!files.length){document.getElementById('prog-title-sf').textContent='No se encontraron archivos';document.getElementById('pbar-label-sf').textContent='Verifique la carpeta seleccionada.';return;}
+  setProgressSF(0,files.length);
+  for(let i=0;i<files.length;i++){
+    const{name,handle}=files[i];
+    try{
+      const file=await handle.getFile();let json;
+      try{json=JSON.parse(await file.text());}catch{logItemSF(name,'JSON inválido','err');statsSF.err++;setProgressSF(i+1,files.length);await tick();continue;}
+      if(!json.numDocumentoIdObligado){logItemSF(name,'Omitido (sin numDocumentoIdObligado)','skip');setProgressSF(i+1,files.length);await tick();continue;}
+      const{data,fC,cC,cobC,vC,invC,cobL,docL}=fixJsonSinFactura(json);
+      const wr=await handle.createWritable();await wr.write(JSON.stringify(data,null,2));await wr.close();
+      statsSF.fmt+=fC;statsSF.cie+=cC;statsSF.cob+=cobC;statsSF.vr+=vC;
+      // Identificador del historial = nombre del archivo
+      const ident=name.replace(/\.json$/i,'');
+      await saveToHistorial(name, ident, fC, cC, cobC, vC, invC.length);
+      const parts=[];
+      if(fC)parts.push(`${fC} formato`);if(cC)parts.push(`${cC} CIE-10`);
+      if(cobC)parts.push(`${cobC} tipo usuario`);if(vC)parts.push(`${vC} valor servicio`);
+      if(invC.length)parts.push(`${invC.length} pendiente(s)`);
+      const hD=cobL.length||docL.length||invC.length;
+      if(hD){allDetailsSF.push({file:name,cobL,docL,invC});logItemSF(name,parts.join(' · '),'warn');}
+      else{logItemSF(name,parts.length?parts.join(' · '):'Sin cambios requeridos','ok');}
+    }catch(e){logItemSF(name,e.message,'err');statsSF.err++;}
+    setProgressSF(i+1,files.length);await tick();
+  }
+  showResultsSinFactura();
+}
+
+function showResultsSinFactura(){
+  document.getElementById('step-progress-sf').classList.add('hidden');
+  document.getElementById('step-results-sf').classList.remove('hidden');
+  document.getElementById('r-total-sf').textContent=statsSF.total;
+  document.getElementById('r-fmt-sf').textContent=statsSF.fmt;
+  document.getElementById('r-cie-sf').textContent=statsSF.cie;
+  document.getElementById('r-cob-sf').textContent=statsSF.cob;
+  document.getElementById('r-vr-sf').textContent=statsSF.vr;
+  document.getElementById('r-err-sf').textContent=statsSF.err;
+  const det=document.getElementById('r-detail-sf');
+  if(!allDetailsSF.length){det.innerHTML='';return;}
+  let html='<div class="section-hdr"><span class="dot" style="background:var(--yellow)"></span>Archivos con cambios o pendientes</div>';
+  html+='<table class="results-table"><thead><tr><th>Archivo</th><th>Detalle</th></tr></thead><tbody>';
+  allDetailsSF.forEach(d=>{
+    const parts=[];
+    if(d.cobL.length)parts.push(`${d.cobL.length} tipoUsuario→12`);
+    if(d.docL.length)parts.push(`${d.docL.length} tipoDoc corregido`);
+    if(d.invC.length)parts.push(`<span style="color:var(--red)">${d.invC.length} pendiente(s)</span>`);
+    html+=`<tr><td style="font-family:var(--mono);font-size:.72rem">${d.file}</td><td>${parts.join(' · ')}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  det.innerHTML=html;
+}
+
+function resetSinFactura(){
+  document.getElementById('step-select-sf').classList.remove('hidden');
+  document.getElementById('step-progress-sf').classList.add('hidden');
+  document.getElementById('step-results-sf').classList.add('hidden');
+  statsSF={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};allDetailsSF=[];
+}
 
 // ═══ SEARCH ═══
 let searchMode='cups';
