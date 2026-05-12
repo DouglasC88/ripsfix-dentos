@@ -6,6 +6,7 @@
 <title>DentOS · Validador y Corrector RIPS</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -343,7 +344,7 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
   <div class="panel active" id="tab-proc">
     <div class="card" id="step-select">
       <div class="card-title">📁 Selección de archivos RIPS</div>
-      <p class="card-sub">Seleccione la carpeta raíz que contiene las subcarpetas de RIPS. La aplicación procesará todos los archivos <code>.json</code> junto con su <code>.xml</code> correspondiente.</p>
+      <p class="card-sub">Seleccione la carpeta raíz que contiene las subcarpetas de RIPS, o cargue directamente el ZIP exportado desde DentOS.</p>
       <div class="patient-box">
         <div>
           <strong style="font-size:.81rem;font-weight:700;color:var(--gray-700)">👤 Lista de pacientes DentOS <span style="font-weight:400;color:var(--gray-400)">(opcional)</span></strong><br>
@@ -363,8 +364,16 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
         <div class="rule-item"><strong>🪪 Tipo de usuario (RVC005)</strong><span>Corrige <code>tipoUsuario</code> según cobertura del XML</span></div>
         <div class="rule-item"><strong>👤 Tipo doc · sexo · edad</strong><span>Corrige documento por edad · <code>codSexo</code> desde CSV o nombre</span></div>
       </div>
-      <button class="btn-primary" onclick="startProcessing()">📂 Seleccionar carpeta y procesar</button>
-      <div class="warn-box">⚠️ Requiere Chrome o Edge · Los archivos JSON se sobreescriben · El XML no se modifica</div>
+      <div class="btn-row" style="flex-direction:column;gap:8px;margin-top:12px;">
+        <button class="btn-primary" onclick="startProcessing()">📂 Seleccionar carpeta y procesar</button>
+        <label style="display:block">
+          <input type="file" id="zip-file" accept=".zip" style="display:none" onchange="startZipProcessing(this)">
+          <div class="btn-primary" style="background:linear-gradient(135deg,#1B7FC4,#29ABE2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 20px;border-radius:10px;color:white;font-family:var(--display);font-size:.88rem;font-weight:700;">
+            🗜️ Cargar ZIP de DentOS
+          </div>
+        </label>
+      </div>
+      <div class="warn-box" style="margin-top:10px;">⚠️ Requiere Chrome o Edge · Los archivos JSON se sobreescriben · El XML no se modifica · El ZIP exportado conserva la estructura de carpetas original</div>
     </div>
     <div class="card hidden" id="step-progress">
       <div class="card-title">⏳ <span id="prog-title">Procesando archivos...</span></div>
@@ -854,6 +863,130 @@ async function startProcessing(){
     }catch(e){logItem(name,e.message,'err');stats.err++;}
     setProgress(i+1,files.length);await tick();
   }
+  showResults();
+}
+
+// ═══ ZIP PROCESSING ═══
+async function startZipProcessing(input) {
+  const file = input.files[0];
+  if (!file) return;
+  // Reset input para permitir cargar mismo archivo de nuevo
+  input.value = '';
+
+  const zipName = file.name.replace(/\.zip$/i, '');
+  stats = {total:0,fmt:0,cie:0,cob:0,vr:0,err:0}; allDetails = [];
+  document.getElementById('proc-log').innerHTML = '';
+  hide('step-select'); show('step-progress');
+  document.getElementById('prog-title').textContent = 'Leyendo ZIP...';
+  document.getElementById('pbar-label').textContent = 'Descomprimiendo archivos...';
+
+  let zip;
+  try {
+    zip = await JSZip.loadAsync(file);
+  } catch(e) {
+    alert('Error al leer el ZIP: ' + e.message);
+    hide('step-progress'); show('step-select');
+    return;
+  }
+
+  // Recopilar todos los archivos del ZIP
+  const allFiles = {};
+  zip.forEach((path, zipEntry) => { allFiles[path] = zipEntry; });
+
+  // Encontrar archivos JSON válidos
+  const jsonPaths = Object.keys(allFiles).filter(p =>
+    p.toLowerCase().endsWith('.json') && !allFiles[p].dir
+  );
+
+  stats.total = jsonPaths.length;
+  if (!jsonPaths.length) {
+    document.getElementById('prog-title').textContent = 'No se encontraron archivos JSON';
+    document.getElementById('pbar-label').textContent = 'Verifique que el ZIP sea de DentOS.';
+    return;
+  }
+
+  setProgress(0, jsonPaths.length);
+
+  // Crear ZIP de salida
+  const outZip = new JSZip();
+
+  // Copiar TODOS los archivos al ZIP de salida primero (incluyendo XMLs, carpetas, etc.)
+  for (const [path, entry] of Object.entries(allFiles)) {
+    if (!entry.dir && !path.toLowerCase().endsWith('.json')) {
+      const content = await entry.async('uint8array');
+      outZip.file(path, content);
+    }
+  }
+
+  // Procesar cada JSON
+  for (let i = 0; i < jsonPaths.length; i++) {
+    const jsonPath = jsonPaths[i];
+    const name = jsonPath.split('/').pop();
+    const dir = jsonPath.includes('/') ? jsonPath.substring(0, jsonPath.lastIndexOf('/') + 1) : '';
+
+    try {
+      const jsonText = await allFiles[jsonPath].async('string');
+      let json;
+      try { json = JSON.parse(jsonText); }
+      catch { logItem(name, 'JSON inválido', 'err'); stats.err++; setProgress(i+1,jsonPaths.length); await tick(); continue; }
+
+      if (!json.numFactura && !json.numDocumentoIdObligado) {
+        logItem(name, 'Omitido', 'skip');
+        outZip.file(jsonPath, jsonText); // conservar original
+        setProgress(i+1,jsonPaths.length); await tick(); continue;
+      }
+
+      // Buscar XML correspondiente en el mismo directorio del ZIP
+      let xml = {issueDate:null,periodStart:null,periodEnd:null,coberturaId:null,payableAmount:null};
+      const base = name.replace(/\.json$/i, '');
+      const xmlPath = dir + base + '.xml' in allFiles ? dir + base + '.xml' :
+                      dir + base + '.XML' in allFiles ? dir + base + '.XML' :
+                      Object.keys(allFiles).find(p => p.startsWith(dir) && p.toLowerCase().endsWith('.xml') && !allFiles[p].dir);
+      if (xmlPath && allFiles[xmlPath]) {
+        try {
+          const xmlText = await allFiles[xmlPath].async('string');
+          xml = parseXML(xmlText);
+        } catch(e) {}
+      }
+
+      const {data, fC, cC, cobC, vC, invC, cobL, docL} = fixJson(json, xml);
+      outZip.file(jsonPath, JSON.stringify(data, null, 2));
+
+      stats.fmt += fC; stats.cie += cC; stats.cob += cobC; stats.vr += vC;
+      await saveToHistorial(name, json.numFactura||'', fC, cC, cobC, vC, invC.length);
+
+      const parts = [];
+      if(fC) parts.push(`${fC} formato`);
+      if(cC) parts.push(`${cC} CIE-10`);
+      if(cobC) parts.push(`${cobC} tipo usuario`);
+      if(vC) parts.push(`${vC} valor servicio`);
+      if(invC.length) parts.push(`${invC.length} pendiente(s)`);
+
+      const hD = cobL.length || docL.length || invC.length;
+      if(hD) { allDetails.push({file:name,cobL,docL,invC}); logItem(name,parts.join(' · '),'warn'); }
+      else { logItem(name,parts.length?parts.join(' · '):'Sin cambios requeridos','ok'); }
+
+    } catch(e) { logItem(name, e.message, 'err'); stats.err++; }
+
+    setProgress(i+1, jsonPaths.length);
+    await tick();
+  }
+
+  // Generar y descargar ZIP corregido
+  document.getElementById('prog-title').textContent = 'Generando ZIP corregido...';
+  try {
+    const blob = await outZip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'RIPS_CORREGIDOS.zip';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+  } catch(e) {
+    alert('Error al generar ZIP: ' + e.message);
+  }
+
   showResults();
 }
 
