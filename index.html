@@ -6,7 +6,6 @@
 <title>DentOS · Validador y Corrector RIPS</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -364,16 +363,8 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
         <div class="rule-item"><strong>🪪 Tipo de usuario (RVC005)</strong><span>Corrige <code>tipoUsuario</code> según cobertura del XML</span></div>
         <div class="rule-item"><strong>👤 Tipo doc · sexo · edad</strong><span>Corrige documento por edad · <code>codSexo</code> desde CSV o nombre</span></div>
       </div>
-      <div class="btn-row" style="flex-direction:column;gap:8px;margin-top:12px;">
-        <button class="btn-primary" onclick="startProcessing()">📂 Seleccionar carpeta y procesar</button>
-        <label style="display:block">
-          <input type="file" id="zip-file" accept=".zip" style="display:none" onchange="startZipProcessing(this)">
-          <div class="btn-primary" style="background:linear-gradient(135deg,#1B7FC4,#29ABE2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 20px;border-radius:10px;color:white;font-family:var(--display);font-size:.88rem;font-weight:700;">
-            🗜️ Cargar ZIP de DentOS
-          </div>
-        </label>
-      </div>
-      <div class="warn-box" style="margin-top:10px;">⚠️ Requiere Chrome o Edge · Los archivos JSON se sobreescriben · El XML no se modifica · El ZIP exportado conserva la estructura de carpetas original</div>
+      <button class="btn-primary" onclick="startProcessing()">📂 Seleccionar carpeta y procesar</button>
+      <div class="warn-box" style="margin-top:10px;">⚠️ Requiere Chrome o Edge · Los archivos JSON se sobreescriben · El XML no se modifica</div>
     </div>
     <div class="card hidden" id="step-progress">
       <div class="card-title">⏳ <span id="prog-title">Procesando archivos...</span></div>
@@ -866,197 +857,6 @@ async function startProcessing(){
   showResults();
 }
 
-// ═══ ZIP PROCESSING ═══
-async function startZipProcessing(input) {
-  const file = input.files[0];
-  if (!file) return;
-  input.value = '';
-
-  const zipName = file.name.replace(/\.zip$/i, '');
-
-  // Leer ZIP primero
-  let zip;
-  try {
-    zip = await JSZip.loadAsync(file);
-  } catch(e) {
-    alert('Error al leer el ZIP: ' + e.message); return;
-  }
-
-  const allFiles = {};
-  zip.forEach((path, entry) => { allFiles[path] = entry; });
-
-  const jsonPaths = Object.keys(allFiles).filter(p =>
-    p.toLowerCase().endsWith('.json') && !allFiles[p].dir
-  );
-
-  if (!jsonPaths.length) {
-    alert('No se encontraron archivos JSON en el ZIP.');
-    return;
-  }
-
-  // Pedir carpeta destino ANTES de procesar
-  let outDir;
-  try {
-    outDir = await window.showDirectoryPicker({ mode: 'readwrite' });
-  } catch(e) {
-    if (e.name !== 'AbortError') alert('Error: ' + e.message);
-    return;
-  }
-
-  // Crear carpeta con nombre del ZIP
-  let rootDir;
-  try {
-    rootDir = await outDir.getDirectoryHandle(zipName, { create: true });
-  } catch(e) {
-    alert('Error al crear carpeta: ' + e.message); return;
-  }
-
-  // Helper para crear subcarpetas anidadas
-  async function mkdirp(base, path) {
-    const parts = path.split('/').filter(Boolean);
-    let cur = base;
-    for (const part of parts) cur = await cur.getDirectoryHandle(part, { create: true });
-    return cur;
-  }
-
-  // Helper para escribir archivo
-  async function writeFile(dir, name, content) {
-    const fh = await dir.getFileHandle(name, { create: true });
-    const wr = await fh.createWritable();
-    await wr.write(content);
-    await wr.close();
-  }
-
-  stats = {total:0,fmt:0,cie:0,cob:0,vr:0,err:0}; allDetails = [];
-  document.getElementById('proc-log').innerHTML = '';
-  hide('step-select'); show('step-progress');
-  stats.total = jsonPaths.length;
-  setProgress(0, jsonPaths.length);
-
-  // Copiar primero todos los archivos no-JSON (XMLs, etc.)
-  document.getElementById('prog-title').textContent = 'Copiando archivos...';
-  for (const [path, entry] of Object.entries(allFiles)) {
-    if (entry.dir || path.toLowerCase().endsWith('.json')) continue;
-    try {
-      const parts = path.split('/');
-      const fileName = parts.pop();
-      const dirPath = parts.join('/');
-      const targetDir = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
-      const content = await entry.async('uint8array');
-      await writeFile(targetDir, fileName, content);
-    } catch(e) {}
-  }
-
-  // Procesar y escribir JSONs corregidos
-  document.getElementById('prog-title').textContent = 'Procesando RIPS...';
-  for (let i = 0; i < jsonPaths.length; i++) {
-    const jsonPath = jsonPaths[i];
-    const parts = jsonPath.split('/');
-    const name = parts.pop();
-    const dirPath = parts.join('/');
-    const dir = jsonPath.includes('/') ? jsonPath.substring(0, jsonPath.lastIndexOf('/') + 1) : '';
-
-    try {
-      const jsonText = await allFiles[jsonPath].async('string');
-      let json;
-      try { json = JSON.parse(jsonText); }
-      catch {
-        logItem(name, 'JSON inválido', 'err'); stats.err++;
-        const td = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
-        await writeFile(td, name, jsonText);
-        setProgress(i+1,jsonPaths.length); await tick(); continue;
-      }
-
-      if (!json.numFactura && !json.numDocumentoIdObligado) {
-        logItem(name, 'Omitido', 'skip');
-        const td = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
-        await writeFile(td, name, jsonText);
-        setProgress(i+1,jsonPaths.length); await tick(); continue;
-      }
-
-      // Buscar XML en el ZIP
-      let xml = {issueDate:null,periodStart:null,periodEnd:null,coberturaId:null,payableAmount:null};
-      const base = name.replace(/\.json$/i, '');
-      const xmlKey = [dir+base+'.xml', dir+base+'.XML']
-        .find(k => allFiles[k]) ||
-        Object.keys(allFiles).find(p => p.startsWith(dir) && p.toLowerCase().endsWith('.xml') && !allFiles[p].dir);
-      if (xmlKey && allFiles[xmlKey]) {
-        try { xml = parseXML(await allFiles[xmlKey].async('string')); } catch(e) {}
-      }
-
-      const {data, fC, cC, cobC, vC, invC, cobL, docL} = fixJson(json, xml);
-
-      const targetDir = dirPath ? await mkdirp(rootDir, dirPath) : rootDir;
-      await writeFile(targetDir, name, JSON.stringify(data, null, 2));
-
-      stats.fmt+=fC; stats.cie+=cC; stats.cob+=cobC; stats.vr+=vC;
-      await saveToHistorial(name, json.numFactura||'', fC, cC, cobC, vC, invC.length);
-
-      const ps = [];
-      if(fC) ps.push(`${fC} formato`);
-      if(cC) ps.push(`${cC} CIE-10`);
-      if(cobC) ps.push(`${cobC} tipo usuario`);
-      if(vC) ps.push(`${vC} valor servicio`);
-      if(invC.length) ps.push(`${invC.length} pendiente(s)`);
-
-      if(cobL.length||docL.length||invC.length) {
-        allDetails.push({file:name,cobL,docL,invC});
-        logItem(name, ps.join(' · '), 'warn');
-      } else {
-        logItem(name, ps.length ? ps.join(' · ') : 'Sin cambios requeridos', 'ok');
-      }
-
-    } catch(e) { logItem(name, e.message, 'err'); stats.err++; }
-
-    setProgress(i+1, jsonPaths.length);
-    await tick();
-  }
-
-  showResults();
-}
-}
-
-function showResults(){
-  hide('step-progress');show('step-results');
-  document.getElementById('r-total').textContent=stats.total;
-  document.getElementById('r-fmt').textContent=stats.fmt;
-  document.getElementById('r-cie').textContent=stats.cie;
-  document.getElementById('r-cob').textContent=stats.cob;
-  document.getElementById('r-vr').textContent=stats.vr;
-  document.getElementById('r-err').textContent=stats.err;
-  const det=document.getElementById('r-detail');
-  if(!allDetails.length){det.innerHTML='';return;}
-  let html='';
-  const cobE=allDetails.filter(d=>d.cobL.length);
-  if(cobE.length){
-    html+=`<div class="section-hdr"><div class="dot" style="background:var(--orange)"></div>Correcciones de Tipo de Usuario</div><div style="overflow-x:auto"><table class="results-table"><thead><tr><th>Archivo</th><th>U</th><th>Antes</th><th>Después</th><th>Cobertura</th></tr></thead><tbody>`;
-    cobE.forEach(({file,cobL})=>cobL.forEach(d=>{html+=`<tr><td style="color:var(--gray-500);font-size:.69rem">${file}</td><td>${d.u}</td><td><code class="bad">${d.antes}</code></td><td><code class="ok">${d.despues}</code></td><td style="font-size:.69rem;color:var(--gray-500)">${d.cob} — ${d.cobNom}</td></tr>`;}));
-    html+=`</tbody></table></div>`;
-  }
-  const invE=allDetails.filter(d=>d.invC.length);
-  if(invE.length){
-    html+=`<div class="section-hdr"><div class="dot" style="background:var(--red)"></div>Campos Pendientes</div><div style="overflow-x:auto"><table class="results-table"><thead><tr><th>Archivo</th><th>Campo</th><th>Observación</th><th>Tipo</th></tr></thead><tbody>`;
-    invE.forEach(({file,invC})=>invC.forEach(({campo,valor,tipo})=>{html+=`<tr><td style="color:var(--gray-500);font-size:.69rem">${file}</td><td style="font-family:var(--mono);font-size:.7rem">${campo}</td><td><code class="bad">${valor}</code></td><td><span class="badge badge-yellow">${tipo}</span></td></tr>`;}));
-    html+=`</tbody></table></div>`;
-  }
-  det.innerHTML=html;
-}
-
-function resetApp(){
-  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};allDetails=[];
-  document.getElementById('proc-log').innerHTML='';
-  document.getElementById('r-detail').innerHTML='';
-  document.getElementById('pbar').style.width='0%';
-  document.getElementById('prog-title').textContent='Procesando archivos...';
-  if(patientSexMap.size>0){const st=document.getElementById('patient-status');st.className='loaded';st.textContent=`✓ ${patientSexMap.size.toLocaleString()} pacientes en memoria`;}
-  hide('step-progress');hide('step-results');show('step-select');
-}
-function resetCliente(){
-  patientSexMap=new Map();patientNameMap=new Map();
-  document.getElementById('patient-file').value='';
-  const st=document.getElementById('patient-status');st.className='';st.textContent='Sin archivo cargado';
-  resetApp();
-}
 function tick(){return new Promise(r=>setTimeout(r,0));}
 
 // ═══ SEARCH ═══
