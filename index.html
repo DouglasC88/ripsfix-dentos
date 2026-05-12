@@ -189,6 +189,60 @@ code.ok{color:var(--green);background:#F0FDF4;}
 ::-webkit-scrollbar-track{background:var(--gray-100);}
 ::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--blue);}
+
+/* ── DARK MODE ── */
+body.dark{
+  --white:#1E2A35;--gray-50:#161F28;--gray-100:#1A2530;--gray-200:#243040;
+  --gray-300:#2E3D50;--gray-500:#8BA5BB;--gray-700:#B8CEDF;--gray-900:#E8F2FA;
+  --blue-light:#1A3040;--blue-mid:#1E3A50;--shadow-sm:0 1px 3px rgba(0,0,0,.3);
+  --shadow:0 4px 16px rgba(0,0,0,.4);--shadow-lg:0 10px 40px rgba(0,0,0,.5);
+}
+body.dark .login-card{background:#1E2A35;border-color:#243040;}
+body.dark .form-input{background:#161F28;border-color:#2E3D50;color:#E8F2FA;}
+body.dark .auth-msg.error{background:#3A1A1A;border-color:#7B2020;}
+body.dark .auth-msg.success{background:#1A3A20;border-color:#207B30;}
+body.dark code{background:#1A3040;color:#29ABE2;}
+body.dark code.bad{background:#3A1A1A;color:#EF4444;}
+body.dark code.ok{background:#1A3A20;color:#22C55E;}
+body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
+
+/* ── GOOGLE BUTTON ── */
+.btn-google{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:10px;background:var(--white);border:1.5px solid var(--gray-200);border-radius:10px;
+  color:var(--gray-700);font-family:var(--display);font-size:.85rem;font-weight:700;
+  cursor:pointer;transition:all .2s;margin-top:8px;}
+.btn-google:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(41,171,226,.2);}
+.divider{display:flex;align-items:center;gap:8px;margin:12px 0;}
+.divider hr{flex:1;border:none;border-top:1px solid var(--gray-200);}
+.divider span{font-size:.72rem;color:var(--gray-400);white-space:nowrap;}
+
+/* ── THEME TOGGLE ── */
+.btn-theme{padding:6px 10px;background:var(--white);border:1.5px solid var(--gray-200);
+  border-radius:7px;font-size:.85rem;cursor:pointer;transition:all .2s;}
+.btn-theme:hover{border-color:var(--blue);}
+
+/* ── LAYOUT CON SIDEBAR ── */
+.app-layout{display:flex;gap:0;min-height:calc(100vh - 100px);}
+.sidebar{width:220px;flex-shrink:0;background:var(--white);border:1px solid var(--gray-200);
+  border-radius:var(--radius);padding:8px;box-shadow:var(--shadow-sm);
+  display:flex;flex-direction:column;gap:2px;align-self:flex-start;position:sticky;top:20px;}
+.sidebar-group{font-size:.62rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;
+  letter-spacing:.1em;padding:10px 10px 4px;margin-top:6px;}
+.sidebar-group:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;
+  cursor:pointer;transition:all .2s;border:none;background:transparent;width:100%;text-align:left;
+  font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--gray-500);}
+.nav-item:hover{background:var(--blue-light);color:var(--blue);}
+.nav-item.active{background:var(--blue);color:var(--white);}
+.nav-item .nav-icon{font-size:1rem;flex-shrink:0;}
+.nav-badge{margin-left:auto;font-size:.6rem;background:var(--gray-200);color:var(--gray-500);
+  padding:1px 5px;border-radius:10px;font-weight:700;}
+.nav-item.active .nav-badge{background:rgba(255,255,255,.3);color:var(--white);}
+.content-area{flex:1;min-width:0;}
+.coming-soon{text-align:center;padding:60px 20px;color:var(--gray-400);}
+.coming-soon .cs-icon{font-size:3rem;margin-bottom:12px;}
+.coming-soon h3{font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--gray-700);margin-bottom:6px;}
+.coming-soon p{font-size:.82rem;line-height:1.6;}
 </style>
 </head>
 <body>
@@ -216,6 +270,11 @@ code.ok{color:var(--green);background:#F0FDF4;}
         <input class="form-input" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
       </div>
       <button class="btn-login" id="btn-login" onclick="doLogin()">Iniciar sesión</button>
+      <div class="divider"><hr><span>o continúa con</span><hr></div>
+      <button class="btn-google" onclick="doGoogleLogin()">
+        <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.1 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.6 26.8 36 24 36c-5.2 0-9.7-2.9-11.9-7.2l-6.6 4.9C9.5 39.5 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.4-2.5 4.5-4.6 6l6.2 5.2C40.7 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
+        Iniciar sesión con Google
+      </button>
     </div>
     <!-- REGISTER -->
     <div id="register-form" class="hidden">
@@ -255,18 +314,30 @@ code.ok{color:var(--green);background:#F0FDF4;}
     </div>
     <div class="header-right">
       <div class="user-info">
-        <div class="version-badge">v19</div>
+        <div class="version-badge">v20</div>
         <div class="user-email" id="user-email-display"></div>
       </div>
+      <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
       <button class="btn-logout" onclick="doLogout()">🚪 Salir</button>
     </div>
   </header>
 
-  <div class="tabs">
-    <button class="tab active" onclick="switchTab('proc')">⚙️ Procesar RIPS</button>
-    <button class="tab" onclick="switchTab('hist')">📋 Historial</button>
-    <button class="tab" onclick="switchTab('search')">🔍 Buscar Código</button>
-  </div>
+  <div class="app-layout">
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+      <div class="sidebar-group">Principal</div>
+      <button class="nav-item active" id="nav-proc" onclick="switchTab('proc')"><span class="nav-icon">⚙️</span>Procesar RIPS</button>
+      <button class="nav-item" id="nav-convenios" onclick="switchTab('convenios')"><span class="nav-icon">🤝</span>RIPS Convenios</button>
+      <button class="nav-item" id="nav-sinfactura" onclick="switchTab('sinfactura')"><span class="nav-icon">📄</span>RIPS sin Factura</button>
+      <div class="sidebar-group">Herramientas</div>
+      <button class="nav-item" id="nav-cups" onclick="switchTab('cups')"><span class="nav-icon">🔧</span>Corrector CUPS</button>
+      <button class="nav-item" id="nav-json" onclick="switchTab('json')"><span class="nav-icon">📊</span>Creación JSON</button>
+      <div class="sidebar-group">Consultas</div>
+      <button class="nav-item" id="nav-hist" onclick="switchTab('hist')"><span class="nav-icon">📋</span>Historial</button>
+      <button class="nav-item" id="nav-search" onclick="switchTab('search')"><span class="nav-icon">🔍</span>Buscar Código</button>
+    </nav>
+    <!-- CONTENT -->
+    <div class="content-area">
 
   <!-- PROCESAR -->
   <div class="panel active" id="tab-proc">
@@ -346,6 +417,53 @@ code.ok{color:var(--green);background:#F0FDF4;}
       <div class="search-results" id="search-results"><div class="sr-empty">Escriba al menos 2 caracteres para buscar...</div></div>
     </div>
   </div>
+
+  <!-- RIPS CONVENIOS -->
+  <div class="panel" id="tab-convenios">
+    <div class="card">
+      <div class="coming-soon">
+        <div class="cs-icon">🤝</div>
+        <h3>RIPS Convenios</h3>
+        <p>Módulo para gestión y corrección de RIPS por convenio o entidad pagadora. Próximamente disponible.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIPS SIN FACTURA -->
+  <div class="panel" id="tab-sinfactura">
+    <div class="card">
+      <div class="coming-soon">
+        <div class="cs-icon">📄</div>
+        <h3>RIPS sin Factura</h3>
+        <p>Generación y envío de RIPS para prestaciones que no requieren factura electrónica. Próximamente disponible.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORRECTOR CUPS -->
+  <div class="panel" id="tab-cups">
+    <div class="card">
+      <div class="coming-soon">
+        <div class="cs-icon">🔧</div>
+        <h3>Corrector de Lista CUPS</h3>
+        <p>Carga tu lista de procedimientos en Excel y valida o completa automáticamente: código CUPS, CIE-10, tipo servicio, tipo procedimiento, causa externa, acto quirúrgico y ámbito. Próximamente disponible.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREACIÓN JSON -->
+  <div class="panel" id="tab-json">
+    <div class="card">
+      <div class="coming-soon">
+        <div class="cs-icon">📊</div>
+        <h3>Creación JSON desde Excel</h3>
+        <p>Genera archivos RIPS JSON directamente desde una plantilla Excel. Ideal para clínicas sin historia clínica digital. Próximamente disponible.</p>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /content-area -->
+  </div><!-- /app-layout -->
 </div>
 </div>
 
@@ -421,8 +539,31 @@ async function doRegister() {
   else showAuthMsg('✓ Cuenta creada. Revisa tu correo para confirmar.', 'success');
 }
 
+async function doGoogleLogin() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+  if (error) showAuthMsg(error.message, 'error');
+}
+
 async function doLogout() {
   await sb.auth.signOut();
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.toggle('dark');
+  document.getElementById('btn-theme').textContent = isDark ? '☀️' : '🌙';
+  localStorage.setItem('ripsfix-theme', isDark ? 'dark' : 'light');
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('ripsfix-theme');
+  if (saved === 'dark') {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = '☀️';
+  }
 }
 
 // ═══ HISTORIAL ═══
@@ -668,12 +809,16 @@ function setProgress(cur,tot){
   document.getElementById('pbar-label').textContent=`${cur} de ${tot} archivos procesados`;
   document.getElementById('pbar-pct').textContent=p+'%';
 }
-function switchTab(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['proc','hist','search'][i]===t));
-  document.querySelectorAll('.panel').forEach(el=>el.classList.remove('active'));
-  document.getElementById('tab-'+t).classList.add('active');
-  if(t==='search')document.getElementById('search-box').focus();
-  if(t==='hist')loadHistorial();
+function switchTab(t) {
+  const tabs = ['proc','hist','search','convenios','sinfactura','cups','json'];
+  tabs.forEach(id => {
+    const nav = document.getElementById('nav-'+id);
+    const panel = document.getElementById('tab-'+id);
+    if (nav) nav.classList.toggle('active', id===t);
+    if (panel) panel.classList.toggle('active', id===t);
+  });
+  if(t==='search') document.getElementById('search-box').focus();
+  if(t==='hist') loadHistorial();
 }
 
 // ═══ MAIN FLOW ═══
@@ -789,6 +934,7 @@ function copyCode(code){
 }
 
 // ═══ INIT ═══
+initTheme();
 initAuth();
 </script>
 </body>
