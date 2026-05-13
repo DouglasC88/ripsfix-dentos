@@ -437,11 +437,6 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
             <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> o arrastra el XML</div>
           </div>
           <div id="cvxmlout"></div>
-          <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-            <label style="font-size:.78rem;font-weight:700;color:var(--gray-700);white-space:nowrap;">Número de factura:</label>
-            <input id="cv-numfact" type="text" placeholder="Ej: FACT_19620 o DEN119598" style="flex:1;padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.82rem;outline:none;background:var(--white);color:var(--gray-900);" oninput="if(vX)vX.nF=this.value.trim()">
-            <span style="font-size:.7rem;color:var(--gray-400);">Reemplaza el UUID del XML</span>
-          </div>
         </div>
       </div>
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
@@ -1017,9 +1012,7 @@ window.cvLX=function(f){
       while((m2=rNm.exec(txt))!==null)aNm.push(m2[1].trim());
       vX={nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null};
       document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+cvI('Factura',nF,'mono')+cvI('Prestador',vX.sNm)+cvI('NIT Prestador',vX.nP,'mono')+cvI('Pagador',vX.cNm)+cvI('NIT Pagador',vX.nC,'mono')+cvI('Periodo',(st||'?')+' a '+(en||'?'),'mono')+cvI('Valor total',fm(py),'green')+'</div>';
-      var inp=document.getElementById('cv-numfact');
-      if(inp){if(!inp.value)inp.value=nF;else vX.nF=inp.value.trim();}
-      sok(1,'OK '+vX.nF);cvUV();
+      sok(1,'OK '+nF);cvUV();
     }catch(er){alert('Error XML: '+er.message);}
   };
   rd.readAsText(f);
@@ -1062,10 +1055,12 @@ window.cvLC=function(f){
     try{
       vC={};
       e.target.result.split('\n').forEach(function(ln){
-        var c=ln.split('\t');
-        if(c.length<11)return;
-        var d=String(c[2]||'').trim(),n=String(c[8]||'').trim(),sx=String(c[10]||'').trim().toLowerCase();
-        if(d&&n)vC[d]={nac:n,sx:sx.indexOf('fem')>-1?'F':'M'};
+        var c=ln.split(';');
+        if(c.length<9)return;
+        var d=String(c[2]||'').trim().replace(/"/g,'');
+        var n=String(c[7]||'').trim().replace(/"/g,'');
+        var sx=String(c[8]||'').trim().toLowerCase();
+        if(d&&n&&n!=='fch_nac')vC[d]={nac:n,sx:sx.indexOf('fem')>-1?'F':'M'};
       });
       var tot=Object.keys(vC).length;
       var uDocs=[];vR&&vR.forEach(function(r){if(uDocs.indexOf(r.doc)<0)uDocs.push(r.doc);});
