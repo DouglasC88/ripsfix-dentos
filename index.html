@@ -1054,22 +1054,29 @@ window.cvLC=function(f){
   rd.onload=function(e){
     try{
       vC={};
-      e.target.result.split('\n').forEach(function(ln){
+      var lines=e.target.result.split('\n');
+      var loaded=0;
+      lines.forEach(function(ln){
+        ln=ln.replace(/\r/g,'');
         var c=ln.split(';');
         if(c.length<9)return;
         var d=String(c[2]||'').trim().replace(/"/g,'');
         var n=String(c[7]||'').trim().replace(/"/g,'');
-        var sx=String(c[8]||'').trim().toLowerCase();
-        if(d&&n&&n!=='fch_nac')vC[d]={nac:n,sx:sx.indexOf('fem')>-1?'F':'M'};
+        var sx=String(c[8]||'').trim().toLowerCase().replace(/"/g,'');
+        if(d&&n&&n!=='fch_nac'&&n.length>4){
+          vC[d]={nac:n,sx:sx.indexOf('fem')>-1?'F':'M'};
+          loaded++;
+        }
       });
-      var tot=Object.keys(vC).length;
-      var uDocs=[];vR&&vR.forEach(function(r){if(uDocs.indexOf(r.doc)<0)uDocs.push(r.doc);});
+      var uDocs=[];
+      if(vR)vR.forEach(function(r){if(uDocs.indexOf(r.doc)<0)uDocs.push(r.doc);});
       var crz=uDocs.filter(function(d){return vC[d];}).length;
-      document.getElementById('cvcsv').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+cvI('En CSV',''+tot,'mono')+cvI('Cruzados',''+crz,'mono')+cvI('Sin datos',''+(uDocs.length-crz),'mono')+'</div>';
+      var out=document.getElementById('cvcsv');
+      if(out)out.innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+cvI('En CSV',''+loaded,'mono')+cvI('Cruzados',''+crz,'mono')+cvI('Sin datos',''+(uDocs.length-crz),'mono')+'</div>';
       sok(3,'OK '+crz+' cruzados');
-    }catch(er){alert('Error CSV: '+er.message);}
+    }catch(er){alert('Error CSV: '+er.message);console.error(er);}
   };
-  rd.readAsText(f,'latin1');
+  rd.readAsText(f,'iso-8859-1');
 };
 function cvUV(){
   if(!vX||!vR)return;
