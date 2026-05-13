@@ -999,14 +999,14 @@ window.cvLX=function(f){var r=new FileReader();r.onload=function(e){try{
   var txt=e.target.result;
   var doc=new DOMParser().parseFromString(txt,'text/xml');
   var nF=xg(doc,'ID'),py=parseFloat(xg(doc,'PayableAmount')||'0'),st=xg(doc,'StartDate'),en=xg(doc,'EndDate');
-  // Extraer NITs con regex directo sobre el texto XML (más confiable con namespaces DIAN)
-  function rxAfter(pattern,str){var m=str.match(pattern);return m?m[1].trim():null;}
-  var supBlock=txt.match(/AccountingSupplierParty[\s\S]*?AccountingCustomerParty/);
-  var cusBlock=txt.match(/AccountingCustomerParty[\s\S]*?(?:Delivery|InvoiceLine|LegalMonetaryTotal)/);
-  var nP=supBlock?rxAfter(/CompanyID[^>]*>([^<]+)/,supBlock[0]):null;
-  var sNm=supBlock?rxAfter(/RegistrationName[^>]*>([^<]+)/,supBlock[0]):null;
-  var nC=cusBlock?rxAfter(/CompanyID[^>]*>([^<]+)/,cusBlock[0]):null;
-  var cNm=cusBlock?rxAfter(/RegistrationName[^>]*>([^<]+)/,cusBlock[0]):null;
+  // Extraer CompanyID y RegistrationName en orden de aparición
+  function allMatches(re,str){var m,r=[];while((m=re.exec(str))!==null)r.push(m[1].trim().replace(/\s+/g,''));return r;}
+  var ids=allMatches(/CompanyID[^>]*>([^<]+)/g,txt);
+  var nms=allMatches(/RegistrationName[^>]*>([^<]+)/g,txt);
+  var nP=ids[0]||null;   // NIT prestador (1er CompanyID)
+  var nC=ids[1]||null;   // NIT pagador   (2do CompanyID)
+  var sNm=nms[0]||null;  // Nombre prestador
+  var cNm=nms[1]||null;  // Nombre pagador
   vX={nF,py,st,en,nP,sNm,nC,cNm};
   document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+ci('Factura',nF,'mono')+ci('Prestador',sNm)+ci('NIT Prestador',nP,'mono')+ci('Pagador',cNm)+ci('NIT Pagador',nC,'mono')+ci('Período',(st||'?')+' → '+(en||'?'),'mono')+ci('Valor total',fm(py),'green')+'</div>';
   sok(1,'✓ '+nF);cvUV();
