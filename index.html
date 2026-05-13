@@ -996,12 +996,17 @@ document.addEventListener('DOMContentLoaded',function(){
   var i3=document.getElementById('cvi3');if(i3)i3.addEventListener('change',function(){if(this.files[0])cvLC(this.files[0]);});
 });
 window.cvLX=function(f){var r=new FileReader();r.onload=function(e){try{
-  var doc=new DOMParser().parseFromString(e.target.result,'text/xml');
+  var txt=e.target.result;
+  var doc=new DOMParser().parseFromString(txt,'text/xml');
   var nF=xg(doc,'ID'),py=parseFloat(xg(doc,'PayableAmount')||'0'),st=xg(doc,'StartDate'),en=xg(doc,'EndDate');
-  var sn=doc.querySelectorAll('AccountingSupplierParty CompanyID'),nP=sn.length?sn[0].textContent.trim():null;
-  var ar=doc.querySelectorAll('RegistrationName'),sNm=ar.length?ar[0].textContent.trim():null;
-  var cn=doc.querySelectorAll('AccountingCustomerParty CompanyID'),nC=cn.length?cn[0].textContent.trim():null;
-  var cNm=ar.length>1?ar[1].textContent.trim():null;
+  // Extraer NITs con regex directo sobre el texto XML (más confiable con namespaces DIAN)
+  function rxAfter(pattern,str){var m=str.match(pattern);return m?m[1].trim():null;}
+  var supBlock=txt.match(/AccountingSupplierParty[\s\S]*?AccountingCustomerParty/);
+  var cusBlock=txt.match(/AccountingCustomerParty[\s\S]*?(?:Delivery|InvoiceLine|LegalMonetaryTotal)/);
+  var nP=supBlock?rxAfter(/CompanyID[^>]*>([^<]+)/,supBlock[0]):null;
+  var sNm=supBlock?rxAfter(/RegistrationName[^>]*>([^<]+)/,supBlock[0]):null;
+  var nC=cusBlock?rxAfter(/CompanyID[^>]*>([^<]+)/,cusBlock[0]):null;
+  var cNm=cusBlock?rxAfter(/RegistrationName[^>]*>([^<]+)/,cusBlock[0]):null;
   vX={nF,py,st,en,nP,sNm,nC,cNm};
   document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+ci('Factura',nF,'mono')+ci('Prestador',sNm)+ci('NIT Prestador',nP,'mono')+ci('Pagador',cNm)+ci('NIT Pagador',nC,'mono')+ci('Período',(st||'?')+' → '+(en||'?'),'mono')+ci('Valor total',fm(py),'green')+'</div>';
   sok(1,'✓ '+nF);cvUV();
