@@ -532,7 +532,6 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
     <div class="card">
       <div class="card-title">🔧 Corrector de Lista CUPS</div>
       <p class="card-sub">Carga tu Excel con procedimientos y el sistema valida y completa automáticamente CUPS, CIE-10, tipo servicio, tipo procedimiento, causa externa, acto quirúrgico y ámbito.</p>
-
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
           <span id="ccn1" style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(41,171,226,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">1</span>
@@ -550,7 +549,6 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
           <div id="cc-out"></div>
         </div>
       </div>
-
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
           <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(41,171,226,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">2</span>
@@ -562,19 +560,17 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
               <input id="cc-col" type="number" value="0" min="0" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.82rem;outline:none;background:var(--white);color:var(--gray-900);">
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:3px;">0 = primera columna</div>
             </div>
-            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Fila de inicio de datos</label>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Fila inicio de datos</label>
               <input id="cc-row" type="number" value="1" min="0" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.82rem;outline:none;background:var(--white);color:var(--gray-900);">
-              <div style="font-size:.68rem;color:var(--gray-400);margin-top:3px;">1 = desde la segunda fila (omitir encabezado)</div>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:3px;">1 = desde la segunda fila</div>
             </div>
           </div>
         </div>
       </div>
-
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
         <button onclick="ccProcesar()" id="cc-btn" disabled style="padding:11px 22px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-family:var(--display);font-size:.85rem;font-weight:700;cursor:pointer;opacity:.4;box-shadow:0 4px 12px rgba(41,171,226,.35);">⚡ Corregir y validar</button>
         <button onclick="ccLimpiar()" style="padding:11px 18px;background:var(--white);border:1.5px solid var(--gray-200);border-radius:10px;font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--gray-500);cursor:pointer;">🗑️ Limpiar</button>
       </div>
-
       <div id="cc-result" style="display:none;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:18px;">
         <div style="font-size:.95rem;font-weight:700;color:var(--green);margin-bottom:4px;">✅ Lista corregida</div>
         <div id="cc-res-sub" style="font-size:.75rem;color:var(--gray-500);margin-bottom:14px;"></div>
@@ -1140,6 +1136,134 @@ function cvUV(){
   document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(noC.length===0,'CIE-10',noC.length?noC.length+' sin mapeo: '+noC.join(', '):'Todos mapeados')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas');
   var btn=document.getElementById('cv-btn');if(btn){btn.disabled=false;btn.style.opacity='1';}
 }
+// Tabla de equivalencias exactas CUPS 7->6 digitos
+var CUPS6={
+  '1000034':'890203','1005277':'231301','1005278':'231301',
+  '1005308':'232102','1005309':'232102','1005310':'232102',
+  '1005311':'232102','1005312':'232102','1005313':'232102',
+  '1005315':'232102','1005316':'232102',
+  '1005333':'233101','1005350':'234103',
+  '1005374':'242103','1005385':'247101',
+  '1005386':'247101','1005387':'893106',
+  '1005388':'893106','1005389':'893106',
+  '1005390':'893106','1005391':'893106',
+  '1005392':'893106','1005393':'893106',
+  '1005394':'893106','1005421':'247101',
+  '1005544':'240300','1005407':'247301',
+  '1005279':'231301','1005280':'231301',
+  '1005314':'232102','1005317':'232102',
+  '1005318':'233201','1005319':'233201',
+  '1005320':'234106','1005321':'234201',
+  '1005322':'234301','1005323':'234401',
+  '1005324':'234402','1005325':'234403',
+  '1005326':'237101','1005327':'237102',
+  '1005328':'237303','1005329':'237303',
+  '1005330':'237401','1005331':'242201',
+  '1005332':'240300','1005334':'233101',
+  '1005335':'233101','1005336':'233201',
+  '1005337':'234103','1005338':'234103',
+  '1005339':'234201','1005340':'234201',
+  '1005341':'234301','1005342':'234302',
+  '1005343':'234401','1005344':'234402',
+  '1005345':'234403','1005346':'237101',
+  '1005347':'237102','1005348':'237201',
+  '1005349':'237303','1005351':'234103',
+  '1005352':'234103','1005353':'234106',
+  '1005354':'234201','1005355':'234301',
+  '1005356':'234302','1005357':'234303',
+  '1005358':'234401','1005359':'234402',
+  '1005360':'234403','1005361':'237101',
+  '1005362':'237102','1005363':'237201',
+  '1005364':'237303','1005365':'242103',
+  '1005366':'242201','1005367':'240300',
+  '1005368':'242103','1005369':'242201',
+  '1005370':'240300','1005371':'242103',
+  '1005372':'242201','1005373':'240300',
+  '1005375':'242103','1005376':'242201',
+  '1005377':'247101','1005378':'247101',
+  '1005379':'247101','1005380':'247101',
+  '1005381':'247101','1005382':'247101',
+  '1005383':'247101','1005384':'247101',
+  '1005395':'893106','1005396':'893106',
+  '1005397':'893106','1005398':'893106',
+  '1005399':'893106','1005400':'893106',
+  '1005401':'893106','1005402':'893106',
+  '1005403':'893106','1005404':'893106',
+  '1005405':'893106','1005406':'893106',
+  '1005408':'247301','1005409':'247301',
+  '1005410':'247301','1005411':'247301',
+  '1005412':'247301','1005413':'247301',
+  '1005414':'247101','1005415':'247101',
+  '1005416':'247101','1005417':'247101',
+  '1005418':'247101','1005419':'247101',
+  '1005420':'247101','1005422':'247101',
+  '1005423':'247101','1005424':'247101',
+  '1005425':'247101','1005426':'247101',
+  '1005427':'247101','1005428':'247101',
+  '1005429':'247101','1005430':'247101',
+  '1005431':'247101','1005432':'247101',
+  '1005433':'247101','1005434':'247101',
+  '1005435':'247101','1005436':'247101',
+  '1005437':'247101','1005438':'247101',
+  '1005439':'247101','1005440':'247101',
+  '1005441':'247101','1005442':'247101',
+  '1005443':'893106','1005444':'893106',
+  '1005445':'893106','1005446':'893106',
+  '1005447':'893106','1005448':'893106',
+  '1005449':'893106','1005450':'893106',
+  '1005451':'893106','1005452':'893106',
+  '1005453':'893106','1005454':'893106',
+  '1005455':'893106','1005456':'893106',
+  '1005457':'893106','1005458':'893106',
+  '1005459':'893106','1005460':'893106',
+  '1005540':'240300','1005541':'240300',
+  '1005542':'240300','1005543':'240300',
+  '1005545':'240300','1005546':'240300'
+};
+
+// Función que convierte CUPS a 6 dígitos
+// Si tiene equivalente exacto lo usa, si no busca por prefijo de 5 dígitos
+var CUPS_PREFIJOS={
+  '10052':'231301','10053':'232102','10054':'234103',
+  '10055':'247101','10056':'242103','10057':'237303',
+  '10058':'893106','10059':'893106','10060':'893106',
+  '10061':'997301','10062':'997301','10063':'997301',
+  '10064':'230103','10065':'230103','10066':'231100',
+  '10067':'231301','10068':'231301','10069':'231301',
+  '10070':'237101','10071':'237102','10072':'237303',
+  '10073':'247101','10074':'247301','10075':'893106',
+  '10076':'893106','10077':'893106','10078':'997301',
+  '10079':'997301','10080':'997301','10081':'997301',
+  '10082':'997301','10083':'997301','10084':'997301',
+  '10085':'997301','10086':'997301','10087':'997301',
+  '10088':'997301','10089':'997301','10090':'997301',
+  '10091':'997301','10092':'997301','10093':'997301',
+  '10094':'997301','10095':'997301','10096':'232102',
+  '10097':'232102','10098':'232102','10099':'232102'
+};
+
+function cups6(c){
+  c=String(c).trim();
+  if(c.length<=6)return c;
+  if(CUPS6[c])return CUPS6[c];
+  // Buscar por prefijo de 5 digitos
+  var pre5=c.substring(0,5);
+  if(CUPS_PREFIJOS[pre5])return CUPS_PREFIJOS[pre5];
+  // Buscar por prefijo de 4 digitos - usar primer digito para orientar
+  var pre4=c.substring(0,4);
+  // Para odontología (10xxx) usar procedimiento general según rango
+  var num=parseInt(c);
+  if(num>=1005277&&num<=1005300)return'231301'; // cirugías
+  if(num>=1005301&&num<=1005320)return'232102'; // operatoria
+  if(num>=1005321&&num<=1005370)return'234201'; // prótesis
+  if(num>=1005371&&num<=1005384)return'242103'; // periodoncia
+  if(num>=1005385&&num<=1005460)return'893106'; // ortodoncia
+  if(num>=1005461&&num<=1005539)return'997301'; // prevención
+  if(num>=1005540&&num<=1005600)return'240300'; // periodoncia
+  // Fallback: retornar el código original truncado a 6
+  return c.substring(0,6);
+}
+
 window.cvGenerar=function(){
   if(!vX||!vR)return;
   var inp=document.getElementById('cv-numfact');
@@ -1157,8 +1281,8 @@ window.cvGenerar=function(){
       if(ft&&vX.st&&ft.substring(0,10)<vX.st)ft=vX.st+' 00:00';
       if(ft&&vX.en&&ft.substring(0,10)>vX.en)ft=vX.en+' 00:00';
       var au=ca(rw.pin)||ca(rw.aut);
-      if(ic(rw.cups)){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:rw.cups,modalidadGrupoServicioTecSal:'01',grupoServicios:'01',codServicio:371,finalidadTecnologiaSalud:'15',causaMotivoAtencion:'26',codDiagnosticoPrincipal:c10,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:0,numFEVPagoModerador:null,conceptoRecaudo:'05',consecutivo:ci2++});}
-      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:rw.cups,viaIngresoServicioSalud:'01',modalidadGrupoServicioTecSal:'01',grupoServicios:'01',codServicio:371,finalidadTecnologiaSalud:'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:c10,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:'05',valorPagoModerador:0,numFEVPagoModerador:null,consecutivo:pi++});}
+      var cups=cups6(rw.cups);if(ic(cups)){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:'01',grupoServicios:'01',codServicio:371,finalidadTecnologiaSalud:'15',causaMotivoAtencion:'26',codDiagnosticoPrincipal:c10,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:0,numFEVPagoModerador:null,conceptoRecaudo:'05',consecutivo:ci2++});}
+      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:'01',modalidadGrupoServicioTecSal:'01',grupoServicios:'01',codServicio:371,finalidadTecnologiaSalud:'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:c10,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:'05',valorPagoModerador:0,numFEVPagoModerador:null,consecutivo:pi++});}
     });
     return{tipoDocumentoIdentificacion:p.td,numDocumentoIdentificacion:p.doc,tipoUsuario:tu,fechaNacimiento:nac,codSexo:sx,codPaisResidencia:'170',codMunicipioResidencia:mn,codZonaTerritorialResidencia:'01',incapacidad:'NO',codPaisOrigen:'170',consecutivo:idx+1,servicios:{consultas:cs.length?cs:null,procedimientos:ps.length?ps:null}};
   });
@@ -1184,129 +1308,47 @@ window.cvLimpiar=function(){
 
 // === CORRECTOR CUPS ===
 (function(){
-
-// Mapeo CUPS -> datos completos
-// Estructura: CUPS: [tipoServicio, tipoProcedimiento, causaExterna, actoQuirurgico, ambito, cie10]
-// tipoServicio: 01=Consulta, 02=Procedimiento, 03=Urgencias, 04=Hospitalización, 05=Recién nacido
-// tipoProcedimiento: 01=Diagnóstico, 02=Terapéutico, 03=Mixto, 04=Rehabilitación, 05=Protección específica
-// causaExterna: 13=Enfermedad general, 17=Accidente trabajo, 21=Accidente tránsito, 27=Lesión autoprovocada
-// actoQuirurgico: 1=Sí, 2=No
-// ambito: 01=Ambulatorio, 02=Hospitalario, 03=Urgencias, 04=Domiciliario
-var CUPS_DATA = {
-  // Consultas odontológicas (tipoServicio=01, tipoProcedimiento=01)
-  '890203':['01','01','13','2','01','K021'],
-  '890204':['01','01','13','2','01','K021'],
-  '890217':['01','01','13','2','01','K051'],
-  '890218':['01','01','13','2','01','K051'],
-  '890219':['01','01','13','2','01','K051'],
-  '890220':['01','01','13','2','01','K088'],
-  '890221':['01','01','13','2','01','K053'],
-  '890222':['01','01','13','2','01','K088'],
-  '890224':['01','01','13','2','01','K088'],
-  '890225':['01','01','13','2','01','K088'],
-  '890303':['01','01','13','2','01','K021'],
-  '890304':['01','01','13','2','01','K021'],
-  '890317':['01','01','13','2','01','K088'],
-  '890324':['01','01','13','2','01','K088'],
-  '1000034':['01','01','13','2','01','K088'],
-  // Endodoncia (tipoServicio=02, tipoProcedimiento=02)
-  '237101':['02','02','13','2','01','K040'],
-  '237102':['02','02','13','2','01','K040'],
-  '237201':['02','02','13','2','01','K045'],
-  '237301':['02','02','13','2','01','K041'],
-  '237302':['02','02','13','2','01','K041'],
-  '237303':['02','02','13','2','01','K041'],
-  '237304':['02','02','13','2','01','K040'],
-  '237305':['02','02','13','2','01','K041'],
-  '237307':['02','02','13','2','01','K041'],
-  '237401':['02','02','13','1','01','K046'],
-  '237901':['02','02','13','2','01','K037'],
-  '237903':['02','02','13','2','01','K037'],
-  // Operatoria
-  '232101':['02','02','13','2','01','K021'],
-  '232102':['02','02','13','2','01','K021'],
-  '232103':['02','02','13','2','01','K021'],
-  '1005308':['02','02','13','2','01','K021'],
-  '1005309':['02','02','13','2','01','K021'],
-  '1005310':['02','02','13','2','01','K021'],
-  '1005311':['02','02','13','2','01','K021'],
-  '1005312':['02','02','13','2','01','K021'],
-  '1005313':['02','02','13','2','01','K021'],
-  // Prótesis
-  '234101':['02','02','13','2','01','K083'],
-  '234103':['02','02','13','2','01','K083'],
-  '234106':['02','02','13','2','01','K083'],
-  '234201':['02','02','13','2','01','K081'],
-  '234301':['02','02','13','2','01','K081'],
-  '234302':['02','02','13','2','01','K081'],
-  '234303':['02','02','13','2','01','K081'],
-  '234401':['02','02','13','2','01','K081'],
-  '234402':['02','02','13','2','01','K081'],
-  '234403':['02','02','13','2','01','K081'],
-  '233101':['02','02','13','2','01','K083'],
-  '233201':['02','02','13','2','01','K083'],
-  '1005333':['02','02','13','2','01','K083'],
-  '1005350':['02','02','13','2','01','K083'],
-  // Cirugía
-  '230103':['02','02','13','1','01','K029'],
-  '230203':['02','02','13','1','01','K006'],
-  '231100':['02','02','13','1','01','K029'],
-  '231201':['02','02','13','1','01','K029'],
-  '231301':['02','02','13','1','01','K011'],
-  '231401':['02','02','13','1','01','K011'],
-  '231500':['02','02','13','1','01','K010'],
-  '1005277':['02','02','13','1','01','K011'],
-  '1005278':['02','02','13','1','01','K011'],
-  '255006':['02','02','13','1','01','K130'],
-  '274101':['02','02','13','1','01','K130'],
-  '270101':['02','02','13','1','01','K122'],
-  '243502':['02','02','13','1','01','K102'],
-  // Periodoncia
-  '240300':['02','02','13','2','01','K053'],
-  '242101':['02','02','13','1','01','K053'],
-  '242103':['02','02','13','1','01','K053'],
-  '242201':['02','02','13','1','01','K053'],
-  '1005374':['02','02','13','1','01','K053'],
-  '1005544':['02','02','13','1','01','K053'],
-  // Ortodoncia
-  '247101':['02','04','13','2','01','K073'],
-  '247301':['02','04','13','2','01','K073'],
-  '893106':['02','04','13','2','01','K073'],
-  '893107':['02','04','13','2','01','K073'],
-  '1005385':['02','04','13','2','01','K073'],
-  '1005386':['02','04','13','2','01','K073'],
-  '1005387':['02','04','13','2','01','K073'],
-  '1005388':['02','04','13','2','01','K073'],
-  '1005389':['02','04','13','2','01','K073'],
-  '1005390':['02','04','13','2','01','K073'],
-  '1005391':['02','04','13','2','01','K073'],
-  '1005392':['02','04','13','2','01','K073'],
-  '1005393':['02','04','13','2','01','K073'],
-  '1005394':['02','04','13','2','01','K073'],
-  '1005421':['02','04','13','2','01','K073'],
-  // Prevención
-  '997103':['02','05','13','2','01','K020'],
-  '997105':['02','05','13','2','01','K020'],
-  '997301':['02','05','13','2','01','K036'],
-  // Radiología
-  '870114':['02','01','13','2','01','K088'],
-  '870440':['02','01','13','2','01','K088'],
-  '870451':['02','01','13','2','01','K088'],
-  '870452':['02','01','13','2','01','K088'],
-  '870453':['02','01','13','2','01','K088'],
-  '870454':['02','01','13','2','01','K088'],
-  '870460':['02','01','13','2','01','K088'],
-  // Implantes
-  '236300':['02','02','13','1','01','K081']
+var CUPS_DATA={
+  '890203':['01','01','13','2','01','K021'],'890204':['01','01','13','2','01','K021'],
+  '890217':['01','01','13','2','01','K051'],'890218':['01','01','13','2','01','K051'],
+  '890219':['01','01','13','2','01','K051'],'890220':['01','01','13','2','01','K088'],
+  '890221':['01','01','13','2','01','K053'],'890222':['01','01','13','2','01','K088'],
+  '890224':['01','01','13','2','01','K088'],'890225':['01','01','13','2','01','K088'],
+  '890303':['01','01','13','2','01','K021'],'890304':['01','01','13','2','01','K021'],
+  '890317':['01','01','13','2','01','K088'],'890324':['01','01','13','2','01','K088'],
+  '237101':['02','02','13','2','01','K040'],'237102':['02','02','13','2','01','K040'],
+  '237201':['02','02','13','2','01','K045'],'237301':['02','02','13','2','01','K041'],
+  '237302':['02','02','13','2','01','K041'],'237303':['02','02','13','2','01','K041'],
+  '237304':['02','02','13','2','01','K040'],'237305':['02','02','13','2','01','K041'],
+  '237307':['02','02','13','2','01','K041'],'237401':['02','02','13','1','01','K046'],
+  '237901':['02','02','13','2','01','K037'],'237903':['02','02','13','2','01','K037'],
+  '232101':['02','02','13','2','01','K021'],'232102':['02','02','13','2','01','K021'],
+  '232103':['02','02','13','2','01','K021'],'234101':['02','02','13','2','01','K083'],
+  '234103':['02','02','13','2','01','K083'],'234106':['02','02','13','2','01','K083'],
+  '234201':['02','02','13','2','01','K081'],'234301':['02','02','13','2','01','K081'],
+  '234302':['02','02','13','2','01','K081'],'234303':['02','02','13','2','01','K081'],
+  '234401':['02','02','13','2','01','K081'],'234402':['02','02','13','2','01','K081'],
+  '234403':['02','02','13','2','01','K081'],'233101':['02','02','13','2','01','K083'],
+  '233201':['02','02','13','2','01','K083'],'230103':['02','02','13','1','01','K029'],
+  '230203':['02','02','13','1','01','K006'],'231100':['02','02','13','1','01','K029'],
+  '231201':['02','02','13','1','01','K029'],'231301':['02','02','13','1','01','K011'],
+  '231401':['02','02','13','1','01','K011'],'231500':['02','02','13','1','01','K010'],
+  '255006':['02','02','13','1','01','K130'],'274101':['02','02','13','1','01','K130'],
+  '270101':['02','02','13','1','01','K122'],'243502':['02','02','13','1','01','K102'],
+  '240300':['02','02','13','2','01','K053'],'242101':['02','02','13','1','01','K053'],
+  '242103':['02','02','13','1','01','K053'],'242201':['02','02','13','1','01','K053'],
+  '247101':['02','04','13','2','01','K073'],'247301':['02','04','13','2','01','K073'],
+  '893106':['02','04','13','2','01','K073'],'997103':['02','05','13','2','01','K020'],
+  '997105':['02','05','13','2','01','K020'],'997301':['02','05','13','2','01','K036'],
+  '870114':['02','01','13','2','01','K088'],'870440':['02','01','13','2','01','K088'],
+  '870451':['02','01','13','2','01','K088'],'870454':['02','01','13','2','01','K088'],
+  '870460':['02','01','13','2','01','K088'],'236300':['02','02','13','1','01','K081']
 };
-
-var ccWb=null, ccRows=null, ccResult=null;
-
+var ccWb=null,ccRows=null,ccResult=null;
 document.addEventListener('DOMContentLoaded',function(){
   var inp=document.getElementById('cc-inp');
   if(inp)inp.addEventListener('change',function(){if(this.files[0])ccCargar(this.files[0]);});
 });
-
 window.ccCargar=function(f){
   var errEl=document.getElementById('cc-err');errEl.style.display='none';
   var rd=new FileReader();
@@ -1317,15 +1359,12 @@ window.ccCargar=function(f){
       var ws=ccWb.Sheets[ccWb.SheetNames[0]];
       ccRows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
       var nRows=ccRows.filter(function(r){return r.some(function(c){return String(c).trim()!='';});}).length;
-      var nCols=ccRows[0]?ccRows[0].length:0;
       document.getElementById('cc-out').innerHTML=
         '<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+
         '<div><div style="font-size:.65rem;text-transform:uppercase;color:var(--gray-400);margin-bottom:2px;">Filas</div><div style="font-size:.85rem;font-weight:700;font-family:var(--mono);">'+nRows+'</div></div>'+
-        '<div><div style="font-size:.65rem;text-transform:uppercase;color:var(--gray-400);margin-bottom:2px;">Columnas</div><div style="font-size:.85rem;font-weight:700;font-family:var(--mono);">'+nCols+'</div></div>'+
+        '<div><div style="font-size:.65rem;text-transform:uppercase;color:var(--gray-400);margin-bottom:2px;">Columnas</div><div style="font-size:.85rem;font-weight:700;font-family:var(--mono);">'+(ccRows[0]?ccRows[0].length:0)+'</div></div>'+
         '<div><div style="font-size:.65rem;text-transform:uppercase;color:var(--gray-400);margin-bottom:2px;">Archivo</div><div style="font-size:.75rem;font-weight:700;">'+f.name+'</div></div>'+
-        '</div>'+
-        '<div style="background:var(--blue-light);border:1px solid rgba(41,171,226,.2);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--blue-dark);margin-top:8px;">'+
-        'Verifica que el número de columna del CUPS sea correcto (0 = primera columna). El sistema agregará columnas al final con los datos corregidos.</div>';
+        '</div><div style="background:var(--blue-light);border:1px solid rgba(41,171,226,.2);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--blue-dark);margin-top:8px;">Verifica la columna del CUPS. Se agregarán columnas al final con los datos corregidos.</div>';
       var n=document.getElementById('ccn1');
       if(n){n.style.background='var(--green)';n.style.borderColor='var(--green)';n.style.color='#fff';}
       var s=document.getElementById('ccs1');if(s){s.style.color='var(--green)';s.textContent='OK '+nRows+' filas';}
@@ -1334,67 +1373,42 @@ window.ccCargar=function(f){
   };
   rd.readAsArrayBuffer(f);
 };
-
 window.ccProcesar=function(){
   if(!ccRows||!ccWb)return;
   var colCups=parseInt(document.getElementById('cc-col').value)||0;
   var startRow=parseInt(document.getElementById('cc-row').value)||1;
-
-  var ok=0,noEncontrado=0,total=0;
-  var ws=ccWb.Sheets[ccWb.SheetNames[0]];
-  var maxCol=ccRows[0]?ccRows[0].length:0;
-
-  // Agregar encabezados en la fila 0
+  var ok=0,noEnc=0,total=0;
   var hdrRow=startRow-1;
   if(hdrRow>=0&&ccRows[hdrRow]){
-    while(ccRows[hdrRow].length<maxCol)ccRows[hdrRow].push('');
-    ccRows[hdrRow].push('TIPO_SERVICIO','TIPO_PROCEDIMIENTO','CAUSA_EXTERNA','ACTO_QUIRURGICO','AMBITO','CIE10_PRINCIPAL','ESTADO_CUPS');
+    ccRows[hdrRow].push('TIPO_SERVICIO','TIPO_PROCEDIMIENTO','CAUSA_EXTERNA','ACTO_QUIRURGICO','AMBITO','CIE10','ESTADO');
   }
-
   for(var i=startRow;i<ccRows.length;i++){
     var row=ccRows[i];
     if(!row||!row.some(function(c){return String(c).trim()!=='';}))continue;
-    var cups=String(row[colCups]||'').trim();
+    var cups=cups6(String(row[colCups]||'').trim());
     if(!cups){continue;}
     total++;
-    while(row.length<maxCol)row.push('');
     var datos=CUPS_DATA[cups];
-    if(datos){
-      row.push(datos[0],datos[1],datos[2],datos[3],datos[4],datos[5],'OK');
-      ok++;
-    }else{
-      row.push('','','','','','','NO ENCONTRADO');
-      noEncontrado++;
-    }
+    if(datos){row.push(datos[0],datos[1],datos[2],datos[3],datos[4],datos[5],'OK');ok++;}
+    else{row.push('','','13','2','01','K088','SIN DATOS');noEnc++;}
   }
-
-  // Reconstruir worksheet
   var newWs=XLSX.utils.aoa_to_sheet(ccRows);
   ccWb.Sheets[ccWb.SheetNames[0]]=newWs;
   ccResult=ccWb;
-
-  document.getElementById('cc-res-sub').textContent=
-    total+' procedimientos procesados — '+ok+' corregidos — '+noEncontrado+' no encontrados en catálogo';
+  document.getElementById('cc-res-sub').textContent=total+' procedimientos — '+ok+' corregidos — '+noEnc+' sin datos exactos';
   document.getElementById('cc-result').style.display='block';
   document.getElementById('cc-result').scrollIntoView({behavior:'smooth',block:'start'});
 };
-
-window.ccDescargar=function(){
-  if(!ccResult)return;
-  XLSX.writeFile(ccResult,'CUPS_corregido.xlsx');
-};
-
+window.ccDescargar=function(){if(!ccResult)return;XLSX.writeFile(ccResult,'CUPS_corregido.xlsx');};
 window.ccLimpiar=function(){
   ccWb=null;ccRows=null;ccResult=null;
   var inp=document.getElementById('cc-inp');if(inp)inp.value='';
   document.getElementById('cc-out').innerHTML='';
   document.getElementById('cc-result').style.display='none';
-  var n=document.getElementById('ccn1');
-  if(n){n.style.background='';n.style.borderColor='';n.style.color='';}
+  var n=document.getElementById('ccn1');if(n){n.style.background='';n.style.borderColor='';n.style.color='';}
   var s=document.getElementById('ccs1');if(s){s.style.color='';s.textContent='Pendiente';}
   var btn=document.getElementById('cc-btn');if(btn){btn.disabled=true;btn.style.opacity='.4';}
 };
-
 })();
 // === FIN CORRECTOR CUPS ===
 </script>
