@@ -277,6 +277,23 @@ tr.row-i td{background:#F0FDF4!important;}
       <div class="card-title">🔗 Mapeo de columnas</div>
       <div class="card-sub">Indique cómo están organizados los nombres en su archivo y asigne cada columna fuente al campo correspondiente. Los campos con <span style="color:var(--red)">*</span> son obligatorios.</div>
 
+      <!-- Selector de fila de títulos -->
+      <div style="background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:9px;
+           padding:11px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--blue-dark);">
+          ¿En qué fila están los títulos de las columnas?
+        </span>
+        <div style="display:flex;gap:6px;">
+          <button class="mode-btn" id="hr-btn-0" onclick="changeHeaderRow(0)" title="Sin títulos">Sin títulos</button>
+          <button class="mode-btn" id="hr-btn-1" onclick="changeHeaderRow(1)">Fila 1</button>
+          <button class="mode-btn" id="hr-btn-2" onclick="changeHeaderRow(2)">Fila 2</button>
+          <button class="mode-btn" id="hr-btn-3" onclick="changeHeaderRow(3)">Fila 3</button>
+        </div>
+        <span style="font-size:.72rem;color:var(--blue-dark);opacity:.7;">
+          Si su archivo no tiene títulos, seleccione "Sin títulos" y la app usará Columna 1, Columna 2…
+        </span>
+      </div>
+
       <!-- Vista previa datos cargados -->
       <div class="raw-preview-wrap" id="raw-preview-wrap"></div>
 
@@ -527,15 +544,14 @@ const NAMES_M = new Set(['CARLOS','JUAN','LUIS','JOSE','JORGE','PEDRO','MIGUEL',
 
 // ─── ESTADO ─────────────────────────────────────────────────────────────────
 const st = {
+  matrix: [],              // array de arrays (todas las filas, sin procesar)
   raw: [], headers: [], filename: '',
-  nameMode: 'sep',         // 'full' | 'two' | 'sep'
+  headerRow: 1,            // fila donde están los títulos (1-based)
+  nameMode: 'sep',
   fullCol: '', nombresCol: '', apellidosCol: '',
-  fieldMap: {},            // fieldId → sourceColumn
-  processed: [],           // final rows (objects with OUT field ids)
-  findings: [],            // [{rowNum, type, campo, msg}]
-  filtered: [],
-  sortCol: null, sortDir: 'asc',
-  page: 1,
+  fieldMap: {},
+  processed: [], findings: [], filtered: [],
+  sortCol: null, sortDir: 'asc', page: 1,
 };
 const PAGE = 50;
 
@@ -554,8 +570,8 @@ function loadFile(file){
 
   if(n.endsWith('.csv')||n.endsWith('.txt')){
     Papa.parse(file,{
-      header:true, skipEmptyLines:true, encoding:'UTF-8',
-      complete: r => onData(r.data, r.meta.fields||[], file.name),
+      header:false, skipEmptyLines:false, encoding:'UTF-8',
+      complete: r => onMatrix(r.data, file.name),
       error: e => toast('Error al leer: '+e.message,'err'),
     });
   } else {
@@ -564,26 +580,81 @@ function loadFile(file){
       try{
         const wb = XLSX.read(e.target.result,{type:'array',cellDates:true,raw:false});
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
-        const hdrs = rows.length ? Object.keys(rows[0]) : [];
-        onData(rows, hdrs, file.name);
+        const matrix = XLSX.utils.sheet_to_json(ws,{header:1, defval:'', raw:false});
+        onMatrix(matrix, file.name);
       }catch(er){ toast('Error Excel: '+er.message,'err'); }
     };
     rd.readAsArrayBuffer(file);
   }
 }
 
-function onData(rows, headers, filename){
-  st.raw = rows; st.headers = headers;
+// Recibe la matriz cruda (array de arrays) y detecta automáticamente la fila de títulos
+function onMatrix(matrix, filename){
+  st.matrix = matrix.map(r => Array.isArray(r) ? r : Object.values(r));
+  // Auto-detectar fila de títulos: buscar la primera fila con más de la mitad de celdas no vacías
+  let bestRow = 0;
+  for(let i=0; i<Math.min(5, st.matrix.length); i++){
+    const row = st.matrix[i];
+    const filled = row.filter(c=>String(c||'').trim().length>0).length;
+    if(filled > (row.length * 0.5)){ bestRow = i; break; }
+  }
+  st.headerRow = bestRow + 1;
+  applyHeaderRow(st.headerRow);
+
   const dz = document.getElementById('drop-zone');
   dz.classList.add('loaded');
   document.getElementById('drop-icon').textContent = '✅';
   document.getElementById('drop-title').textContent = filename;
   const li = document.getElementById('loaded-info');
   li.classList.remove('hidden');
-  li.textContent = `${rows.length} filas · ${headers.length} columnas detectadas`;
+  li.textContent = `${st.raw.length} filas de datos · ${st.headers.length} columnas detectadas`;
   document.getElementById('btn-step1').disabled = false;
-  toast(`Archivo cargado: ${rows.length} filas`,'ok');
+  toast(`Archivo cargado: ${st.raw.length} filas`,'ok');
+}
+
+// Aplica una fila como encabezado y construye st.headers y st.raw
+function applyHeaderRow(rowNum){
+  st.headerRow = rowNum;
+  const idx = rowNum - 1;
+  if(idx < 0 || idx >= st.matrix.length){ return; }
+
+  // La fila seleccionada son los títulos
+  const rawHeaders = st.matrix[idx];
+  st.headers = rawHeaders.map((h,i) => {
+    const s = String(h||'').trim();
+    return s || `Columna_${i+1}`;
+  });
+
+  // Las filas de datos son las que vienen DESPUÉS de la fila de títulos
+  st.raw = st.matrix.slice(idx+1)
+    .filter(row => row.some(c => String(c||'').trim() !== ''))  // omitir filas vacías
+    .map(row => {
+      const obj = {};
+      st.headers.forEach((h,i) => { obj[h] = String(row[i]??'').trim(); });
+      return obj;
+    });
+}
+
+// Cambia la fila de títulos (llamado desde el selector en el UI)
+function changeHeaderRow(n){
+  const num = parseInt(n);
+  if(num === 0){
+    // Sin títulos: usar Columna_1, Columna_2, ...
+    const cols = st.matrix[0]?.length || 0;
+    st.headers = Array.from({length:cols},(_,i)=>`Columna_${i+1}`);
+    st.raw = st.matrix
+      .filter(row => row.some(c=>String(c||'').trim()!==''))
+      .map(row=>{
+        const obj={};
+        st.headers.forEach((h,i)=>{ obj[h]=String(row[i]??'').trim(); });
+        return obj;
+      });
+    st.headerRow = 0;
+  } else {
+    applyHeaderRow(num);
+  }
+  st.fieldMap={}; st.fullCol=''; st.nombresCol=''; st.apellidosCol='';
+  buildMappingUI();
 }
 
 // ─── PASOS ────────────────────────────────────────────────────────────────
@@ -715,6 +786,11 @@ function renderNameInputs(){
 }
 
 function buildMappingUI(){
+  // Marcar botón de fila de títulos activo
+  [0,1,2,3].forEach(i=>{
+    const b=document.getElementById('hr-btn-'+i);
+    if(b) b.classList.toggle('active', st.headerRow===i);
+  });
   autoDetect();
   renderRawPreview();
   ['full','two','sep'].forEach(x=>document.getElementById('nm-'+x).classList.toggle('active',x===st.nameMode));
