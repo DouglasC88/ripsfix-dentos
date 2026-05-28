@@ -837,6 +837,21 @@ function parseDate(val){
   const d=new Date(s); return isNaN(d.getTime())?null:d;
 }
 
+// Deja solo dígitos — elimina espacios, letras, guiones, paréntesis, etc.
+function onlyDigits(val){
+  return String(val??'').replace(/[^\d]/g,'');
+}
+// Aplica onlyDigits y registra hallazgo si hubo cambio
+function cleanNum(val, campo, rowFindings){
+  const orig = clean(val);
+  if(!orig) return '';
+  const result = onlyDigits(orig);
+  if(result !== orig){
+    rowFindings.push({type:'info', campo, msg:`Caracteres no numéricos eliminados: "${orig}" → "${result}"`});
+  }
+  return result;
+}
+
 function fmtDate(val){
   const d=parseDate(val); if(!d) return clean(val??'');
   const y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
@@ -948,9 +963,7 @@ function processData(){
     }
     out.tipo_documento = tipoDoc;
 
-    // DOCUMENTO
-    out.documento = docNum;
-    if(!docNum) rowFindings.push({type:'err',campo:'Documento',msg:'Número de documento vacío.'});
+    // DOCUMENTO — la limpieza numérica se hace más abajo junto a los otros campos numéricos
 
     // FECHA NACIMIENTO (regla 6)
     const fechaNacOrig = getVal(row, st.fieldMap.fecha_nacimiento);
@@ -988,18 +1001,31 @@ function processData(){
     if(frOrig && frFmt !== clean(frOrig))
       rowFindings.push({type:'info',campo:'Fecha Registro',msg:`Reformateada: "${frOrig}" → "${frFmt}"`});
 
-    // CAMPOS SIMPLES (regla 7: remover saltos de línea)
-    const simpleMap = {
-      direccion:'direccion', telefono:'telefono', celular:'celular', email:'email',
-      ocupacion:'ocupacion', lugar_nacimiento:'lugar_nacimiento', empresa:'empresa',
-      telefono_empresa:'telefono_empresa', nombre_acompanante:'nombre_acompanante',
-      parentesco:'parentesco', tel_acompanante:'tel_acompanante',
-      cel_acompanante:'cel_acompanante', remitido:'remitido', zona:'zona',
-      nacionalidad:'nacionalidad', estado_civil:'estado_civil', observacion:'observacion',
+    // DOCUMENTO — solo dígitos (regla 7 + limpieza numérica)
+    out.documento = cleanNum(docNum, 'Documento', rowFindings);
+    if(!out.documento) rowFindings.push({type:'err',campo:'Documento',msg:'Número de documento vacío.'});
+
+    // CAMPOS NUMÉRICOS — eliminar espacios y letras
+    const numFields = {
+      telefono:'telefono', celular:'celular',
+      telefono_empresa:'telefono_empresa',
+      tel_acompanante:'tel_acompanante', cel_acompanante:'cel_acompanante',
+    };
+    for(const [outId, mapId] of Object.entries(numFields)){
+      out[outId] = cleanNum(getVal(row, st.fieldMap[mapId]), OUT.find(f=>f.id===outId)?.label||outId, rowFindings);
+    }
+
+    // CAMPOS TEXTO SIMPLES (regla 7: remover saltos de línea)
+    const textFields = {
+      direccion:'direccion', email:'email', ocupacion:'ocupacion',
+      lugar_nacimiento:'lugar_nacimiento', empresa:'empresa',
+      nombre_acompanante:'nombre_acompanante', parentesco:'parentesco',
+      remitido:'remitido', zona:'zona', nacionalidad:'nacionalidad',
+      estado_civil:'estado_civil', observacion:'observacion',
       eps:'eps', tipo_eps:'tipo_eps', tipo_afiliacion:'tipo_afiliacion',
       facebook:'facebook', instagram:'instagram', twitter:'twitter',
     };
-    for(const [outId, mapId] of Object.entries(simpleMap)){
+    for(const [outId, mapId] of Object.entries(textFields)){
       out[outId] = getVal(row, st.fieldMap[mapId]);
     }
 
