@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organizador de Migraciones de Pacientes</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --blue:#29ABE2; --blue-dark:#1B7FC4; --blue-light:#E8F6FD; --blue-mid:#D0EEFA;
+  --white:#FFFFFF; --gray-50:#F8FAFC; --gray-100:#F0F4F8; --gray-200:#E2EAF0;
+  --gray-300:#C8D6E0; --gray-400:#9AB4C8; --gray-500:#6B8599; --gray-700:#3D5468; --gray-900:#1A2E3D;
+  --green:#22C55E; --green-light:#F0FDF4; --yellow:#F59E0B; --yellow-light:#FFFBEB;
+  --red:#EF4444; --red-light:#FEF2F2; --purple:#8B5CF6; --orange:#F97316;
+  --shadow-sm:0 1px 3px rgba(41,171,226,.1),0 1px 2px rgba(0,0,0,.05);
+  --shadow:0 4px 16px rgba(41,171,226,.12),0 2px 8px rgba(0,0,0,.05);
+  --shadow-lg:0 10px 40px rgba(41,171,226,.15),0 4px 16px rgba(0,0,0,.07);
+  --radius:12px; --mono:'Courier New',monospace;
+  --sans:'Nunito Sans',sans-serif; --display:'Nunito',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--gray-50);color:var(--gray-900);min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(41,171,226,.07) 0%,transparent 70%);}
+
+/* ── HEADER ── */
+.app-header{background:var(--white);border-bottom:1px solid var(--gray-200);box-shadow:var(--shadow-sm);
+  padding:0 28px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.header-brand{display:flex;align-items:center;gap:10px;}
+.brand-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--blue),var(--blue-dark));
+  border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.brand-text h1{font-family:var(--display);font-size:1.05rem;font-weight:800;color:var(--gray-900);}
+.brand-text h1 span{color:var(--blue);}
+.brand-text p{font-size:.68rem;color:var(--gray-500);}
+.header-actions{display:flex;align-items:center;gap:8px;}
+.btn-header{padding:6px 14px;border-radius:8px;font-family:var(--display);font-size:.76rem;font-weight:700;
+  cursor:pointer;transition:all .2s;border:none;}
+.btn-export-csv{background:var(--green-light);color:#15803D;border:1.5px solid #BBF7D0;}
+.btn-export-csv:hover{background:#DCFCE7;}
+.btn-export-xlsx{background:var(--blue-light);color:var(--blue-dark);border:1.5px solid var(--blue-mid);}
+.btn-export-xlsx:hover{background:var(--blue-mid);}
+.btn-export-csv:disabled,.btn-export-xlsx:disabled{opacity:.4;cursor:not-allowed;}
+.btn-reset{padding:6px 12px;background:var(--white);border:1.5px solid var(--gray-200);color:var(--gray-500);
+  border-radius:8px;font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;transition:all .2s;}
+.btn-reset:hover{border-color:var(--red);color:var(--red);}
+
+/* ── LAYOUT ── */
+.app-body{max-width:1400px;margin:0 auto;padding:24px 20px 60px;}
+
+/* ── UPLOAD ZONE ── */
+.upload-section{margin-bottom:20px;}
+.drop-zone{border:2px dashed var(--gray-300);border-radius:var(--radius);background:var(--white);
+  padding:48px 20px;text-align:center;cursor:pointer;transition:all .25s;position:relative;}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--blue);background:var(--blue-light);}
+.drop-zone.has-file{border-style:solid;border-color:var(--green);background:var(--green-light);}
+.drop-icon{font-size:2.8rem;margin-bottom:12px;display:block;}
+.drop-title{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--gray-700);margin-bottom:6px;}
+.drop-sub{font-size:.8rem;color:var(--gray-500);}
+.drop-sub span{color:var(--blue);font-weight:700;cursor:pointer;}
+.drop-sub span:hover{text-decoration:underline;}
+.drop-formats{display:flex;gap:6px;justify-content:center;margin-top:10px;}
+.fmt-badge{font-size:.67rem;font-weight:700;padding:3px 9px;border-radius:20px;
+  background:var(--gray-100);color:var(--gray-500);border:1px solid var(--gray-200);}
+#file-input{display:none;}
+.file-info{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;
+  font-size:.8rem;color:#15803D;font-weight:600;}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
+.stat-card{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);
+  padding:14px 10px;text-align:center;box-shadow:var(--shadow-sm);}
+.stat-card .s-icon{font-size:1.3rem;margin-bottom:4px;}
+.stat-card .s-num{font-family:var(--display);font-size:1.6rem;font-weight:800;line-height:1.1;}
+.stat-card .s-label{font-size:.6rem;color:var(--gray-500);text-transform:uppercase;
+  letter-spacing:.07em;font-weight:700;margin-top:3px;}
+.s-num.blue{color:var(--blue);} .s-num.green{color:var(--green);}
+.s-num.red{color:var(--red);} .s-num.yellow{color:var(--yellow);}
+.s-num.purple{color:var(--purple);} .s-num.orange{color:var(--orange);}
+
+/* ── TOOLBAR ── */
+.toolbar{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);
+  padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:var(--shadow-sm);}
+.search-wrap{flex:1;min-width:200px;position:relative;}
+.search-wrap input{width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--gray-200);
+  border-radius:8px;font-size:.82rem;color:var(--gray-900);outline:none;transition:border-color .2s;background:var(--gray-50);}
+.search-wrap input:focus{border-color:var(--blue);background:var(--white);box-shadow:0 0 0 3px rgba(41,171,226,.12);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:.85rem;color:var(--gray-400);}
+.filter-group{display:flex;align-items:center;gap:6px;}
+.filter-label{font-size:.73rem;font-weight:700;color:var(--gray-500);}
+select.filter-select{padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:8px;
+  font-size:.78rem;color:var(--gray-700);background:var(--white);outline:none;cursor:pointer;transition:border-color .2s;}
+select.filter-select:focus{border-color:var(--blue);}
+.filter-btn{padding:7px 13px;border-radius:8px;font-family:var(--display);font-size:.73rem;
+  font-weight:700;cursor:pointer;transition:all .15s;border:1.5px solid var(--gray-200);
+  background:var(--white);color:var(--gray-700);}
+.filter-btn.active{background:var(--red-light);color:var(--red);border-color:#FECACA;}
+.filter-btn:hover:not(.active){border-color:var(--blue);color:var(--blue);}
+.rows-count{font-size:.73rem;color:var(--gray-500);white-space:nowrap;font-weight:600;}
+
+/* ── TABLE ── */
+.table-wrap{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);
+  overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:14px;}
+.table-scroll{overflow-x:auto;max-height:520px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:.74rem;}
+thead{position:sticky;top:0;z-index:10;}
+th{background:var(--gray-50);border-bottom:2px solid var(--gray-200);padding:9px 12px;
+  text-align:left;font-size:.65rem;font-weight:700;color:var(--gray-500);
+  text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;cursor:pointer;user-select:none;}
+th:hover{background:var(--blue-light);color:var(--blue);}
+th.sorted-asc::after{content:" ▲";color:var(--blue);}
+th.sorted-desc::after{content:" ▼";color:var(--blue);}
+td{padding:7px 12px;border-bottom:1px solid var(--gray-100);vertical-align:middle;
+  max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gray-700);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--blue-light);}
+tr.row-error td{background:#FEF2F2 !important;}
+tr.row-warn td{background:#FFFBEB !important;}
+.row-num{font-family:var(--mono);font-size:.65rem;color:var(--gray-400);width:40px;}
+.cell-error{color:var(--red);font-weight:700;}
+.cell-warn{color:#92400E;font-weight:700;}
+.cell-ok{color:var(--green);font-weight:600;}
+.badge-doc{font-family:var(--mono);font-size:.67rem;background:var(--blue-light);
+  color:var(--blue-dark);padding:2px 6px;border-radius:4px;font-weight:700;}
+.badge-err{font-size:.6rem;background:var(--red-light);color:var(--red);padding:1px 5px;
+  border-radius:3px;font-weight:700;margin-left:4px;}
+.badge-warn{font-size:.6rem;background:var(--yellow-light);color:#92400E;padding:1px 5px;
+  border-radius:3px;font-weight:700;margin-left:4px;}
+
+/* ── EMPTY / PLACEHOLDER ── */
+.empty-state{text-align:center;padding:60px 20px;color:var(--gray-400);}
+.empty-state .e-icon{font-size:3rem;margin-bottom:12px;display:block;}
+.empty-state p{font-size:.85rem;}
+
+/* ── COLUMN MAPPING ── */
+.mapping-section{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);
+  padding:18px 22px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
+.mapping-title{font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--gray-900);
+  margin-bottom:4px;display:flex;align-items:center;gap:7px;}
+.mapping-sub{font-size:.75rem;color:var(--gray-500);margin-bottom:14px;}
+.mapping-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+.map-item{display:flex;flex-direction:column;gap:4px;}
+.map-label{font-size:.68rem;font-weight:700;color:var(--gray-700);text-transform:uppercase;letter-spacing:.05em;}
+.map-label .req{color:var(--red);}
+select.map-select{padding:6px 10px;border:1.5px solid var(--gray-200);border-radius:7px;
+  font-size:.77rem;color:var(--gray-900);background:var(--white);outline:none;cursor:pointer;}
+select.map-select:focus{border-color:var(--blue);}
+select.map-select.mapped{border-color:var(--green);background:var(--green-light);}
+select.map-select.unmapped-req{border-color:var(--red);background:var(--red-light);}
+.btn-apply-map{margin-top:12px;padding:9px 20px;background:var(--blue);color:var(--white);
+  border:none;border-radius:9px;font-family:var(--display);font-size:.82rem;font-weight:700;
+  cursor:pointer;transition:all .2s;box-shadow:0 3px 10px rgba(41,171,226,.3);}
+.btn-apply-map:hover{background:var(--blue-dark);transform:translateY(-1px);}
+
+/* ── PAGINATION ── */
+.pagination{display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 16px;
+  background:var(--white);border-top:1px solid var(--gray-200);}
+.page-btn{padding:5px 11px;border:1.5px solid var(--gray-200);border-radius:7px;
+  font-family:var(--display);font-size:.74rem;font-weight:700;cursor:pointer;
+  background:var(--white);color:var(--gray-700);transition:all .15s;}
+.page-btn:hover:not(:disabled){border-color:var(--blue);color:var(--blue);}
+.page-btn.active{background:var(--blue);color:var(--white);border-color:var(--blue);}
+.page-btn:disabled{opacity:.4;cursor:not-allowed;}
+.page-info{font-size:.73rem;color:var(--gray-500);padding:0 8px;}
+
+/* ── VALIDATION PANEL ── */
+.errors-section{background:var(--white);border:1px solid #FECACA;border-radius:var(--radius);
+  padding:16px 20px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
+.errors-title{font-family:var(--display);font-size:.85rem;font-weight:700;color:var(--red);
+  margin-bottom:10px;display:flex;align-items:center;gap:7px;}
+.error-list{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;}
+.error-item{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:6px;
+  background:var(--red-light);font-size:.72rem;color:var(--red);}
+.error-item.warn{background:var(--yellow-light);color:#92400E;}
+.error-row{font-family:var(--mono);font-weight:700;flex-shrink:0;}
+.error-msg{flex:1;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--gray-900);color:var(--white);
+  font-family:var(--display);font-size:.78rem;font-weight:700;padding:11px 18px;
+  border-radius:10px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;
+  box-shadow:0 4px 20px rgba(0,0,0,.25);display:flex;align-items:center;gap:8px;}
+.toast.show{opacity:1;}
+.toast.success{background:var(--green);}
+.toast.error{background:var(--red);}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--gray-100);}
+::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--blue);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:700px){
+  .stats-row{grid-template-columns:repeat(3,1fr);}
+  .header-actions .btn-export-xlsx,.header-actions .btn-export-csv{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="header-brand">
+    <div class="brand-icon">🏥</div>
+    <div class="brand-text">
+      <h1>Migra<span>Pac</span></h1>
+      <p>Organizador de migraciones de pacientes</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-header btn-export-csv" id="btn-csv" onclick="exportCSV()" disabled>⬇ Exportar CSV</button>
+    <button class="btn-header btn-export-xlsx" id="btn-xlsx" onclick="exportXLSX()" disabled>⬇ Exportar Excel</button>
+    <button class="btn-reset" id="btn-reset" onclick="resetApp()" style="display:none">✕ Nuevo archivo</button>
+  </div>
+</header>
+
+<div class="app-body">
+
+  <!-- UPLOAD -->
+  <div class="upload-section" id="upload-section">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <span class="drop-icon">📂</span>
+      <div class="drop-title">Cargue el archivo de migraciones de pacientes</div>
+      <div class="drop-sub">Arrastre y suelte aquí, o <span>haga clic para buscar</span></div>
+      <div class="drop-formats">
+        <span class="fmt-badge">XLSX</span>
+        <span class="fmt-badge">XLS</span>
+        <span class="fmt-badge">CSV</span>
+        <span class="fmt-badge">TXT</span>
+      </div>
+      <div class="file-info" id="file-info" style="display:none"></div>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.txt" onchange="handleFileSelect(event)">
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row" id="stats-row" style="display:none">
+    <div class="stat-card">
+      <div class="s-icon">👥</div>
+      <div class="s-num blue" id="stat-total">0</div>
+      <div class="s-label">Total filas</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-icon">✅</div>
+      <div class="s-num green" id="stat-ok">0</div>
+      <div class="s-label">Válidas</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-icon">❌</div>
+      <div class="s-num red" id="stat-errors">0</div>
+      <div class="s-label">Con errores</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-icon">⚠️</div>
+      <div class="s-num yellow" id="stat-warns">0</div>
+      <div class="s-label">Advertencias</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-icon">📋</div>
+      <div class="s-num purple" id="stat-cols">0</div>
+      <div class="s-label">Columnas</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-icon">🗃</div>
+      <div class="s-num orange" id="stat-dupes">0</div>
+      <div class="s-label">Duplicados</div>
+    </div>
+  </div>
+
+  <!-- COLUMN MAPPING -->
+  <div class="mapping-section" id="mapping-section" style="display:none">
+    <div class="mapping-title">🔗 Mapeo de columnas</div>
+    <div class="mapping-sub">Asigne cada campo estándar a la columna correspondiente en su archivo. Los campos marcados con <span style="color:var(--red)">*</span> son obligatorios.</div>
+    <div class="mapping-grid" id="mapping-grid"></div>
+    <button class="btn-apply-map" onclick="applyMapping()">Aplicar mapeo y validar</button>
+  </div>
+
+  <!-- ERRORS -->
+  <div class="errors-section" id="errors-section" style="display:none">
+    <div class="errors-title">🚨 Problemas encontrados (<span id="error-count">0</span>)</div>
+    <div class="error-list" id="error-list"></div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar" id="toolbar" style="display:none">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Buscar por nombre, documento, municipio..." oninput="applyFilters()">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Sexo:</span>
+      <select class="filter-select" id="filter-sex" onchange="applyFilters()">
+        <option value="">Todos</option>
+        <option value="M">Masculino</option>
+        <option value="F">Femenino</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Régimen:</span>
+      <select class="filter-select" id="filter-regime" onchange="applyFilters()">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Estado:</span>
+      <select class="filter-select" id="filter-status" onchange="applyFilters()">
+        <option value="">Todos</option>
+        <option value="ok">Válidas ✅</option>
+        <option value="error">Con error ❌</option>
+        <option value="warn">Advertencia ⚠️</option>
+      </select>
+    </div>
+    <button class="filter-btn" id="btn-clear-filters" onclick="clearFilters()">✕ Limpiar</button>
+    <span class="rows-count" id="rows-count">0 filas</span>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap" id="table-wrap" style="display:none">
+    <div class="table-scroll" id="table-scroll">
+      <table id="data-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- EMPTY -->
+  <div class="empty-state" id="empty-state" style="display:none">
+    <span class="e-icon">🔎</span>
+    <p>No se encontraron filas con ese criterio de búsqueda.</p>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let rawData = [];        // all rows as objects
+let headers = [];        // original column names
+let mappedData = [];     // rows with standard field names applied
+let filteredData = [];   // after filters
+let currentPage = 1;
+const PAGE_SIZE = 50;
+let sortCol = null;
+let sortDir = 'asc';
+let validationMap = {};  // rowIndex → {errors, warns}
+
+// Standard fields for Colombian patient migrations
+const STANDARD_FIELDS = [
+  { id:'tipo_doc',   label:'Tipo Documento',    req:true,  aliases:['tipo_doc','tipodoc','tipo de documento','type','tipo_id'] },
+  { id:'num_doc',    label:'Número Documento',  req:true,  aliases:['num_doc','numdoc','documento','cedula','nit','id','identificacion','número documento','numero documento','no_doc'] },
+  { id:'primer_nom', label:'Primer Nombre',     req:true,  aliases:['primer_nom','primernombre','nombre1','first_name','nombre','name','primer nombre','nombres'] },
+  { id:'segundo_nom',label:'Segundo Nombre',    req:false, aliases:['segundo_nom','segundonombre','nombre2','segundo nombre','second_name'] },
+  { id:'primer_ape', label:'Primer Apellido',   req:true,  aliases:['primer_ape','primerapellido','apellido1','last_name','apellido','primer apellido','apellidos'] },
+  { id:'segundo_ape',label:'Segundo Apellido',  req:false, aliases:['segundo_ape','segundoapellido','apellido2','segundo apellido','second_last'] },
+  { id:'fec_nac',    label:'Fecha Nacimiento',  req:true,  aliases:['fec_nac','fecha_nac','fecha_nacimiento','nacimiento','birthdate','fecha de nacimiento','dob'] },
+  { id:'sexo',       label:'Sexo',              req:true,  aliases:['sexo','genero','género','sex','gender'] },
+  { id:'municipio',  label:'Municipio',         req:false, aliases:['municipio','ciudad','city','mpio','localidad','municipio_res','municipio_residencia'] },
+  { id:'regimen',    label:'Régimen',           req:false, aliases:['regimen','régimen','tipo_afiliacion','plan','eps_regimen','tipo de afiliación'] },
+  { id:'eps',        label:'EPS / Aseguradora', req:false, aliases:['eps','aseguradora','empresa','pagador','payer','eps_nombre','health_plan'] },
+  { id:'fec_atencion',label:'Fecha Atención',   req:false, aliases:['fec_atencion','fecha_atencion','fecha de atencion','fecha de atención','atencion','service_date','fecha_serv'] },
+  { id:'diagnostico',label:'Diagnóstico CIE',   req:false, aliases:['diagnostico','diagnóstico','cie','cie10','dx','diagnosis','cod_diagnostico','codigo_diagnostico'] },
+  { id:'ips',        label:'IPS',               req:false, aliases:['ips','prestador','proveedor','provider','nombre_ips','institucion'] },
+];
+
+const TIPO_DOC_VALID = ['CC','TI','CE','PA','RC','MS','AS','CD','SC','PE','PT','CN','TE'];
+const REGIMEN_VALID  = ['C','S','P','E','N'];
+
+// ── DRAG & DROP ──
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  const name = file.name.toLowerCase();
+  const fileInfo = document.getElementById('file-info');
+  fileInfo.style.display = 'flex';
+  fileInfo.innerHTML = `✅ ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+  dropZone.classList.add('has-file');
+  document.getElementById('btn-reset').style.display = 'flex';
+
+  if (name.endsWith('.csv') || name.endsWith('.txt')) {
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true, encoding: 'UTF-8',
+      complete: res => { loadData(res.data, res.meta.fields); },
+      error: err => showToast('Error al leer CSV: ' + err.message, 'error'),
+    });
+  } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        const hdrs = rows.length ? Object.keys(rows[0]) : [];
+        loadData(rows, hdrs);
+      } catch(err) { showToast('Error al leer Excel: ' + err.message, 'error'); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    showToast('Formato no soportado. Use XLSX, XLS, CSV o TXT.', 'error');
+  }
+}
+
+function loadData(rows, hdrs) {
+  rawData = rows;
+  headers = hdrs;
+  showStats(rows.length, hdrs.length, 0, 0, 0);
+  buildMappingUI();
+  document.getElementById('stats-row').style.display = 'grid';
+  document.getElementById('mapping-section').style.display = 'block';
+  document.getElementById('upload-section').style.marginBottom = '14px';
+}
+
+// ── COLUMN MAPPING ──
+function buildMappingUI() {
+  const grid = document.getElementById('mapping-grid');
+  grid.innerHTML = '';
+  STANDARD_FIELDS.forEach(field => {
+    const autoMatch = findAutoMatch(field, headers);
+    const div = document.createElement('div');
+    div.className = 'map-item';
+    div.innerHTML = `
+      <span class="map-label">${field.label}${field.req ? ' <span class="req">*</span>' : ''}</span>
+      <select class="map-select ${autoMatch ? 'mapped' : (field.req ? 'unmapped-req' : '')}"
+              id="map-${field.id}" onchange="updateMapStyle(this,'${field.id}')">
+        <option value="">— No mapear —</option>
+        ${headers.map(h => `<option value="${h}" ${h === autoMatch ? 'selected' : ''}>${h}</option>`).join('')}
+      </select>`;
+    grid.appendChild(div);
+  });
+}
+
+function findAutoMatch(field, hdrs) {
+  const normalize = s => s.toLowerCase().replace(/[\s_\-\.]/g,'');
+  for (const alias of field.aliases) {
+    const na = normalize(alias);
+    const found = hdrs.find(h => normalize(h) === na);
+    if (found) return found;
+  }
+  // partial match
+  const normalize2 = s => s.toLowerCase();
+  for (const alias of field.aliases) {
+    const found = hdrs.find(h => normalize2(h).includes(normalize2(alias)) || normalize2(alias).includes(normalize2(h)));
+    if (found) return found;
+  }
+  return null;
+}
+
+function updateMapStyle(sel, fieldId) {
+  sel.className = 'map-select';
+  if (sel.value) {
+    sel.classList.add('mapped');
+  } else {
+    const field = STANDARD_FIELDS.find(f => f.id === fieldId);
+    if (field && field.req) sel.classList.add('unmapped-req');
+  }
+}
+
+function applyMapping() {
+  const mapping = {};
+  STANDARD_FIELDS.forEach(f => {
+    const sel = document.getElementById('map-' + f.id);
+    if (sel && sel.value) mapping[f.id] = sel.value;
+  });
+
+  // Check required fields
+  const missingReq = STANDARD_FIELDS.filter(f => f.req && !mapping[f.id]);
+  if (missingReq.length > 0) {
+    showToast(`Faltan campos obligatorios: ${missingReq.map(f=>f.label).join(', ')}`, 'error');
+    return;
+  }
+
+  // Build mappedData
+  mappedData = rawData.map((row, i) => {
+    const mapped = { _row: i + 2 }; // +2 because row 1 is header
+    STANDARD_FIELDS.forEach(f => {
+      mapped[f.id] = mapping[f.id] ? String(row[mapping[f.id]] ?? '').trim() : '';
+    });
+    // Keep original columns too
+    mapped._original = row;
+    return mapped;
+  });
+
+  validateData();
+  buildRegimeFilter();
+  document.getElementById('mapping-section').style.display = 'none';
+  document.getElementById('toolbar').style.display = 'flex';
+  document.getElementById('table-wrap').style.display = 'block';
+  document.getElementById('btn-csv').disabled = false;
+  document.getElementById('btn-xlsx').disabled = false;
+
+  filteredData = [...mappedData];
+  renderTable();
+  showToast(`${mappedData.length} filas cargadas y validadas ✅`, 'success');
+}
+
+// ── VALIDATION ──
+function validateData() {
+  validationMap = {};
+  const docs = new Map();
+
+  mappedData.forEach((row, idx) => {
+    const errors = [];
+    const warns = [];
+    const rowNum = row._row;
+
+    // Tipo documento
+    if (row.tipo_doc) {
+      const td = row.tipo_doc.toUpperCase();
+      if (!TIPO_DOC_VALID.includes(td)) warns.push(`Tipo de documento inválido: "${row.tipo_doc}"`);
+    }
+
+    // Número documento
+    if (!row.num_doc) {
+      errors.push('Número de documento vacío');
+    } else {
+      if (!/^\d{5,12}$/.test(row.num_doc)) warns.push(`Documento con formato inusual: "${row.num_doc}"`);
+      // Duplicate check
+      if (docs.has(row.num_doc)) {
+        warns.push(`Documento duplicado: "${row.num_doc}" (también en fila ${docs.get(row.num_doc)})`);
+      } else {
+        docs.set(row.num_doc, rowNum);
+      }
+    }
+
+    // Nombres
+    if (!row.primer_nom) errors.push('Primer nombre vacío');
+    if (!row.primer_ape) errors.push('Primer apellido vacío');
+
+    // Fecha nacimiento
+    if (row.fec_nac) {
+      if (!isValidDate(row.fec_nac)) warns.push(`Fecha de nacimiento con formato inusual: "${row.fec_nac}"`);
+    } else {
+      errors.push('Fecha de nacimiento vacía');
+    }
+
+    // Sexo
+    if (row.sexo) {
+      const s = row.sexo.toUpperCase();
+      if (!['M','F','H','MASCULINO','FEMENINO','HOMBRE','MUJER','1','2'].includes(s)) {
+        warns.push(`Valor de sexo inusual: "${row.sexo}"`);
+      }
+    } else {
+      errors.push('Sexo vacío');
+    }
+
+    // Régimen
+    if (row.regimen && !REGIMEN_VALID.includes(row.regimen.toUpperCase())) {
+      warns.push(`Régimen inusual: "${row.regimen}"`);
+    }
+
+    // Fecha atención
+    if (row.fec_atencion && !isValidDate(row.fec_atencion)) {
+      warns.push(`Fecha de atención con formato inusual: "${row.fec_atencion}"`);
+    }
+
+    if (errors.length || warns.length) {
+      validationMap[idx] = { errors, warns };
+    }
+  });
+
+  updateValidationStats();
+  renderErrors();
+}
+
+function isValidDate(str) {
+  const s = String(str).trim();
+  return /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/.test(s) ||
+         /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/.test(s) ||
+         /^\d{8}$/.test(s);
+}
+
+function updateValidationStats() {
+  const total = mappedData.length;
+  let errCount = 0, warnCount = 0, dupes = 0;
+
+  Object.values(validationMap).forEach(v => {
+    if (v.errors.length) errCount++;
+    else if (v.warns.length) warnCount++;
+    v.warns.forEach(w => { if (w.includes('duplicado')) dupes++; });
+  });
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-ok').textContent = total - errCount - warnCount;
+  document.getElementById('stat-errors').textContent = errCount;
+  document.getElementById('stat-warns').textContent = warnCount;
+  document.getElementById('stat-cols').textContent = headers.length;
+  document.getElementById('stat-dupes').textContent = dupes;
+}
+
+function showStats(total, cols, ok, err, warn) {
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-ok').textContent = ok;
+  document.getElementById('stat-errors').textContent = err;
+  document.getElementById('stat-warns').textContent = warn;
+  document.getElementById('stat-cols').textContent = cols;
+  document.getElementById('stat-dupes').textContent = 0;
+}
+
+function renderErrors() {
+  const allProblems = [];
+  Object.entries(validationMap).forEach(([idx, v]) => {
+    const row = mappedData[idx];
+    v.errors.forEach(e => allProblems.push({ row: row._row, msg: e, type: 'error' }));
+    v.warns.forEach(w => allProblems.push({ row: row._row, msg: w, type: 'warn' }));
+  });
+
+  document.getElementById('error-count').textContent = allProblems.length;
+
+  if (allProblems.length === 0) {
+    document.getElementById('errors-section').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('errors-section').style.display = 'block';
+  const list = document.getElementById('error-list');
+  list.innerHTML = allProblems.slice(0, 100).map(p =>
+    `<div class="error-item ${p.type === 'warn' ? 'warn' : ''}">
+      <span class="error-row">Fila ${p.row}</span>
+      <span class="error-msg">${p.msg}</span>
+    </div>`
+  ).join('');
+  if (allProblems.length > 100) {
+    list.innerHTML += `<div class="error-item warn"><span class="error-msg">… y ${allProblems.length - 100} problemas más</span></div>`;
+  }
+}
+
+// ── FILTERS ──
+function buildRegimeFilter() {
+  const regimes = [...new Set(mappedData.map(r => r.regimen).filter(Boolean))].sort();
+  const sel = document.getElementById('filter-regime');
+  sel.innerHTML = '<option value="">Todos</option>' +
+    regimes.map(r => `<option value="${r}">${r}</option>`).join('');
+}
+
+function applyFilters() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const sex = document.getElementById('filter-sex').value.toLowerCase();
+  const regime = document.getElementById('filter-regime').value.toLowerCase();
+  const status = document.getElementById('filter-status').value;
+
+  filteredData = mappedData.filter((row, idx) => {
+    if (q) {
+      const searchable = [row.num_doc, row.primer_nom, row.segundo_nom,
+        row.primer_ape, row.segundo_ape, row.municipio, row.eps, row.ips].join(' ').toLowerCase();
+      if (!searchable.includes(q)) return false;
+    }
+    if (sex && row.sexo.toLowerCase() !== sex && !row.sexo.toLowerCase().includes(sex)) return false;
+    if (regime && row.regimen.toLowerCase() !== regime) return false;
+    if (status) {
+      const v = validationMap[idx];
+      if (status === 'ok' && v) return false;
+      if (status === 'error' && (!v || !v.errors.length)) return false;
+      if (status === 'warn' && (!v || !v.warns.length || v.errors.length)) return false;
+    }
+    return true;
+  });
+
+  currentPage = 1;
+  document.getElementById('rows-count').textContent = `${filteredData.length} fila${filteredData.length !== 1 ? 's' : ''}`;
+  renderTable();
+}
+
+function clearFilters() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('filter-sex').value = '';
+  document.getElementById('filter-regime').value = '';
+  document.getElementById('filter-status').value = '';
+  applyFilters();
+}
+
+// ── TABLE RENDERING ──
+function renderTable() {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = filteredData.slice(start, start + PAGE_SIZE);
+
+  // Thead
+  const thead = document.getElementById('table-head');
+  thead.innerHTML = `<tr>
+    <th class="row-num">#</th>
+    ${STANDARD_FIELDS.map(f => {
+      const cls = sortCol === f.id ? (sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc') : '';
+      return `<th class="${cls}" onclick="sortBy('${f.id}')">${f.label}</th>`;
+    }).join('')}
+  </tr>`;
+
+  // Tbody
+  const tbody = document.getElementById('table-body');
+  if (pageRows.length === 0) {
+    tbody.innerHTML = '';
+    document.getElementById('table-wrap').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'block';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+  document.getElementById('table-wrap').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+
+  tbody.innerHTML = pageRows.map(row => {
+    const idx = mappedData.indexOf(row);
+    const v = validationMap[idx];
+    const rowClass = v ? (v.errors.length ? 'row-error' : 'row-warn') : '';
+    const badge = v ? (v.errors.length
+      ? `<span class="badge-err">ERR</span>`
+      : `<span class="badge-warn">WARN</span>`) : '';
+
+    return `<tr class="${rowClass}">
+      <td class="row-num">${row._row}${badge}</td>
+      <td>${row.tipo_doc || '<span class="cell-warn">—</span>'}</td>
+      <td><span class="badge-doc">${row.num_doc || '<span class="cell-error">vacío</span>'}</span></td>
+      <td>${row.primer_nom || '<span class="cell-error">—</span>'}</td>
+      <td>${row.segundo_nom || ''}</td>
+      <td>${row.primer_ape || '<span class="cell-error">—</span>'}</td>
+      <td>${row.segundo_ape || ''}</td>
+      <td>${formatDate(row.fec_nac)}</td>
+      <td>${formatSexo(row.sexo)}</td>
+      <td>${row.municipio || ''}</td>
+      <td>${row.regimen || ''}</td>
+      <td>${row.eps || ''}</td>
+      <td>${formatDate(row.fec_atencion)}</td>
+      <td>${row.diagnostico || ''}</td>
+      <td>${row.ips || ''}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination();
+}
+
+function formatDate(val) {
+  if (!val) return '';
+  const s = String(val).trim();
+  if (!s) return '';
+  // Try to parse and reformat as YYYY-MM-DD
+  if (/^\d{8}$/.test(s)) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+  return s;
+}
+
+function formatSexo(val) {
+  if (!val) return '';
+  const s = val.toUpperCase();
+  if (['M','H','MASCULINO','HOMBRE','1'].includes(s)) return '♂ M';
+  if (['F','FEMENINO','MUJER','2'].includes(s)) return '♀ F';
+  return val;
+}
+
+function sortBy(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = 'asc';
+  }
+  filteredData.sort((a, b) => {
+    const av = String(a[col] ?? '').toLowerCase();
+    const bv = String(b[col] ?? '').toLowerCase();
+    const cmp = av.localeCompare(bv, 'es');
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function renderPagination() {
+  const total = filteredData.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Anterior</button>`;
+  const range = getPageRange(currentPage, pages);
+  range.forEach(p => {
+    if (p === '...') {
+      html += `<span class="page-info">…</span>`;
+    } else {
+      html += `<button class="page-btn ${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
+    }
+  });
+  html += `<button class="page-btn" onclick="goPage(${currentPage + 1})" ${currentPage === pages ? 'disabled' : ''}>Siguiente ›</button>`;
+  html += `<span class="page-info">Página ${currentPage} de ${pages}</span>`;
+  document.getElementById('pagination').innerHTML = html;
+}
+
+function getPageRange(cur, total) {
+  if (total <= 7) return Array.from({length:total},(_,i)=>i+1);
+  if (cur <= 4) return [1,2,3,4,5,'...',total];
+  if (cur >= total - 3) return [1,'...',total-4,total-3,total-2,total-1,total];
+  return [1,'...',cur-1,cur,cur+1,'...',total];
+}
+
+function goPage(p) {
+  const pages = Math.ceil(filteredData.length / PAGE_SIZE);
+  if (p < 1 || p > pages) return;
+  currentPage = p;
+  renderTable();
+  document.getElementById('table-scroll').scrollTop = 0;
+}
+
+// ── EXPORT ──
+function exportCSV() {
+  if (!mappedData.length) return;
+  const fields = STANDARD_FIELDS.map(f => f.id);
+  const labels = STANDARD_FIELDS.map(f => f.label);
+  const rows = [labels, ...mappedData.map(row => fields.map(f => row[f] ?? ''))];
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, 'migraciones_pacientes.csv');
+  showToast('CSV exportado ✅', 'success');
+}
+
+function exportXLSX() {
+  if (!mappedData.length) return;
+  const fields = STANDARD_FIELDS.map(f => f.id);
+  const labels = STANDARD_FIELDS.map(f => f.label);
+  const wsData = [labels, ...mappedData.map(row => fields.map(f => row[f] ?? ''))];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = labels.map(() => ({ wch: 18 }));
+
+  // Style header row
+  labels.forEach((_, ci) => {
+    const cell = ws[XLSX.utils.encode_cell({r:0, c:ci})];
+    if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: 'E8F6FD' } } };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
+
+  // Add error sheet if there are errors
+  if (Object.keys(validationMap).length) {
+    const errData = [['Fila','Tipo','Descripción']];
+    Object.entries(validationMap).forEach(([idx, v]) => {
+      const row = mappedData[idx];
+      v.errors.forEach(e => errData.push([row._row, 'Error', e]));
+      v.warns.forEach(w => errData.push([row._row, 'Advertencia', w]));
+    });
+    const wsErr = XLSX.utils.aoa_to_sheet(errData);
+    XLSX.utils.book_append_sheet(wb, wsErr, 'Errores');
+  }
+
+  XLSX.writeFile(wb, 'migraciones_pacientes.xlsx');
+  showToast('Excel exportado ✅', 'success');
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── RESET ──
+function resetApp() {
+  rawData = []; headers = []; mappedData = []; filteredData = [];
+  validationMap = {}; sortCol = null; sortDir = 'asc'; currentPage = 1;
+
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('drop-zone').classList.remove('has-file');
+  document.getElementById('stats-row').style.display = 'none';
+  document.getElementById('mapping-section').style.display = 'none';
+  document.getElementById('errors-section').style.display = 'none';
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('table-wrap').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('btn-reset').style.display = 'none';
+  document.getElementById('btn-csv').disabled = true;
+  document.getElementById('btn-xlsx').disabled = true;
+  document.getElementById('search-input').value = '';
+  document.getElementById('table-head').innerHTML = '';
+  document.getElementById('table-body').innerHTML = '';
+}
+
+// ── TOAST ──
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+</script>
+</body>
+</html>
