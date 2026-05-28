@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organizador · Migraciones Pacientes</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --blue:#29ABE2;--blue-dark:#1B7FC4;--blue-light:#E8F6FD;--blue-mid:#D0EEFA;
+  --white:#FFFFFF;--gray-50:#F8FAFC;--gray-100:#F0F4F8;--gray-200:#E2EAF0;
+  --gray-300:#C8D6E0;--gray-400:#9AB4C8;--gray-500:#6B8599;--gray-700:#3D5468;--gray-900:#1A2E3D;
+  --green:#22C55E;--green-light:#F0FDF4;--green-mid:#BBF7D0;
+  --yellow:#F59E0B;--yellow-light:#FFFBEB;
+  --red:#EF4444;--red-light:#FEF2F2;--red-mid:#FECACA;
+  --purple:#8B5CF6;--orange:#F97316;
+  --shadow-sm:0 1px 3px rgba(41,171,226,.1),0 1px 2px rgba(0,0,0,.04);
+  --shadow:0 4px 16px rgba(41,171,226,.12),0 2px 8px rgba(0,0,0,.05);
+  --shadow-lg:0 10px 40px rgba(41,171,226,.15),0 4px 16px rgba(0,0,0,.07);
+  --radius:12px;--mono:'Courier New',monospace;
+  --sans:'Nunito Sans',sans-serif;--display:'Nunito',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--gray-50);color:var(--gray-900);min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(41,171,226,.07) 0%,transparent 70%);}
+
+/* HEADER */
+.app-header{background:var(--white);border-bottom:1px solid var(--gray-200);box-shadow:var(--shadow-sm);
+  padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--blue),var(--blue-dark));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;}
+.brand-text h1{font-family:var(--display);font-size:1.05rem;font-weight:800;color:var(--gray-900);}
+.brand-text h1 span{color:var(--blue);}
+.brand-text p{font-size:.68rem;color:var(--gray-500);}
+
+/* STEPS */
+.steps-bar{display:flex;align-items:center;gap:0;}
+.step-item{display:flex;align-items:center;gap:7px;padding:6px 14px;border-radius:20px;
+  font-family:var(--display);font-size:.75rem;font-weight:700;color:var(--gray-400);transition:all .2s;}
+.step-item.active{color:var(--blue);}
+.step-item.done{color:var(--green);}
+.step-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.68rem;font-weight:800;background:var(--gray-200);color:var(--gray-500);flex-shrink:0;}
+.step-item.active .step-num{background:var(--blue);color:var(--white);}
+.step-item.done .step-num{background:var(--green);color:var(--white);}
+.step-sep{width:24px;height:2px;background:var(--gray-200);border-radius:2px;}
+.step-sep.done{background:var(--green);}
+
+/* BODY */
+.app-body{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);
+  padding:24px 28px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+.card-title{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--gray-900);
+  margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.card-sub{font-size:.78rem;color:var(--gray-500);margin-bottom:20px;line-height:1.6;}
+
+/* DROP ZONE */
+.drop-zone{border:2px dashed var(--gray-300);border-radius:var(--radius);background:var(--white);
+  padding:52px 20px;text-align:center;cursor:pointer;transition:all .25s;}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--blue);background:var(--blue-light);}
+.drop-zone.loaded{border-color:var(--green);border-style:solid;background:var(--green-light);}
+.drop-icon{font-size:3rem;margin-bottom:14px;display:block;}
+.drop-title{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--gray-700);margin-bottom:6px;}
+.drop-sub{font-size:.8rem;color:var(--gray-500);}
+.drop-sub b{color:var(--blue);cursor:pointer;}
+.drop-sub b:hover{text-decoration:underline;}
+.drop-fmts{display:flex;gap:6px;justify-content:center;margin-top:12px;}
+.fmt{font-size:.67rem;font-weight:700;padding:3px 9px;border-radius:20px;
+  background:var(--gray-100);color:var(--gray-500);border:1px solid var(--gray-200);}
+.loaded-info{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;
+  font-size:.82rem;color:#15803D;font-weight:700;}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px;}
+.stat{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);
+  padding:14px 10px;text-align:center;box-shadow:var(--shadow-sm);}
+.stat-icon{font-size:1.3rem;margin-bottom:4px;}
+.stat-num{font-family:var(--display);font-size:1.55rem;font-weight:800;line-height:1.1;}
+.stat-label{font-size:.6rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-top:3px;}
+.blue{color:var(--blue);}.green{color:var(--green);}.red{color:var(--red);}
+.yellow{color:var(--yellow);}.purple{color:var(--purple);}.orange{color:var(--orange);}
+
+/* MAPPING */
+.name-mode-group{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.mode-btn{padding:8px 16px;border-radius:8px;border:2px solid var(--gray-200);background:var(--white);
+  font-family:var(--display);font-size:.77rem;font-weight:700;color:var(--gray-500);cursor:pointer;transition:all .2s;}
+.mode-btn.active{border-color:var(--blue);background:var(--blue-light);color:var(--blue);}
+.name-inputs{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;
+  margin-bottom:18px;padding:14px;background:var(--gray-50);border-radius:10px;border:1px solid var(--gray-200);}
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;}
+.map-item{display:flex;flex-direction:column;gap:4px;}
+.map-lbl{font-size:.69rem;font-weight:700;color:var(--gray-700);text-transform:uppercase;letter-spacing:.05em;}
+.map-lbl .req{color:var(--red);}
+.map-sel{padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:8px;
+  font-size:.78rem;color:var(--gray-900);background:var(--white);outline:none;cursor:pointer;transition:border-color .2s;}
+.map-sel:focus{border-color:var(--blue);}
+.map-sel.ok{border-color:var(--green);background:var(--green-light);}
+.section-sep{font-family:var(--display);font-size:.72rem;font-weight:700;color:var(--gray-400);
+  text-transform:uppercase;letter-spacing:.08em;grid-column:1/-1;margin-top:6px;padding-bottom:4px;
+  border-bottom:1px solid var(--gray-200);}
+
+/* BUTTONS */
+.btn{padding:10px 22px;border-radius:10px;font-family:var(--display);font-size:.84rem;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;display:inline-flex;align-items:center;gap:7px;}
+.btn-primary{background:var(--blue);color:var(--white);box-shadow:0 3px 10px rgba(41,171,226,.35);}
+.btn-primary:hover{background:var(--blue-dark);transform:translateY(-1px);}
+.btn-secondary{background:var(--white);border:1.5px solid var(--gray-300);color:var(--gray-700);}
+.btn-secondary:hover{border-color:var(--blue);color:var(--blue);}
+.btn-green{background:var(--green);color:var(--white);box-shadow:0 3px 10px rgba(34,197,94,.3);}
+.btn-green:hover{background:#16A34A;transform:translateY(-1px);}
+.btn-yellow{background:var(--yellow);color:var(--white);box-shadow:0 3px 10px rgba(245,158,11,.3);}
+.btn-yellow:hover{background:#D97706;transform:translateY(-1px);}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important;}
+.btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.search-wrap{flex:1;min-width:180px;position:relative;}
+.search-wrap input{width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--gray-200);
+  border-radius:8px;font-size:.82rem;outline:none;background:var(--white);transition:border-color .2s;}
+.search-wrap input:focus{border-color:var(--blue);}
+.search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gray-400);}
+.filter-sel{padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:8px;
+  font-size:.78rem;background:var(--white);outline:none;cursor:pointer;}
+.filter-sel:focus{border-color:var(--blue);}
+.rows-lbl{font-size:.73rem;color:var(--gray-500);font-weight:600;white-space:nowrap;}
+
+/* TABLE */
+.tbl-wrap{overflow:hidden;border-radius:var(--radius);border:1px solid var(--gray-200);box-shadow:var(--shadow-sm);}
+.tbl-scroll{overflow-x:auto;max-height:500px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:.73rem;}
+thead{position:sticky;top:0;z-index:5;}
+th{background:var(--gray-50);border-bottom:2px solid var(--gray-200);padding:8px 10px;
+  text-align:left;font-size:.63rem;font-weight:700;color:var(--gray-500);
+  text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;cursor:pointer;user-select:none;}
+th:hover{background:var(--blue-light);color:var(--blue);}
+th.asc::after{content:" ▲";color:var(--blue);}
+th.desc::after{content:" ▼";color:var(--blue);}
+td{padding:6px 10px;border-bottom:1px solid var(--gray-100);vertical-align:middle;
+  max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--blue-light);}
+tr.row-e td{background:#FEF2F2!important;}
+tr.row-w td{background:#FFFBEB!important;}
+tr.row-i td{background:#F0FDF4!important;}
+.n-row{font-family:var(--mono);font-size:.63rem;color:var(--gray-400);width:36px;text-align:right;}
+.doc-badge{font-family:var(--mono);font-size:.67rem;background:var(--blue-light);
+  color:var(--blue-dark);padding:2px 6px;border-radius:4px;font-weight:700;}
+.tag{font-size:.6rem;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:3px;}
+.tag-e{background:var(--red-light);color:var(--red);}
+.tag-w{background:var(--yellow-light);color:#92400E;}
+.tag-i{background:var(--green-light);color:#15803D;}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--gray-100);border-radius:9px;padding:4px;margin-bottom:16px;}
+.tab{flex:1;padding:8px;text-align:center;font-family:var(--display);font-size:.78rem;font-weight:700;
+  color:var(--gray-500);cursor:pointer;border-radius:7px;border:none;background:transparent;transition:all .2s;}
+.tab.active{background:var(--white);color:var(--blue);box-shadow:var(--shadow-sm);}
+.panel{display:none;}.panel.active{display:block;}
+
+/* FINDINGS */
+.findings-list{display:flex;flex-direction:column;gap:5px;max-height:400px;overflow-y:auto;}
+.finding{display:flex;align-items:flex-start;gap:8px;padding:7px 11px;border-radius:7px;font-size:.75rem;}
+.finding.err{background:var(--red-light);border:1px solid var(--red-mid);}
+.finding.warn{background:var(--yellow-light);border:1px solid #FDE68A;}
+.finding.info{background:var(--green-light);border:1px solid var(--green-mid);}
+.f-row{font-family:var(--mono);font-weight:700;flex-shrink:0;min-width:50px;}
+.f-campo{font-weight:700;color:var(--gray-700);flex-shrink:0;min-width:110px;}
+.f-msg{color:var(--gray-700);flex:1;}
+.findings-empty{text-align:center;padding:30px;color:var(--gray-400);font-size:.85rem;}
+
+/* EXPORT SECTION */
+.export-box{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;
+  padding:18px 20px;margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.export-input{flex:1;min-width:200px;padding:9px 14px;border:1.5px solid var(--gray-200);
+  border-radius:8px;font-size:.85rem;outline:none;background:var(--white);transition:border-color .2s;}
+.export-input:focus{border-color:var(--blue);}
+.export-ext{font-size:.78rem;color:var(--gray-500);font-weight:600;white-space:nowrap;}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;justify-content:center;gap:5px;padding:10px 14px;
+  border-top:1px solid var(--gray-200);}
+.pg-btn{padding:4px 10px;border:1.5px solid var(--gray-200);border-radius:6px;
+  font-family:var(--display);font-size:.72rem;font-weight:700;cursor:pointer;
+  background:var(--white);color:var(--gray-700);transition:all .15s;}
+.pg-btn:hover:not(:disabled){border-color:var(--blue);color:var(--blue);}
+.pg-btn.active{background:var(--blue);color:var(--white);border-color:var(--blue);}
+.pg-btn:disabled{opacity:.4;cursor:not-allowed;}
+.pg-info{font-size:.7rem;color:var(--gray-500);padding:0 6px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;font-family:var(--display);font-size:.78rem;font-weight:700;
+  padding:11px 18px;border-radius:10px;opacity:0;transition:opacity .3s;pointer-events:none;
+  z-index:999;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-lg);color:var(--white);}
+.toast.show{opacity:1;}
+.toast.ok{background:var(--green);}
+.toast.err{background:var(--red);}
+.toast.info{background:var(--blue);}
+
+/* MISC */
+.hidden{display:none!important;}
+.empty-state{text-align:center;padding:50px 20px;color:var(--gray-400);}
+.empty-state span{font-size:2.5rem;display:block;margin-bottom:10px;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--gray-100);}
+::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--blue);}
+@media(max-width:650px){.stats-row{grid-template-columns:repeat(3,1fr);}
+  .steps-bar .step-item span:last-child{display:none;}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon">🏥</div>
+    <div class="brand-text">
+      <h1>Migra<span>Pac</span></h1>
+      <p>Organizador de migraciones de pacientes · DentOS</p>
+    </div>
+  </div>
+  <div class="steps-bar">
+    <div class="step-item active" id="s1"><span class="step-num">1</span><span>Cargar</span></div>
+    <div class="step-sep" id="sep1"></div>
+    <div class="step-item" id="s2"><span class="step-num">2</span><span>Mapear</span></div>
+    <div class="step-sep" id="sep2"></div>
+    <div class="step-item" id="s3"><span class="step-num">3</span><span>Procesar</span></div>
+  </div>
+</header>
+
+<div class="app-body">
+
+  <!-- ── PASO 1: CARGAR ── -->
+  <div id="step1">
+    <div class="card">
+      <div class="card-title">📂 Cargar archivo de pacientes</div>
+      <div class="card-sub">Suba el archivo fuente en cualquier formato. La app lo organizará al formato de migración DentOS (34 columnas, tabulación).</div>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-in').click()">
+        <span class="drop-icon" id="drop-icon">📁</span>
+        <div class="drop-title" id="drop-title">Arrastre el archivo aquí</div>
+        <div class="drop-sub">o <b onclick="event.stopPropagation();document.getElementById('file-in').click()">haga clic para buscar</b></div>
+        <div class="drop-fmts"><span class="fmt">XLSX</span><span class="fmt">XLS</span><span class="fmt">CSV</span><span class="fmt">TXT</span></div>
+        <div class="loaded-info hidden" id="loaded-info"></div>
+      </div>
+      <input type="file" id="file-in" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="handleFile(event)">
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;">
+        <button class="btn btn-primary" id="btn-step1" onclick="goStep(2)" disabled>Siguiente: Mapear columnas →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PASO 2: MAPEAR ── -->
+  <div id="step2" class="hidden">
+    <div class="card">
+      <div class="card-title">🔗 Mapeo de columnas</div>
+      <div class="card-sub">Indique cómo están organizados los nombres en su archivo y asigne cada columna fuente al campo correspondiente. Los campos con <span style="color:var(--red)">*</span> son obligatorios.</div>
+
+      <!-- Nombre mode -->
+      <div style="margin-bottom:14px;">
+        <div style="font-family:var(--display);font-size:.78rem;font-weight:700;color:var(--gray-700);margin-bottom:8px;">¿Cómo vienen los nombres en el archivo?</div>
+        <div class="name-mode-group">
+          <button class="mode-btn" id="nm-full" onclick="setNameMode('full')">📋 Nombre completo en una columna</button>
+          <button class="mode-btn" id="nm-two" onclick="setNameMode('two')">🔀 Nombres y apellidos en 2 columnas</button>
+          <button class="mode-btn active" id="nm-sep" onclick="setNameMode('sep')">📑 Campos separados (4 columnas)</button>
+        </div>
+        <div id="name-inputs" class="name-inputs"><!-- rendered by JS --></div>
+      </div>
+
+      <!-- Other fields -->
+      <div class="map-grid" id="map-grid"><!-- rendered by JS --></div>
+
+      <div style="margin-top:20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <button class="btn btn-secondary" onclick="goStep(1)">← Volver</button>
+        <button class="btn btn-primary" onclick="processData()">⚙ Procesar y validar →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PASO 3: RESULTADO ── -->
+  <div id="step3" class="hidden">
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat"><div class="stat-icon">👥</div><div class="stat-num blue" id="st-total">0</div><div class="stat-label">Total</div></div>
+      <div class="stat"><div class="stat-icon">✅</div><div class="stat-num green" id="st-ok">0</div><div class="stat-label">Sin hallazgos</div></div>
+      <div class="stat"><div class="stat-icon">🔧</div><div class="stat-num purple" id="st-corr">0</div><div class="stat-label">Corregidos</div></div>
+      <div class="stat"><div class="stat-icon">⚠️</div><div class="stat-num yellow" id="st-warn">0</div><div class="stat-label">Advertencias</div></div>
+      <div class="stat"><div class="stat-icon">❌</div><div class="stat-num red" id="st-err">0</div><div class="stat-label">Errores</div></div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('prev')">📋 Vista previa</button>
+        <button class="tab" onclick="switchTab('hall')">🔍 Hallazgos</button>
+      </div>
+
+      <!-- PREVIEW TAB -->
+      <div class="panel active" id="tab-prev">
+        <div class="toolbar">
+          <div class="search-wrap">
+            <span class="search-ico">🔍</span>
+            <input type="text" placeholder="Buscar por nombre, documento..." oninput="applyFilters()" id="search-in">
+          </div>
+          <select class="filter-sel" id="f-sexo" onchange="applyFilters()">
+            <option value="">Sexo: Todos</option>
+            <option value="masculino">Masculino</option>
+            <option value="femenino">Femenino</option>
+          </select>
+          <select class="filter-sel" id="f-status" onchange="applyFilters()">
+            <option value="">Estado: Todos</option>
+            <option value="ok">Sin hallazgos</option>
+            <option value="corr">Corregidos</option>
+            <option value="warn">Advertencias</option>
+            <option value="err">Errores</option>
+          </select>
+          <button class="btn btn-secondary" style="padding:7px 12px;font-size:.73rem;" onclick="clearFilters()">✕</button>
+          <span class="rows-lbl" id="rows-lbl">0 filas</span>
+        </div>
+        <div class="tbl-wrap">
+          <div class="tbl-scroll">
+            <table>
+              <thead id="tbl-head"></thead>
+              <tbody id="tbl-body"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination"></div>
+        </div>
+        <div class="empty-state hidden" id="tbl-empty"><span>🔎</span><p>Sin resultados con ese filtro.</p></div>
+      </div>
+
+      <!-- HALLAZGOS TAB -->
+      <div class="panel" id="tab-hall">
+        <div id="findings-list" class="findings-list"></div>
+        <div class="findings-empty hidden" id="findings-empty">🎉 No se encontraron hallazgos.</div>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="card">
+      <div class="card-title">⬇ Exportar</div>
+      <div class="export-box">
+        <input type="text" class="export-input" id="export-name" placeholder="Nombre del archivo">
+        <span class="export-ext">.txt</span>
+        <button class="btn btn-green" onclick="exportTXT()">⬇ Exportar TXT (tabulación)</button>
+        <button class="btn btn-yellow" onclick="exportFindings()">📄 Descargar hallazgos</button>
+        <button class="btn btn-secondary" onclick="goStep(1)">🔄 Nuevo archivo</button>
+      </div>
+    </div>
+
+  </div><!-- /step3 -->
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── DATOS DEL FORMATO DE SALIDA ────────────────────────────────────────────
+const OUT = [
+  {id:'fila',              label:'Fila',                  type:'num',  req:true },
+  {id:'tipo_documento',    label:'Tipo Documento',        type:'text', req:true },
+  {id:'documento',         label:'Documento',             type:'num',  req:true },
+  {id:'primer_nombre',     label:'Primer Nombre',         type:'text', req:true },
+  {id:'segundo_nombre',    label:'Segundo Nombre',        type:'text', req:false},
+  {id:'primer_apellido',   label:'Primer Apellido',       type:'text', req:true },
+  {id:'segundo_apellido',  label:'Segundo Apellido',      type:'text', req:false},
+  {id:'fecha_registro',    label:'Fecha Registro',        type:'date', req:false},
+  {id:'fecha_nacimiento',  label:'Fecha Nacimiento',      type:'date', req:true },
+  {id:'edad',              label:'Edad',                  type:'num',  req:false},
+  {id:'sexo',              label:'Sexo',                  type:'text', req:true },
+  {id:'direccion',         label:'Dirección',             type:'text', req:false},
+  {id:'telefono',          label:'Teléfono',              type:'num',  req:false},
+  {id:'celular',           label:'Celular',               type:'num',  req:false},
+  {id:'email',             label:'Email',                 type:'text', req:false},
+  {id:'ocupacion',         label:'Ocupación',             type:'text', req:false},
+  {id:'lugar_nacimiento',  label:'Lugar Nacimiento',      type:'text', req:false},
+  {id:'empresa',           label:'Empresa',               type:'text', req:false},
+  {id:'telefono_empresa',  label:'Teléfono Empresa',      type:'num',  req:false},
+  {id:'nombre_acompanante',label:'Nombre Acompañante',    type:'text', req:false},
+  {id:'parentesco',        label:'Parentesco Acomp.',     type:'text', req:false},
+  {id:'tel_acompanante',   label:'Tel. Acompañante',      type:'num',  req:false},
+  {id:'cel_acompanante',   label:'Cel. Acompañante',      type:'num',  req:false},
+  {id:'remitido',          label:'Remitido',              type:'text', req:false},
+  {id:'zona',              label:'Zona',                  type:'text', req:false},
+  {id:'nacionalidad',      label:'Nacionalidad',          type:'text', req:false},
+  {id:'estado_civil',      label:'Estado Civil',          type:'text', req:false},
+  {id:'observacion',       label:'Observación',           type:'text', req:false},
+  {id:'eps',               label:'EPS',                   type:'text', req:false},
+  {id:'tipo_eps',          label:'Tipo EPS',              type:'text', req:false},
+  {id:'tipo_afiliacion',   label:'Tipo Afiliación',       type:'text', req:false},
+  {id:'facebook',          label:'Facebook',              type:'text', req:false},
+  {id:'instagram',         label:'Instagram',             type:'text', req:false},
+  {id:'twitter',           label:'Twitter',               type:'text', req:false},
+];
+
+const MAPPABLE = OUT.filter(f => f.id !== 'fila');
+
+const ALIASES = {
+  tipo_documento:    ['tipo_doc','tipodoc','tipo de documento','tipo documento','type','tipo_id','tipo identificacion'],
+  documento:         ['documento','num_doc','numdoc','cedula','cedula ciudadania','nit','id','identificacion','numero documento','no_doc','no. documento','nro doc'],
+  primer_nombre:     ['primer_nombre','primer nombre','primernombre','nombre1','first_name','primer nom'],
+  segundo_nombre:    ['segundo_nombre','segundo nombre','segundonombre','nombre2','second_name','seg nombre'],
+  primer_apellido:   ['primer_apellido','primer apellido','primerapellido','apellido1','last_name','primer ape'],
+  segundo_apellido:  ['segundo_apellido','segundo apellido','segundoapellido','apellido2','second_last','seg apellido'],
+  fecha_registro:    ['fecha_registro','fecha registro','fecharegistro','fec_reg','fecha reg','registration_date','fecha_creacion'],
+  fecha_nacimiento:  ['fecha_nacimiento','fecha nacimiento','fechanacimiento','fec_nac','nacimiento','birthdate','dob','fecha nac'],
+  edad:              ['edad','age','anos','años'],
+  sexo:              ['sexo','genero','género','sex','gender'],
+  direccion:         ['direccion','dirección','address','dir','domicilio'],
+  telefono:          ['telefono','teléfono','tel','phone','fono','tel fijo'],
+  celular:           ['celular','movil','móvil','mobile','cell','cel','tel celular'],
+  email:             ['email','correo','e-mail','mail','correo electronico','correo_electronico'],
+  ocupacion:         ['ocupacion','ocupación','profesion','profesión','oficio','cargo','profession'],
+  lugar_nacimiento:  ['lugar_nacimiento','lugar nacimiento','lugar_nac','birthplace','ciudad nacimiento'],
+  empresa:           ['empresa','company','empleador','employer','entidad'],
+  telefono_empresa:  ['telefono_empresa','tel_empresa','tel empresa','empresa tel','phone_work'],
+  nombre_acompanante:['nombre_acompanante','acompanante','acompañante','companion','nombre acompañante'],
+  parentesco:        ['parentesco','relationship','parentesco_acompanante','parentesco acompañante'],
+  tel_acompanante:   ['tel_acompanante','telefono_acompanante','tel acompañante'],
+  cel_acompanante:   ['cel_acompanante','celular_acompanante','cel acompañante'],
+  remitido:          ['remitido','referred_by','referido','referencia'],
+  zona:              ['zona','zone','sector','area'],
+  nacionalidad:      ['nacionalidad','nationality','pais','país','country'],
+  estado_civil:      ['estado_civil','estado civil','estadocivil','civil_status','marital'],
+  observacion:       ['observacion','observación','notas','notes','comentarios','observation','obs'],
+  eps:               ['eps','aseguradora','seguro','insurance','health_plan','eps_nombre','entidad salud'],
+  tipo_eps:          ['tipo_eps','tipo eps','tipo de eps','eps_tipo','cotizante'],
+  tipo_afiliacion:   ['tipo_afiliacion','tipo afiliacion','tipo_afiliación','regimen','régimen','plan','afiliacion'],
+  facebook:          ['facebook','fb'],
+  instagram:         ['instagram','ig','insta'],
+  twitter:           ['twitter','tw'],
+};
+
+// ─── NOMBRES FEMENINOS / MASCULINOS ─────────────────────────────────────────
+const NAMES_F = new Set(['MARIA','ANA','LAURA','SANDRA','PATRICIA','GLORIA','CARMEN','ROSA','LUZ',
+  'MARTHA','MARTA','DIANA','CLAUDIA','ELENA','SOFIA','VALENTINA','ISABELLA','CAMILA','ALEJANDRA',
+  'ANDREA','MONICA','PAOLA','ADRIANA','ISABEL','NATALIA','JOHANNA','VIVIANA','VANESSA','CAROLINA',
+  'MARCELA','LILIANA','FABIOLA','NORMA','OLGA','ESPERANZA','BEATRIZ','AMPARO','BLANCA','CECILIA',
+  'CONSUELO','EMMA','FERNANDA','GABRIELA','HELENA','IRENE','JESSICA','KAREN','KELLY','LORENA',
+  'LUISA','MAGDALENA','MARGARITA','NELLY','PILAR','RUTH','STELLA','TERESA','VICTORIA','XIMENA',
+  'YANETH','ZULMA','YOLANDA','SUSANA','SILVIA','ROCIO','REBECA','RAQUEL','NORA','MIRIAM',
+  'MILAGROS','MANUELA','JULIANA','JOHANA','JENNIFER','DELIA','CONSTANZA','CATALINA','BERTHA',
+  'ANGELA','ALBA','AGUSTINA','AIDA','ALICIA','AMALIA','AMANDA','ANGIE','ANITA','ANTONIA',
+  'AURA','AURORA','BELEN','CRISTINA','DORA','ELBA','ELISA','ESMERALDA','EVA','FLOR','GRACIELA',
+  'INES','JANNETH','JANETH','JENNY','LEIDY','LEILA','LENA','LEONOR','LETICIA','LIA','LILI',
+  'LINA','LIZBETH','LUCERO','LUCIA','LUNA','LYDA','MAIRA','MARIANA','MARIBEL','MARISELA','MARY',
+  'MERCEDES','NANCY','NATHALIA','NATHALY','NIDIA','NOHEMY','NUBIA','NYDIA','OFELIA','OLIVIA',
+  'ORFA','PAULA','PERLA','RUBY','SAIDA','SARA','SONIA','TANIA','TATIANA','VERONICA','VILMA',
+  'WENDY','XIOMARA','YENNY','YESENIA','GLADYS','NADIA','MELISSA','MICHELLE','MILENA','MYRIAM',
+  'NELSY','NIEVES','NOHORA','NOHRA','ROSAURA','SALOME','SELENA','SHIRLEY','SINDY','STEFANIA',
+  'STEPHANIE','TAMARA','YADIRA','YAMILE','YANIRA','YULIANA','YULIETH','YURANI','ZULAY','ZULEMA',
+  'ASTRID','BRIGITTE','CINDY','DAISY','DALIA','DEBORA','DEBORAH','DELCY','DERLY','DILMA',
+  'DOLORES','EDELMIRA','EDITH','EDNA','ELIANA','ELVIRA','EMILIA','ESTHER','EUGENIA','EUNICE',
+  'FANNY','FRANCY','GENOVEVA','GERALDINE','GIOVANNA','INGRID','IRMA','JASMINE','JULIA','JULIETH',
+  'JUSTINA','KARIN','KARINA','KATIA','LEIDYS','LEONELA','LINDA','LISSETTE','LOLA','LOURDES',
+  'LUCINDA','LYDIA','MAGDA','MAGNOLIA','MALENA','MARISOL','MARLENE','MARYORI','MIRNA',
+  'NOEMI','PENELOPE','PIEDAD','PRISCILA','REINA','REMEDIOS','ROSARIO','ROXANA','SOLEDAD',
+  'TRINIDAD','VIRGINIA','YAQUELIN','ZENAIDA','JHOANA','GISELA','NATHALIE','ROSSANA',
+  'FARIDE','FATIMA','FIDELIA','FILOMENA','GILDA','HEDWIG','HEIDY','ILSE','ISAURA',
+  'JAQUELINE','JUNE','LESLEY','LOLA','MAFALDA','MARIELA','MURIEL','ODETTE','ROXANNA',
+  'SHIRLEY','SULEY','TIARA','YSABEL','YULIA','EULALIA','HERMELINDA','HERMINIA','LOURDES',
+  'HORTENSIA','GUADALUPE','PENELOPE','TRINIDAD','YOMAIRA','YOMARYS','ZULEYMA','ZULEIKA',
+  'LINETH','LEINIS','LEIDIS','LEIDYS','YILENIS','YINETH','YINETTE','LEIDY','DAYANA',
+  'ANGIE','XIOMY','SUSY','SUSI','GABY','NATY','PILY','VERO','CARO','CECI','PATY',
+  'JOHIS','YURIS','YURIS','LURYS','LURISA','LEINA','LEINIS','LENIS','LURYS',
+  'KAROL','KARLA','NORA','LINA','NELA','NELI','NELLY','NELSY','NELIDA','NEIDA',
+  'MEIDY','MEIDI','MAYRA','MAYTE','MAYTE','YENIFER','YENIFFER','YENIPHER',
+]);
+const NAMES_M = new Set(['CARLOS','JUAN','LUIS','JOSE','JORGE','PEDRO','MIGUEL','ANTONIO','EDUARDO',
+  'ANDRES','DAVID','DANIEL','FELIPE','MANUEL','FRANCISCO','MARIO','OSCAR','HERNANDO','RAFAEL',
+  'RODRIGO','SERGIO','GABRIEL','DIEGO','ALEJANDRO','ALBERTO','HECTOR','GERMAN','GUILLERMO',
+  'GUSTAVO','HENRY','IVAN','JAIRO','JAVIER','JOHN','JONATAN','JULIAN','KEVIN','LEON',
+  'LEONARDO','MARCO','MAURICIO','NELSON','NICOLAS','PABLO','RAMIRO','RAUL','RENE','RICHARD',
+  'ROBERTO','ROLANDO','RUBEN','SAMUEL','SANTIAGO','SEBASTIAN','VICTOR','WILLIAM','WILSON',
+  'ARMANDO','ARTURO','AUGUSTO','BORIS','CAMILO','CESAR','CRISTIAN','EDGAR','EFRAIN','EMILIO',
+  'ERNESTO','FABIAN','FERNEY','FREDY','GERARDO','GIOVANNI','GONZALO','HAROLD','HERNAN','HUGO',
+  'ISIDRO','JAIME','JEISSON','JHON','JOEL','JONATHAN','JORDAN','JOSEPH','JOSUE','LEANDRO',
+  'LISANDRO','GILBERTO','GILDARDO','ALDEMAR','ALDRIN','ALEXIS','ALONSO','ANIBAL','ARCESIO',
+  'ARGEMIRO','ARISTIDES','ARLES','ARNOLDO','ARNULFO','ARSENIO','ASDRUBAL','AUGUSTO','AURELIO',
+  'AVELINO','BAYRON','BELISARIO','BERNARDO','BLADIMIR','BRAULIO','BRAYAN','BRIAN','CALIXTO',
+  'CELIO','CIRO','CLEMENTE','CORNELIO','DAGOBERTO','DARIO','DARWIN','DEIMER','DEIVER',
+  'DELFIN','DELMER','DEMETRIO','DIDIER','DIMAS','DIONISIO','DUVAN','EDIER','EDMAR','EDSON',
+  'EDILBERTO','EDINSON','EDILSON','EFREN','ELBERT','ELBER','ELEAZAR','ELKIN','ELMER',
+  'ELPIDIO','ELVER','ELVIN','ERASMO','ERICK','ERNEY','EVELIO','EZEQUIEL','FABIO','FAUSTO',
+  'FELIX','FERNAN','FIDEL','FILEMON','FLAVIO','FLORENCIO','FRANCO','GERBER','GENARO','GIL',
+  'GIOVANNY','GIOANNY','GONZALO','GRACIANO','GREGORIO','GUIDO','GILMAR','GILSON','HARBEY',
+  'HARVIN','HERLEY','HORACIO','IGNACIO','JAIR','JAISON','JAMES','JEFFREY','JHONATAN',
+  'JHONNY','JHONY','JHOAN','JOAO','JOBANI','JONAS','JONNY','JOSAFAT','JUANDI','JULIO',
+  'KELVIN','LAUDINO','LAUREANO','LAZARO','LEITON','LEONEL','LEONIDAS','LESTER','LEVIS',
+  'LINCOL','LORENZO','LUCA','LUCIANO','LUCIO','LUDWIN','MAICOL','MAIRON','MARCOS',
+  'MARK','MARTIN','MATEO','MATIAS','MAXIMILIANO','MILCIADES','MOISES','NEFTALI','NESTOR',
+  'NOEL','NORBERTO','OLIVERIO','OMAR','ORLANDO','OSWALDO','PASTOR','PATRICIO','PAULO',
+  'REINALDO','REINEL','RENZO','RIGOBERTO','ROGELIO','ROMAN','RONALDO','ROQUE','ROSENDO',
+  'RUDOLPH','RUDY','SAUL','SILVIO','SIMON','TEODORO','TOMAS','ULISES','VALENTIN','VIRGILIO',
+  'WENCESLAO','WILBER','WILMAR','WILMER','YEIFER','YEISON','YENDER','YERLAN','YILBER',
+  'YIMER','YOEL','YONATAN','YORDAN','YOSEL','YUBANS','ELIAS','TOBIAS','ISAIAS','JEREMIAS',
+  'JESUS','ANGEL','JHONATAN','JHOINER','JHOEL','JHOFRE','JHOANNY','NEYMAR','ALDER',
+  'ALEXANDER','ALFREDO','AQUILEO','ASTERIO','ATAHUALPA','BALBINO','BALDOVINO','BALMORE',
+  'BENEDICTO','BENIGNO','BENILDO','BERNAL','CALIXTO','GEINER','GEISSON','GELBER','GELVER',
+  'GERSON','GIOVANNI','GLOBER','GODOFREDO','GURWINDER','HELIODORO','ABSALON','ABNER',
+  'ADALBERTO','ADALY','ADONIAS','ADONIAS','ADRIANO','AGUSTIN','AHARON','AIMER','AIRON',
+  'AITON','ALADINO','ALBEIRO','ALBEIRO','ALBER','ALBI','ALDAIR',
+]);
+
+// ─── ESTADO ─────────────────────────────────────────────────────────────────
+const st = {
+  raw: [], headers: [], filename: '',
+  nameMode: 'sep',         // 'full' | 'two' | 'sep'
+  fullCol: '', nombresCol: '', apellidosCol: '',
+  fieldMap: {},            // fieldId → sourceColumn
+  processed: [],           // final rows (objects with OUT field ids)
+  findings: [],            // [{rowNum, type, campo, msg}]
+  filtered: [],
+  sortCol: null, sortDir: 'asc',
+  page: 1,
+};
+const PAGE = 50;
+
+// ─── FILE LOADING ─────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); const f = e.dataTransfer.files[0]; if(f) loadFile(f); });
+
+function handleFile(e){ const f = e.target.files[0]; if(f) loadFile(f); }
+
+function loadFile(file){
+  const n = file.name.toLowerCase();
+  st.filename = file.name.replace(/\.[^.]+$/,'');
+  document.getElementById('export-name').value = st.filename + '_organizado';
+
+  if(n.endsWith('.csv')||n.endsWith('.txt')){
+    Papa.parse(file,{
+      header:true, skipEmptyLines:true, encoding:'UTF-8',
+      complete: r => onData(r.data, r.meta.fields||[], file.name),
+      error: e => toast('Error al leer: '+e.message,'err'),
+    });
+  } else {
+    const rd = new FileReader();
+    rd.onload = e => {
+      try{
+        const wb = XLSX.read(e.target.result,{type:'array',cellDates:true,raw:false});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+        const hdrs = rows.length ? Object.keys(rows[0]) : [];
+        onData(rows, hdrs, file.name);
+      }catch(er){ toast('Error Excel: '+er.message,'err'); }
+    };
+    rd.readAsArrayBuffer(file);
+  }
+}
+
+function onData(rows, headers, filename){
+  st.raw = rows; st.headers = headers;
+  const dz = document.getElementById('drop-zone');
+  dz.classList.add('loaded');
+  document.getElementById('drop-icon').textContent = '✅';
+  document.getElementById('drop-title').textContent = filename;
+  const li = document.getElementById('loaded-info');
+  li.classList.remove('hidden');
+  li.textContent = `${rows.length} filas · ${headers.length} columnas detectadas`;
+  document.getElementById('btn-step1').disabled = false;
+  toast(`Archivo cargado: ${rows.length} filas`,'ok');
+}
+
+// ─── PASOS ────────────────────────────────────────────────────────────────
+function goStep(n){
+  [1,2,3].forEach(i=>{
+    document.getElementById('step'+i).classList.toggle('hidden', i!==n);
+    const si = document.getElementById('s'+i);
+    si.classList.remove('active','done');
+    if(i < n) si.classList.add('done');
+    else if(i===n) si.classList.add('active');
+    if(i<3){ const sep=document.getElementById('sep'+i); sep.classList.toggle('done',i<n); }
+  });
+  if(n===2) buildMappingUI();
+}
+
+// ─── MAPPING UI ────────────────────────────────────────────────────────────
+function norm(s){ return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s_\-\.]+/g,'_').trim(); }
+
+function autoDetect(){
+  const nh = {}; st.headers.forEach(h=>{ nh[norm(h)]=h; });
+
+  // Detect name mode
+  const fullCands = ['nombre_completo','nombre completo','nombrecompleto','paciente','beneficiario','nombres_completos'];
+  for(const c of fullCands){ if(nh[norm(c)]){ st.nameMode='full'; st.fullCol=nh[norm(c)]; break; } }
+  if(st.nameMode!=='full'){
+    let nomF=null, apeF=null;
+    for(const a of ['nombres','nombre']){ if(nh[norm(a)]){ nomF=nh[norm(a)]; break; } }
+    for(const a of ['apellidos','apellido']){ if(nh[norm(a)]){ apeF=nh[norm(a)]; break; } }
+    if(nomF&&apeF){ st.nameMode='two'; st.nombresCol=nomF; st.apellidosCol=apeF; }
+  }
+
+  // Detect individual fields
+  const fm = {};
+  for(const fid in ALIASES){
+    for(const a of ALIASES[fid]){
+      if(nh[norm(a)]){ fm[fid]=nh[norm(a)]; break; }
+    }
+    if(!fm[fid]){
+      const n1 = norm(fid.replace(/_/g,' '));
+      const found = Object.keys(nh).find(k=>k.includes(n1)||n1.includes(k));
+      if(found) fm[fid]=nh[found];
+    }
+  }
+  st.fieldMap = fm;
+  if(st.nameMode==='sep'){
+    ['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido'].forEach(f=>{
+      for(const a of ALIASES[f]||[]){ if(nh[norm(a)]){ fm[f]=nh[norm(a)]; break; } }
+    });
+  }
+}
+
+function setNameMode(m){
+  st.nameMode=m;
+  ['full','two','sep'].forEach(x=>document.getElementById('nm-'+x).classList.toggle('active',x===m));
+  renderNameInputs();
+}
+
+function renderNameInputs(){
+  const ni = document.getElementById('name-inputs');
+  const opts = ['<option value="">— No mapear —</option>',...st.headers.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`)].join('');
+  if(st.nameMode==='full'){
+    ni.innerHTML=`<div class="map-item"><span class="map-lbl">Nombre completo (4 partes) <span class="req">*</span></span>
+      <select class="map-sel ${st.fullCol?'ok':''}" id="nm-full-sel" onchange="st.fullCol=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(st.fullCol)}"`,`value="${esc(st.fullCol)}" selected`)}</select></div>`;
+  } else if(st.nameMode==='two'){
+    ni.innerHTML=`
+      <div class="map-item"><span class="map-lbl">Columna Nombres <span class="req">*</span></span>
+        <select class="map-sel ${st.nombresCol?'ok':''}" id="nm-nom-sel" onchange="st.nombresCol=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(st.nombresCol)}"`,`value="${esc(st.nombresCol)}" selected`)}</select></div>
+      <div class="map-item"><span class="map-lbl">Columna Apellidos <span class="req">*</span></span>
+        <select class="map-sel ${st.apellidosCol?'ok':''}" id="nm-ape-sel" onchange="st.apellidosCol=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(st.apellidosCol)}"`,`value="${esc(st.apellidosCol)}" selected`)}</select></div>`;
+  } else {
+    const nameFields = ['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido'];
+    ni.innerHTML = nameFields.map(fid=>{
+      const f = OUT.find(x=>x.id===fid); const cur = st.fieldMap[fid]||'';
+      return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
+        <select class="map-sel ${cur?'ok':''}" data-fid="${fid}" onchange="st.fieldMap['${fid}']=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(cur)}"`,`value="${esc(cur)}" selected`)}</select></div>`;
+    }).join('');
+  }
+}
+
+function buildMappingUI(){
+  autoDetect();
+  ['full','two','sep'].forEach(x=>document.getElementById('nm-'+x).classList.toggle('active',x===st.nameMode));
+  renderNameInputs();
+
+  const nameIds = new Set(['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido','fila']);
+  const fields = MAPPABLE.filter(f=>!nameIds.has(f.id));
+  const opts = ['<option value="">— No mapear —</option>',...st.headers.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`)].join('');
+
+  const groups = [
+    {label:'Identificación',ids:['tipo_documento','documento']},
+    {label:'Fechas',ids:['fecha_registro','fecha_nacimiento','edad']},
+    {label:'Datos personales',ids:['sexo','direccion','telefono','celular','email','ocupacion','lugar_nacimiento','nacionalidad','estado_civil','zona']},
+    {label:'Empresa',ids:['empresa','telefono_empresa']},
+    {label:'Acompañante',ids:['nombre_acompanante','parentesco','tel_acompanante','cel_acompanante']},
+    {label:'Salud',ids:['eps','tipo_eps','tipo_afiliacion','remitido']},
+    {label:'Otros',ids:['observacion','facebook','instagram','twitter']},
+  ];
+
+  const grid = document.getElementById('map-grid');
+  grid.innerHTML = groups.map(g=>{
+    const items = g.ids.map(id=>{
+      const f = OUT.find(x=>x.id===id); if(!f) return '';
+      const cur = st.fieldMap[id]||'';
+      return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
+        <select class="map-sel ${cur?'ok':''}" data-fid="${id}" onchange="st.fieldMap['${id}']=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(cur)}"`,`value="${esc(cur)}" selected`)}</select></div>`;
+    }).join('');
+    return `<div class="section-sep">${g.label}</div>${items}`;
+  }).join('');
+}
+
+function updateSelStyle(sel){ sel.classList.toggle('ok', !!sel.value); }
+
+// ─── UTILIDADES ─────────────────────────────────────────────────────────────
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function clean(v){ return String(v??'').replace(/[\r\n\t]/g,' ').trim(); }
+
+function parseDate(val){
+  if(!val) return null;
+  if(val instanceof Date) return isNaN(val.getTime())?null:val;
+  const s = String(val).trim();
+  if(!s) return null;
+  let m;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s+'T00:00:00');
+  m=s.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})$/); if(m) return new Date(`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}T00:00:00`);
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if(m) return new Date(`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}T00:00:00`);
+  if(/^\d{8}$/.test(s)) return new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`);
+  const d=new Date(s); return isNaN(d.getTime())?null:d;
+}
+
+function fmtDate(val){
+  const d=parseDate(val); if(!d) return clean(val??'');
+  const y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${da}`;
+}
+
+function calcAge(dob){
+  const d=parseDate(dob); if(!d) return '';
+  const now=new Date(); let age=now.getFullYear()-d.getFullYear();
+  if(now.getMonth()<d.getMonth()||(now.getMonth()===d.getMonth()&&now.getDate()<d.getDate())) age--;
+  return age>=0?String(age):'';
+}
+
+function inferDocType(dob){
+  const age=parseInt(calcAge(dob),10); if(isNaN(age)||age<0) return '';
+  if(age<=6) return 'RC'; if(age<=17) return 'TI'; return 'CC';
+}
+
+function normDocType(val){
+  if(!val) return '';
+  const v=clean(val).toUpperCase();
+  const MAP={'CEDULA':'CC','CÉDULA':'CC','C.C':'CC','C.C.':'CC','CEDULA CIUDADANIA':'CC',
+    'TARJETA IDENTIDAD':'TI','TARJETA DE IDENTIDAD':'TI','REGISTRO CIVIL':'RC',
+    'CEDULA EXTRANJERIA':'CE','CÉDULA DE EXTRANJERÍA':'CE','PASAPORTE':'PA',
+    'ADULTO SIN IDENTIFICACION':'AS','MENOR SIN IDENTIFICACION':'MS',
+    'NUMERO UNICO':'NU','NO REGISTRA':'NR','NUMERO IDENTIFICACION TRIBUTARIA':'NIT'};
+  return MAP[v]||v;
+}
+
+function inferSex(nombre){
+  if(!nombre) return '';
+  const n=nombre.toUpperCase().trim().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(NAMES_M.has(n)) return 'masculino';
+  if(NAMES_F.has(n)) return 'femenino';
+  // Reglas gramaticales
+  if(n.endsWith('A')&&!['EZA','ADA'].some(x=>n.endsWith(x)&&n.length<4)) return 'femenino';
+  if(n.endsWith('O')||n.endsWith('OS')) return 'masculino';
+  if(['SON','IN','ON','AN','EL','OL','ER','US','IS','OR'].some(x=>n.endsWith(x))) return 'masculino';
+  return '';
+}
+
+function normSexo(val){
+  if(!val) return '';
+  const v=clean(val).toUpperCase();
+  if(['M','H','MASCULINO','HOMBRE','1','MALE'].includes(v)) return 'masculino';
+  if(['F','FEMENINO','MUJER','2','FEMALE'].includes(v)) return 'femenino';
+  return clean(val).toLowerCase();
+}
+
+function splitFull(s){
+  const parts=clean(s).split(/\s+/).filter(Boolean);
+  switch(parts.length){
+    case 0: return ['','','',''];
+    case 1: return [parts[0],'','',''];
+    case 2: return [parts[0],'',parts[1],''];
+    case 3: return [parts[0],'',parts[1],parts[2]];
+    case 4: return [parts[0],parts[1],parts[2],parts[3]];
+    default: return [parts[0],parts[1],parts[2],parts.slice(3).join(' ')];
+  }
+}
+function splitTwo(s){ const p=clean(s).split(/\s+/).filter(Boolean); return [p[0]||'',p.slice(1).join(' ')||'']; }
+
+function getVal(row, col){ return col ? clean(row[col]??'') : ''; }
+
+// ─── PROCESAR ────────────────────────────────────────────────────────────────
+function processData(){
+  if(!st.raw.length){ toast('Cargue un archivo primero','err'); return; }
+
+  const processed=[], findings=[];
+  let fila=1;
+
+  st.raw.forEach((row,idx)=>{
+    const rn = idx+2; // fila humana (sin contar encabezado)
+    const rowFindings=[];
+    const out={};
+
+    // FILA (regla 9)
+    out.fila = String(fila++);
+
+    // NOMBRES (regla 4)
+    if(st.nameMode==='full'){
+      const full = getVal(row, st.fullCol);
+      const [pn,sn,pa,sa]=splitFull(full);
+      out.primer_nombre=pn; out.segundo_nombre=sn; out.primer_apellido=pa; out.segundo_apellido=sa;
+      if(full && full.trim().split(/\s+/).length>4) rowFindings.push({type:'info',campo:'Nombre',msg:`Nombre con más de 4 partes, se agrupó el resto en segundo apellido: "${full}"`});
+    } else if(st.nameMode==='two'){
+      const noms=getVal(row,st.nombresCol), apes=getVal(row,st.apellidosCol);
+      const [pn,sn]=splitTwo(noms), [pa,sa]=splitTwo(apes);
+      out.primer_nombre=pn; out.segundo_nombre=sn; out.primer_apellido=pa; out.segundo_apellido=sa;
+    } else {
+      out.primer_nombre  = getVal(row, st.fieldMap.primer_nombre);
+      out.segundo_nombre = getVal(row, st.fieldMap.segundo_nombre);
+      out.primer_apellido= getVal(row, st.fieldMap.primer_apellido);
+      out.segundo_apellido= getVal(row, st.fieldMap.segundo_apellido);
+    }
+
+    // TIPO DOCUMENTO (reglas 1 y 2)
+    const rawDoc = getVal(row, st.fieldMap.tipo_documento);
+    let tipoDoc = normDocType(rawDoc);
+    const docNum = getVal(row, st.fieldMap.documento);
+    const fechaNac = fmtDate(getVal(row, st.fieldMap.fecha_nacimiento)||'');
+
+    if(!tipoDoc){
+      const inf = inferDocType(fechaNac);
+      if(inf){ tipoDoc=inf; rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Sin tipo de documento. Se asignó ${inf} según fecha de nacimiento (DANE).`}); }
+      else rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin tipo de documento y no se pudo inferir (fecha de nacimiento inválida o ausente).'});
+    } else if(rawDoc.trim()!==tipoDoc){
+      rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Normalizado a mayúsculas: "${rawDoc}" → "${tipoDoc}"`});
+    }
+    out.tipo_documento = tipoDoc;
+
+    // DOCUMENTO
+    out.documento = docNum;
+    if(!docNum) rowFindings.push({type:'err',campo:'Documento',msg:'Número de documento vacío.'});
+
+    // FECHA NACIMIENTO (regla 6)
+    const fechaNacOrig = getVal(row, st.fieldMap.fecha_nacimiento);
+    const fechaNacFmt = fmtDate(fechaNacOrig);
+    out.fecha_nacimiento = fechaNacFmt;
+    if(fechaNacOrig && fechaNacFmt !== clean(fechaNacOrig))
+      rowFindings.push({type:'info',campo:'Fecha Nacimiento',msg:`Fecha reformateada: "${fechaNacOrig}" → "${fechaNacFmt}"`});
+    if(!fechaNacFmt) rowFindings.push({type:'err',campo:'Fecha Nacimiento',msg:'Fecha de nacimiento vacía.'});
+
+    // EDAD (regla 3)
+    const rawEdad = getVal(row, st.fieldMap.edad);
+    let edad = rawEdad ? clean(rawEdad) : '';
+    if(!edad && fechaNacFmt){
+      edad = calcAge(fechaNacFmt);
+      if(edad) rowFindings.push({type:'info',campo:'Edad',msg:`Calculada automáticamente desde fecha de nacimiento: ${edad} años.`});
+    }
+    out.edad = edad;
+
+    // SEXO (regla 5)
+    const rawSexo = getVal(row, st.fieldMap.sexo);
+    let sexo = normSexo(rawSexo);
+    if(!sexo){
+      const inf = inferSex(out.primer_nombre);
+      if(inf){ sexo=inf; rowFindings.push({type:'info',campo:'Sexo',msg:`Sin sexo. Inferido por nombre "${out.primer_nombre}": ${inf}.`}); }
+      else rowFindings.push({type:'warn',campo:'Sexo',msg:`Sin sexo y no se pudo inferir por el nombre "${out.primer_nombre}".`});
+    } else if(rawSexo.toLowerCase()!==sexo){
+      rowFindings.push({type:'info',campo:'Sexo',msg:`Normalizado: "${rawSexo}" → "${sexo}"`});
+    }
+    out.sexo = sexo;
+
+    // FECHA REGISTRO (regla 6)
+    const frOrig = getVal(row, st.fieldMap.fecha_registro);
+    const frFmt = fmtDate(frOrig);
+    out.fecha_registro = frFmt;
+    if(frOrig && frFmt !== clean(frOrig))
+      rowFindings.push({type:'info',campo:'Fecha Registro',msg:`Reformateada: "${frOrig}" → "${frFmt}"`});
+
+    // CAMPOS SIMPLES (regla 7: remover saltos de línea)
+    const simpleMap = {
+      direccion:'direccion', telefono:'telefono', celular:'celular', email:'email',
+      ocupacion:'ocupacion', lugar_nacimiento:'lugar_nacimiento', empresa:'empresa',
+      telefono_empresa:'telefono_empresa', nombre_acompanante:'nombre_acompanante',
+      parentesco:'parentesco', tel_acompanante:'tel_acompanante',
+      cel_acompanante:'cel_acompanante', remitido:'remitido', zona:'zona',
+      nacionalidad:'nacionalidad', estado_civil:'estado_civil', observacion:'observacion',
+      eps:'eps', tipo_eps:'tipo_eps', tipo_afiliacion:'tipo_afiliacion',
+      facebook:'facebook', instagram:'instagram', twitter:'twitter',
+    };
+    for(const [outId, mapId] of Object.entries(simpleMap)){
+      out[outId] = getVal(row, st.fieldMap[mapId]);
+    }
+
+    // VALIDAR NOMBRE
+    if(!out.primer_nombre) rowFindings.push({type:'err',campo:'Primer Nombre',msg:'Primer nombre vacío.'});
+    if(!out.primer_apellido) rowFindings.push({type:'err',campo:'Primer Apellido',msg:'Primer apellido vacío.'});
+
+    if(rowFindings.length) findings.push(...rowFindings.map(f=>({rowNum:rn, ...f})));
+    processed.push(out);
+  });
+
+  st.processed = processed;
+  st.findings = findings;
+  st.filtered = [...processed];
+  st.page = 1;
+  st.sortCol = null;
+
+  renderStats();
+  renderTable();
+  renderFindings();
+  goStep(3);
+  toast(`Procesadas ${processed.length} filas · ${findings.length} hallazgos`,'ok');
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────
+function renderStats(){
+  const total = st.processed.length;
+  const rowsWithFindings = new Set(st.findings.map(f=>f.rowNum));
+  const errs = new Set(st.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
+  const warns = new Set(st.findings.filter(f=>f.type==='warn').map(f=>f.rowNum));
+  const corr = new Set(st.findings.filter(f=>f.type==='info').map(f=>f.rowNum));
+
+  document.getElementById('st-total').textContent = total;
+  document.getElementById('st-ok').textContent = total - rowsWithFindings.size;
+  document.getElementById('st-err').textContent = errs.size;
+  document.getElementById('st-warn').textContent = warns.size;
+  document.getElementById('st-corr').textContent = corr.size;
+}
+
+// ─── TABLA ────────────────────────────────────────────────────────────────
+const VISIBLE = ['fila','tipo_documento','documento','primer_nombre','segundo_nombre',
+  'primer_apellido','segundo_apellido','fecha_nacimiento','edad','sexo',
+  'direccion','telefono','celular','email','eps','tipo_afiliacion'];
+
+function getRowStatus(rowNum){
+  const rf = st.findings.filter(f=>f.rowNum===rowNum);
+  if(rf.some(f=>f.type==='err')) return 'err';
+  if(rf.some(f=>f.type==='warn')) return 'warn';
+  if(rf.some(f=>f.type==='info')) return 'corr';
+  return 'ok';
+}
+
+function renderTable(){
+  const start=(st.page-1)*PAGE, pageRows=st.filtered.slice(start,start+PAGE);
+  const rn = document.getElementById('rows-lbl'); rn.textContent = `${st.filtered.length} filas`;
+
+  const errRows = new Set(st.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
+  const warnRows = new Set(st.findings.filter(f=>f.type==='warn').map(f=>f.rowNum));
+  const infoRows = new Set(st.findings.filter(f=>f.type==='info').map(f=>f.rowNum));
+
+  // Head
+  const thead = document.getElementById('tbl-head');
+  thead.innerHTML=`<tr><th class="n-row">#</th>${VISIBLE.map(id=>{
+    const f=OUT.find(x=>x.id===id);
+    const cls=st.sortCol===id?(st.sortDir==='asc'?'asc':'desc'):'';
+    return `<th class="${cls}" onclick="sortBy('${id}')">${f?.label||id}</th>`;
+  }).join('')}</tr>`;
+
+  const tbody = document.getElementById('tbl-body');
+  if(!pageRows.length){
+    tbody.innerHTML='';
+    document.getElementById('tbl-wrap')?.classList.add('hidden');
+    document.getElementById('tbl-empty').classList.remove('hidden');
+    document.getElementById('pagination').innerHTML='';
+    return;
+  }
+  document.querySelector('.tbl-wrap').classList.remove('hidden');
+  document.getElementById('tbl-empty').classList.add('hidden');
+
+  const rowNum = (row)=>{
+    // map processed row back to original row number
+    const idx = st.processed.indexOf(row);
+    return idx>=0 ? idx+2 : 0;
+  };
+
+  tbody.innerHTML = pageRows.map(row=>{
+    const rn2 = parseInt(row.fila,10)+1; // fila+1 = row number (fila is 1-based, row number = fila+1 header)
+    // Actually let's use the position in processed array
+    const idx = st.processed.indexOf(row);
+    const origRow = idx+2;
+    const cls = errRows.has(origRow)?'row-e':warnRows.has(origRow)?'row-w':infoRows.has(origRow)?'row-i':'';
+    const tags = errRows.has(origRow)?'<span class="tag tag-e">ERR</span>':
+                 warnRows.has(origRow)?'<span class="tag tag-w">WARN</span>':
+                 infoRows.has(origRow)?'<span class="tag tag-i">CORR</span>':'';
+    return `<tr class="${cls}">
+      <td class="n-row">${origRow}${tags}</td>
+      ${VISIBLE.map(id=>{
+        const v = esc(row[id]||'');
+        if(id==='documento') return `<td><span class="doc-badge">${v||'—'}</span></td>`;
+        if(id==='tipo_documento') return `<td style="font-weight:700;color:var(--blue-dark)">${v}</td>`;
+        if(id==='sexo') return `<td>${row[id]==='femenino'?'♀ F':row[id]==='masculino'?'♂ M':v}</td>`;
+        return `<td>${v||''}</td>`;
+      }).join('')}
+    </tr>`;
+  }).join('');
+
+  renderPagination();
+}
+
+function sortBy(col){
+  if(st.sortCol===col) st.sortDir=st.sortDir==='asc'?'desc':'asc';
+  else { st.sortCol=col; st.sortDir='asc'; }
+  st.filtered.sort((a,b)=>{
+    const av=String(a[col]??'').toLowerCase(), bv=String(b[col]??'').toLowerCase();
+    return st.sortDir==='asc'?av.localeCompare(bv,'es'):bv.localeCompare(av,'es');
+  });
+  st.page=1; renderTable();
+}
+
+function applyFilters(){
+  const q=document.getElementById('search-in').value.toLowerCase();
+  const sex=document.getElementById('f-sexo').value;
+  const status=document.getElementById('f-status').value;
+  const errRows=new Set(st.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
+  const warnRows=new Set(st.findings.filter(f=>f.type==='warn').map(f=>f.rowNum));
+  const infoRows=new Set(st.findings.filter(f=>f.type==='info').map(f=>f.rowNum));
+
+  st.filtered=st.processed.filter((row,idx)=>{
+    const origRow=idx+2;
+    if(q){
+      const s=[row.documento,row.primer_nombre,row.segundo_nombre,row.primer_apellido,row.segundo_apellido,row.eps].join(' ').toLowerCase();
+      if(!s.includes(q)) return false;
+    }
+    if(sex && row.sexo!==sex) return false;
+    if(status){
+      if(status==='ok' && (errRows.has(origRow)||warnRows.has(origRow)||infoRows.has(origRow))) return false;
+      if(status==='err' && !errRows.has(origRow)) return false;
+      if(status==='warn' && !warnRows.has(origRow)) return false;
+      if(status==='corr' && !infoRows.has(origRow)) return false;
+    }
+    return true;
+  });
+  st.page=1; renderTable();
+}
+
+function clearFilters(){
+  document.getElementById('search-in').value='';
+  document.getElementById('f-sexo').value='';
+  document.getElementById('f-status').value='';
+  st.filtered=[...st.processed]; st.page=1; renderTable();
+}
+
+function renderPagination(){
+  const total=st.filtered.length, pages=Math.ceil(total/PAGE);
+  const pg=document.getElementById('pagination');
+  if(pages<=1){ pg.innerHTML=''; return; }
+  const range=pRange(st.page,pages);
+  pg.innerHTML=`<button class="pg-btn" onclick="goPage(${st.page-1})" ${st.page===1?'disabled':''}>‹</button>
+    ${range.map(p=>p==='...'?`<span class="pg-info">…</span>`:
+      `<button class="pg-btn ${p===st.page?'active':''}" onclick="goPage(${p})">${p}</button>`).join('')}
+    <button class="pg-btn" onclick="goPage(${st.page+1})" ${st.page===pages?'disabled':''}>›</button>
+    <span class="pg-info">Página ${st.page}/${pages}</span>`;
+}
+function pRange(c,t){ if(t<=7) return Array.from({length:t},(_,i)=>i+1);
+  if(c<=4) return [1,2,3,4,5,'...',t]; if(c>=t-3) return [1,'...',t-4,t-3,t-2,t-1,t];
+  return [1,'...',c-1,c,c+1,'...',t]; }
+function goPage(p){ const pages=Math.ceil(st.filtered.length/PAGE);
+  if(p<1||p>pages) return; st.page=p; renderTable();
+  document.querySelector('.tbl-scroll').scrollTop=0; }
+
+// ─── HALLAZGOS ────────────────────────────────────────────────────────────
+function renderFindings(){
+  const list=document.getElementById('findings-list');
+  const empty=document.getElementById('findings-empty');
+  if(!st.findings.length){ list.innerHTML=''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  list.innerHTML=st.findings.slice(0,500).map(f=>`
+    <div class="finding ${f.type}">
+      <span class="f-row">Fila ${f.rowNum}</span>
+      <span class="f-campo">${f.campo}</span>
+      <span class="f-msg">${f.msg}</span>
+    </div>`).join('');
+  if(st.findings.length>500) list.innerHTML+=`<div class="finding warn"><span class="f-msg">… y ${st.findings.length-500} hallazgos más (incluidos en la descarga).</span></div>`;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['prev','hall'][i]===id));
+  document.getElementById('tab-prev').classList.toggle('active',id==='prev');
+  document.getElementById('tab-hall').classList.toggle('active',id==='hall');
+}
+
+// ─── EXPORTAR TXT ────────────────────────────────────────────────────────
+function exportTXT(){
+  if(!st.processed.length){ toast('Sin datos para exportar','err'); return; }
+  const name=(document.getElementById('export-name').value.trim()||'migraciones_pacientes');
+  // 34 columnas, tab, sin encabezado, sin saltos de línea (reglas 7, 8, 10)
+  const lines = st.processed.map(row=>
+    OUT.map(f=>clean(String(row[f.id]??''))).join('\t')
+  );
+  const blob = new Blob([lines.join('\r\n')],{type:'text/plain;charset=utf-8'});
+  downloadBlob(blob, name+'.txt');
+  toast('Archivo TXT exportado ✅','ok');
+}
+
+// ─── EXPORTAR HALLAZGOS ───────────────────────────────────────────────────
+function exportFindings(){
+  const name=(document.getElementById('export-name').value.trim()||'migraciones_pacientes')+'_hallazgos';
+  if(!st.findings.length){ toast('No hay hallazgos para exportar','info'); return; }
+  const header='Fila\tTipo\tCampo\tDescripción\r\n';
+  const lines=st.findings.map(f=>`${f.rowNum}\t${f.type==='err'?'Error':f.type==='warn'?'Advertencia':'Corrección automática'}\t${f.campo}\t${f.msg}`);
+  const blob=new Blob([header+lines.join('\r\n')],{type:'text/plain;charset=utf-8'});
+  downloadBlob(blob, name+'.txt');
+  toast('Hallazgos exportados ✅','ok');
+}
+
+function downloadBlob(blob, filename){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────
+function toast(msg, type='info'){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.className=`toast show ${type}`; clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('show'),3200);
+}
+</script>
+</body>
+</html>
