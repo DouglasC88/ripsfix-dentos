@@ -165,6 +165,20 @@ tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through
 .tab.active{background:var(--white);color:var(--blue);box-shadow:var(--shadow-sm);}
 .panel{display:none;}.panel.active{display:block;}
 
+/* MODE NAV (secciones principales) */
+.mode-nav{display:flex;gap:8px;margin-bottom:22px;}
+.mode-nav-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:9px;
+  padding:14px 18px;border-radius:var(--radius);border:2px solid var(--gray-200);
+  background:var(--white);font-family:var(--display);font-size:.88rem;font-weight:800;
+  color:var(--gray-500);cursor:pointer;transition:all .2s;box-shadow:var(--shadow-sm);}
+.mode-nav-btn .mn-ico{font-size:1.3rem;}
+.mode-nav-btn .mn-txt{text-align:left;line-height:1.2;}
+.mode-nav-btn .mn-txt small{display:block;font-size:.66rem;font-weight:600;color:var(--gray-400);margin-top:1px;}
+.mode-nav-btn:hover{border-color:var(--blue);color:var(--blue);transform:translateY(-1px);}
+.mode-nav-btn.active{border-color:var(--blue);background:var(--blue-light);color:var(--blue-dark);
+  box-shadow:0 4px 14px rgba(41,171,226,.2);}
+.mode-nav-btn.active .mn-txt small{color:var(--blue-dark);opacity:.7;}
+
 /* FINDINGS */
 .findings-list{display:flex;flex-direction:column;gap:5px;max-height:400px;overflow-y:auto;}
 .finding{display:flex;align-items:flex-start;gap:8px;padding:7px 11px;border-radius:7px;font-size:.75rem;}
@@ -242,7 +256,7 @@ tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through
       <p>Organizador de migraciones de pacientes · DentOS</p>
     </div>
   </div>
-  <div class="steps-bar">
+  <div class="steps-bar" id="steps-bar-header">
     <div class="step-item active" id="s1"><span class="step-num">1</span><span>Cargar</span></div>
     <div class="step-sep" id="sep1"></div>
     <div class="step-item" id="s2"><span class="step-num">2</span><span>Mapear</span></div>
@@ -252,6 +266,21 @@ tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through
 </header>
 
 <div class="app-body">
+
+  <!-- ── NAVEGACIÓN ENTRE SECCIONES ── -->
+  <div class="mode-nav">
+    <button class="mode-nav-btn active" id="mode-btn-organizar" onclick="switchMode('organizar')">
+      <span class="mn-ico">🗂</span>
+      <span class="mn-txt">Organizar Migración<small>Convertir lista de pacientes al formato DentOS</small></span>
+    </button>
+    <button class="mode-nav-btn" id="mode-btn-faltantes" onclick="switchMode('faltantes')">
+      <span class="mn-ico">🔍</span>
+      <span class="mn-txt">Pacientes Faltantes<small>Comparar lista DentOS vs lista del cliente</small></span>
+    </button>
+  </div>
+
+  <!-- ════════════════════════ SECCIÓN: ORGANIZAR MIGRACIÓN ════════════════════════ -->
+  <div id="mode-organizar">
 
   <!-- ── PASO 1: CARGAR ── -->
   <div id="step1">
@@ -393,7 +422,145 @@ tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through
     </div>
 
   </div><!-- /step3 -->
-</div>
+  </div><!-- /mode-organizar -->
+
+  <!-- ════════════════════════ SECCIÓN: PACIENTES FALTANTES ════════════════════════ -->
+  <div id="mode-faltantes" class="hidden">
+
+    <!-- PASO 1: cargar archivo A (DentOS) -->
+    <div class="card">
+      <div class="card-title">1️⃣ Archivo A — Lista de pacientes ya creados en DentOS</div>
+      <div class="card-sub">Cargue el archivo descargado de DentOS. Solo se usa para saber qué documentos <b>ya existen</b> en el sistema.</div>
+      <div class="drop-zone" id="fa-drop" onclick="document.getElementById('fa-in').click()">
+        <span class="drop-icon" id="fa-icon">📁</span>
+        <div class="drop-title" id="fa-title">Arrastre el Archivo A (DentOS) aquí</div>
+        <div class="drop-sub">o <b onclick="event.stopPropagation();document.getElementById('fa-in').click()">haga clic para buscar</b></div>
+        <div class="drop-fmts"><span class="fmt">XLSX</span><span class="fmt">XLS</span><span class="fmt">CSV</span><span class="fmt">TXT</span></div>
+        <div class="loaded-info hidden" id="fa-info"></div>
+      </div>
+      <input type="file" id="fa-in" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="faltHandleFile(event,'A')">
+
+      <div id="fa-config" class="hidden" style="margin-top:16px;">
+        <div style="background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:9px;
+             padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--blue-dark);">Fila de títulos:</span>
+          <div style="display:flex;gap:6px;">
+            <button class="mode-btn" onclick="faltSetHeaderRow('A',0)" id="fa-hr-0">Sin títulos</button>
+            <button class="mode-btn" onclick="faltSetHeaderRow('A',1)" id="fa-hr-1">Fila 1</button>
+            <button class="mode-btn" onclick="faltSetHeaderRow('A',2)" id="fa-hr-2">Fila 2</button>
+            <button class="mode-btn" onclick="faltSetHeaderRow('A',3)" id="fa-hr-3">Fila 3</button>
+          </div>
+        </div>
+        <div class="raw-preview-wrap" id="fa-preview"></div>
+        <div class="map-item" style="max-width:340px;margin-top:10px;">
+          <span class="map-lbl">¿Cuál columna es el Número de Documento? <span class="req">*</span></span>
+          <select class="map-sel" id="fa-doc-col" onchange="faltState.A.docCol=this.value;updateSelStyle(this)"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 2: cargar archivo B (cliente) -->
+    <div class="card">
+      <div class="card-title">2️⃣ Archivo B — Lista de pacientes enviada por el cliente</div>
+      <div class="card-sub">Cargue la lista del cliente. De aquí se extraen los pacientes que <b>faltan</b> por crear, con todos sus datos.</div>
+      <div class="drop-zone" id="fb-drop" onclick="document.getElementById('fb-in').click()">
+        <span class="drop-icon" id="fb-icon">📁</span>
+        <div class="drop-title" id="fb-title">Arrastre el Archivo B (cliente) aquí</div>
+        <div class="drop-sub">o <b onclick="event.stopPropagation();document.getElementById('fb-in').click()">haga clic para buscar</b></div>
+        <div class="drop-fmts"><span class="fmt">XLSX</span><span class="fmt">XLS</span><span class="fmt">CSV</span><span class="fmt">TXT</span></div>
+        <div class="loaded-info hidden" id="fb-info"></div>
+      </div>
+      <input type="file" id="fb-in" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="faltHandleFile(event,'B')">
+
+      <div id="fb-config" class="hidden" style="margin-top:16px;">
+        <div style="background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:9px;
+             padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--blue-dark);">Fila de títulos:</span>
+          <div style="display:flex;gap:6px;">
+            <button class="mode-btn" onclick="faltSetHeaderRow('B',0)" id="fb-hr-0">Sin títulos</button>
+            <button class="mode-btn" onclick="faltSetHeaderRow('B',1)" id="fb-hr-1">Fila 1</button>
+            <button class="mode-btn" onclick="faltSetHeaderRow('B',2)" id="fb-hr-2">Fila 2</button>
+            <button class="mode-btn" onclick="faltSetHeaderRow('B',3)" id="fb-hr-3">Fila 3</button>
+          </div>
+        </div>
+        <div class="raw-preview-wrap" id="fb-preview"></div>
+
+        <!-- Modo nombres -->
+        <div style="margin:14px 0;">
+          <div style="font-family:var(--display);font-size:.78rem;font-weight:700;color:var(--gray-700);margin-bottom:8px;">¿Cómo vienen los nombres?</div>
+          <div class="name-mode-group">
+            <button class="mode-btn" id="fb-nm-full" onclick="faltSetNameMode('full')">📋 Nombre completo</button>
+            <button class="mode-btn" id="fb-nm-two" onclick="faltSetNameMode('two')">🔀 Nombres y apellidos</button>
+            <button class="mode-btn active" id="fb-nm-sep" onclick="faltSetNameMode('sep')">📑 Campos separados</button>
+          </div>
+          <div id="fb-name-inputs" class="name-inputs"></div>
+        </div>
+
+        <div class="map-grid" id="fb-map-grid"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:center;margin-bottom:16px;">
+      <button class="btn btn-primary" id="fb-compare-btn" onclick="faltCompare()" disabled style="padding:13px 32px;font-size:.92rem;">
+        🔍 Comparar y generar pacientes faltantes
+      </button>
+    </div>
+
+    <!-- RESULTADO -->
+    <div id="falt-result" class="hidden">
+      <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat"><div class="stat-icon">📋</div><div class="stat-num blue" id="fst-totalB">0</div><div class="stat-label">Total cliente (B)</div></div>
+        <div class="stat"><div class="stat-icon">✅</div><div class="stat-num green" id="fst-exist">0</div><div class="stat-label">Ya en DentOS</div></div>
+        <div class="stat"><div class="stat-icon">➕</div><div class="stat-num orange" id="fst-falt">0</div><div class="stat-label">Faltantes</div></div>
+        <div class="stat"><div class="stat-icon">🗑</div><div class="stat-num red" id="fst-dup">0</div><div class="stat-label">Duplicados en B</div></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs">
+          <button class="tab active" id="falt-tab-prev-btn" onclick="faltSwitchTab('prev')">➕ Pacientes faltantes</button>
+          <button class="tab" id="falt-tab-hall-btn" onclick="faltSwitchTab('hall')">🔍 Hallazgos</button>
+        </div>
+
+        <div class="panel active" id="falt-tab-prev">
+          <div class="toolbar">
+            <div class="search-wrap">
+              <span class="search-ico">🔍</span>
+              <input type="text" placeholder="Buscar por nombre, documento..." oninput="faltRenderTable()" id="falt-search">
+            </div>
+            <span class="rows-lbl" id="falt-rows-lbl">0 faltantes</span>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-scroll">
+              <table>
+                <thead id="falt-tbl-head"></thead>
+                <tbody id="falt-tbl-body"></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="falt-pagination"></div>
+          </div>
+          <div class="empty-state hidden" id="falt-tbl-empty"><span>🎉</span><p>No hay pacientes faltantes — todos los del cliente ya están en DentOS.</p></div>
+        </div>
+
+        <div class="panel" id="falt-tab-hall">
+          <div id="falt-findings-list" class="findings-list"></div>
+          <div class="findings-empty hidden" id="falt-findings-empty">🎉 No se encontraron hallazgos.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⬇ Exportar pacientes faltantes</div>
+        <div class="export-box">
+          <input type="text" class="export-input" id="falt-export-name" placeholder="Nombre del archivo" value="pacientes_faltantes">
+          <span class="export-ext">.txt</span>
+          <button class="btn btn-green" onclick="faltExportTXT()">⬇ Exportar TXT (formato DentOS)</button>
+          <button class="btn btn-yellow" onclick="faltExportFindings()">📄 Descargar hallazgos</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /mode-faltantes -->
+
+</div><!-- /app-body -->
 
 <div class="toast" id="toast"></div>
 
@@ -1284,6 +1451,493 @@ function toast(msg, type='info'){
   const t=document.getElementById('toast'); t.textContent=msg;
   t.className=`toast show ${type}`; clearTimeout(t._t);
   t._t=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+/* ╔══════════════════════════════════════════════════════════════════════════╗
+   ║  MÓDULO: PACIENTES FALTANTES (sección autónoma — no toca la sección       ║
+   ║  Organizar Migración). Reutiliza funciones puras: clean, esc, fmtDate,    ║
+   ║  calcAge, inferDocType, normDocType, inferSex, normSexo, splitFull,       ║
+   ║  splitTwo, onlyDigits, cleanNum, getVal, OUT, ALIASES, norm, colDisplay.  ║
+   ╚══════════════════════════════════════════════════════════════════════════╝ */
+
+const faltState = {
+  A: { matrix:[], headers:[], raw:[], headerRow:1, docCol:'' },          // lista DentOS
+  B: { matrix:[], headers:[], raw:[], headerRow:1,                        // lista cliente
+       nameMode:'sep', fullCol:'', nombresCol:'', apellidosCol:'', fieldMap:{} },
+  faltantes: [], findings: [], filtered: [], page: 1,
+};
+const FALT_PAGE = 50;
+
+// ── NAVEGACIÓN ENTRE SECCIONES ──
+function switchMode(mode){
+  const isOrg = mode==='organizar';
+  document.getElementById('mode-organizar').classList.toggle('hidden', !isOrg);
+  document.getElementById('mode-faltantes').classList.toggle('hidden', isOrg);
+  document.getElementById('mode-btn-organizar').classList.toggle('active', isOrg);
+  document.getElementById('mode-btn-faltantes').classList.toggle('active', !isOrg);
+  // La barra de pasos del header solo aplica a Organizar
+  document.getElementById('steps-bar-header').style.visibility = isOrg ? 'visible' : 'hidden';
+}
+
+// ── CARGA DE ARCHIVOS A / B ──
+function faltHandleFile(e, which){ const f=e.target.files[0]; if(f) faltLoadFile(f, which); }
+
+function faltLoadFile(file, which){
+  const n = file.name.toLowerCase();
+  if(n.endsWith('.csv')||n.endsWith('.txt')){
+    Papa.parse(file,{ header:false, skipEmptyLines:false, encoding:'UTF-8',
+      complete: r => faltOnMatrix(r.data, which, file.name),
+      error: e => toast('Error al leer: '+e.message,'err') });
+  } else {
+    const rd=new FileReader();
+    rd.onload = e => {
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array',cellDates:true,raw:false});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const matrix=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+        faltOnMatrix(matrix, which, file.name);
+      }catch(er){ toast('Error Excel: '+er.message,'err'); }
+    };
+    rd.readAsArrayBuffer(file);
+  }
+}
+
+function faltOnMatrix(matrix, which, filename){
+  const S = faltState[which];
+  S.matrix = matrix.map(r => Array.isArray(r)?r:Object.values(r));
+  // auto-detectar fila de títulos
+  let best=0;
+  for(let i=0;i<Math.min(5,S.matrix.length);i++){
+    const row=S.matrix[i];
+    const filled=row.filter(c=>String(c||'').trim().length>0).length;
+    if(filled>(row.length*0.5)){ best=i; break; }
+  }
+  faltApplyHeaderRow(which, best+1);
+
+  const pfx = which==='A'?'fa':'fb';
+  const dz=document.getElementById(pfx+'-drop');
+  dz.classList.add('loaded');
+  document.getElementById(pfx+'-icon').textContent='✅';
+  document.getElementById(pfx+'-title').textContent=filename;
+  const li=document.getElementById(pfx+'-info');
+  li.classList.remove('hidden');
+  li.textContent=`${S.raw.length} filas · ${S.headers.length} columnas`;
+  document.getElementById(pfx+'-config').classList.remove('hidden');
+
+  if(which==='A'){ S.docCol=''; faltAutoDetectDocCol(); }
+  else faltAutoDetect();
+  faltRenderConfig(which);
+  faltCheckReady();
+  toast(`Archivo ${which} cargado: ${S.raw.length} filas`,'ok');
+}
+
+function faltApplyHeaderRow(which, rowNum){
+  const S = faltState[which];
+  S.headerRow = rowNum;
+  if(rowNum===0){
+    const cols=S.matrix[0]?.length||0;
+    S.headers=Array.from({length:cols},(_,i)=>`Columna_${i+1}`);
+    S.raw=S.matrix.filter(r=>r.some(c=>String(c||'').trim()!==''))
+      .map(r=>{ const o={}; S.headers.forEach((h,i)=>o[h]=String(r[i]??'').trim()); return o; });
+  } else {
+    const idx=rowNum-1;
+    if(idx<0||idx>=S.matrix.length) return;
+    S.headers=S.matrix[idx].map((h,i)=>{ const s=String(h||'').trim(); return s||`Columna_${i+1}`; });
+    S.raw=S.matrix.slice(idx+1).filter(r=>r.some(c=>String(c||'').trim()!==''))
+      .map(r=>{ const o={}; S.headers.forEach((h,i)=>o[h]=String(r[i]??'').trim()); return o; });
+  }
+}
+
+function faltSetHeaderRow(which, n){
+  faltApplyHeaderRow(which, parseInt(n));
+  const S=faltState[which];
+  if(which==='A'){ S.docCol=''; faltAutoDetectDocCol(); }
+  else { S.fieldMap={}; S.fullCol=''; S.nombresCol=''; S.apellidosCol=''; faltAutoDetect(); }
+  faltRenderConfig(which);
+  faltCheckReady();
+}
+
+// ── HELPERS DE COLUMNAS (parametrizados por archivo) ──
+function faltColSamples(S, col, max=3){
+  const vals=[];
+  for(const row of S.raw){
+    const v=String(row[col]??'').trim();
+    if(v && !vals.includes(v)) vals.push(v.substring(0,18));
+    if(vals.length>=max) break;
+  }
+  return vals;
+}
+function faltBuildOpts(S, selectedVal=''){
+  return ['<option value="">— No mapear —</option>',
+    ...S.headers.map(h=>{
+      const disp=colDisplay(h), samples=faltColSamples(S,h);
+      const label=samples.length?`${disp}  ·  ${samples.join('  ·  ')}`:disp;
+      return `<option value="${esc(h)}"${h===selectedVal?' selected':''}>${esc(label)}</option>`;
+    })].join('');
+}
+function faltRenderPreview(which){
+  const S=faltState[which];
+  const wrap=document.getElementById(which==='A'?'fa-preview':'fb-preview');
+  if(!S.raw.length){ wrap.innerHTML=''; return; }
+  const rows=S.raw.slice(0,5);
+  wrap.innerHTML=`
+    <div class="raw-preview-title">🔍 Vista previa <span style="font-weight:400;color:var(--gray-500);font-size:.72rem;">(primeras ${rows.length} filas)</span></div>
+    <div class="raw-preview-scroll"><table>
+      <thead><tr>${S.headers.map((h,i)=>`<th><span class="col-num">${i+1}</span>${esc(colDisplay(h))}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r=>`<tr>${S.headers.map(h=>`<td>${esc(String(r[h]??'').substring(0,30))}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+// ── CONFIG ARCHIVO A (solo columna documento) ──
+function faltAutoDetectDocCol(){
+  const S=faltState.A;
+  const nh={}; S.headers.forEach(h=>nh[norm(h)]=h);
+  for(const a of ALIASES.documento){ if(nh[norm(a)]){ S.docCol=nh[norm(a)]; return; } }
+}
+
+// ── CONFIG ARCHIVO B (mapeo completo) ──
+function faltAutoDetect(){
+  const S=faltState.B;
+  const nh={}; S.headers.forEach(h=>nh[norm(h)]=h);
+  const full=['nombre_completo','nombre completo','paciente','beneficiario'];
+  for(const c of full){ if(nh[norm(c)]){ S.nameMode='full'; S.fullCol=nh[norm(c)]; break; } }
+  if(S.nameMode!=='full'){
+    let nomF=null,apeF=null;
+    for(const a of ['nombres','nombre']){ if(nh[norm(a)]){ nomF=nh[norm(a)]; break; } }
+    for(const a of ['apellidos','apellido']){ if(nh[norm(a)]){ apeF=nh[norm(a)]; break; } }
+    if(nomF&&apeF){ S.nameMode='two'; S.nombresCol=nomF; S.apellidosCol=apeF; }
+  }
+  const fm={};
+  for(const fid in ALIASES){
+    for(const a of ALIASES[fid]){ if(nh[norm(a)]){ fm[fid]=nh[norm(a)]; break; } }
+    if(!fm[fid]){ const n1=norm(fid.replace(/_/g,' ')); const f=Object.keys(nh).find(k=>k.includes(n1)||n1.includes(k)); if(f) fm[fid]=nh[f]; }
+  }
+  S.fieldMap=fm;
+}
+
+function faltSetNameMode(m){
+  faltState.B.nameMode=m;
+  ['full','two','sep'].forEach(x=>document.getElementById('fb-nm-'+x).classList.toggle('active',x===m));
+  faltRenderNameInputs();
+}
+function faltRenderNameInputs(){
+  const S=faltState.B, ni=document.getElementById('fb-name-inputs');
+  if(S.nameMode==='full'){
+    ni.innerHTML=`<div class="map-item"><span class="map-lbl">Nombre completo (4 partes) <span class="req">*</span></span>
+      <select class="map-sel ${S.fullCol?'ok':''}" onchange="faltState.B.fullCol=this.value;updateSelStyle(this)">${faltBuildOpts(S,S.fullCol)}</select></div>`;
+  } else if(S.nameMode==='two'){
+    ni.innerHTML=`
+      <div class="map-item"><span class="map-lbl">Columna Nombres <span class="req">*</span></span>
+        <select class="map-sel ${S.nombresCol?'ok':''}" onchange="faltState.B.nombresCol=this.value;updateSelStyle(this)">${faltBuildOpts(S,S.nombresCol)}</select></div>
+      <div class="map-item"><span class="map-lbl">Columna Apellidos <span class="req">*</span></span>
+        <select class="map-sel ${S.apellidosCol?'ok':''}" onchange="faltState.B.apellidosCol=this.value;updateSelStyle(this)">${faltBuildOpts(S,S.apellidosCol)}</select></div>`;
+  } else {
+    const fields=['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido'];
+    ni.innerHTML=fields.map(fid=>{
+      const f=OUT.find(x=>x.id===fid), cur=S.fieldMap[fid]||'';
+      return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
+        <select class="map-sel ${cur?'ok':''}" onchange="faltState.B.fieldMap['${fid}']=this.value;updateSelStyle(this)">${faltBuildOpts(S,cur)}</select></div>`;
+    }).join('');
+  }
+}
+function faltBuildMapGrid(){
+  const S=faltState.B;
+  const groups=[
+    {label:'Identificación',ids:['tipo_documento','documento']},
+    {label:'Fechas',ids:['fecha_registro','fecha_nacimiento','edad']},
+    {label:'Datos personales',ids:['sexo','direccion','telefono','celular','email','ocupacion','lugar_nacimiento','nacionalidad','estado_civil','zona']},
+    {label:'Empresa',ids:['empresa','telefono_empresa']},
+    {label:'Acompañante',ids:['nombre_acompanante','parentesco','tel_acompanante','cel_acompanante']},
+    {label:'Salud',ids:['eps','tipo_eps','tipo_afiliacion','remitido']},
+    {label:'Otros',ids:['observacion','facebook','instagram','twitter']},
+  ];
+  document.getElementById('fb-map-grid').innerHTML=groups.map(g=>{
+    const items=g.ids.map(id=>{
+      const f=OUT.find(x=>x.id===id); if(!f) return '';
+      const cur=S.fieldMap[id]||'';
+      return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
+        <select class="map-sel ${cur?'ok':''}" onchange="faltState.B.fieldMap['${id}']=this.value;updateSelStyle(this)">${faltBuildOpts(S,cur)}</select></div>`;
+    }).join('');
+    return `<div class="section-sep">${g.label}</div>${items}`;
+  }).join('');
+}
+
+function faltRenderConfig(which){
+  faltRenderPreview(which);
+  [0,1,2,3].forEach(i=>{
+    const b=document.getElementById((which==='A'?'fa':'fb')+'-hr-'+i);
+    if(b) b.classList.toggle('active', faltState[which].headerRow===i);
+  });
+  if(which==='A'){
+    const sel=document.getElementById('fa-doc-col');
+    sel.innerHTML=faltBuildOpts(faltState.A, faltState.A.docCol);
+    sel.classList.toggle('ok', !!faltState.A.docCol);
+  } else {
+    ['full','two','sep'].forEach(x=>document.getElementById('fb-nm-'+x).classList.toggle('active',x===faltState.B.nameMode));
+    faltRenderNameInputs();
+    faltBuildMapGrid();
+  }
+}
+
+function faltCheckReady(){
+  const ready = faltState.A.raw.length>0 && faltState.B.raw.length>0;
+  document.getElementById('fb-compare-btn').disabled = !ready;
+}
+
+// ── PROCESAR UNA FILA AL FORMATO DENTOS (lógica propia del módulo) ──
+function faltProcessRow(row, fila){
+  const S=faltState.B, rowFindings=[], out={};
+  out.fila=String(fila);
+
+  // Nombres
+  if(S.nameMode==='full'){
+    const [pn,sn,pa,sa]=splitFull(getVal(row,S.fullCol));
+    out.primer_nombre=pn; out.segundo_nombre=sn; out.primer_apellido=pa; out.segundo_apellido=sa;
+  } else if(S.nameMode==='two'){
+    const [pn,sn]=splitTwo(getVal(row,S.nombresCol)), [pa,sa]=splitTwo(getVal(row,S.apellidosCol));
+    out.primer_nombre=pn; out.segundo_nombre=sn; out.primer_apellido=pa; out.segundo_apellido=sa;
+  } else {
+    out.primer_nombre=getVal(row,S.fieldMap.primer_nombre);
+    out.segundo_nombre=getVal(row,S.fieldMap.segundo_nombre);
+    out.primer_apellido=getVal(row,S.fieldMap.primer_apellido);
+    out.segundo_apellido=getVal(row,S.fieldMap.segundo_apellido);
+  }
+
+  // Tipo documento
+  const rawDoc=getVal(row,S.fieldMap.tipo_documento);
+  let tipoDoc=normDocType(rawDoc);
+  const fechaNacFmt=fmtDate(getVal(row,S.fieldMap.fecha_nacimiento));
+  if(!tipoDoc){
+    const inf=inferDocType(fechaNacFmt);
+    if(inf){ tipoDoc=inf; rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Asignado ${inf} según fecha de nacimiento (DANE).`}); }
+    else rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin tipo de documento y no se pudo inferir.'});
+  } else if(rawDoc.trim()!==tipoDoc){
+    rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Normalizado: "${rawDoc}" → "${tipoDoc}"`});
+  }
+  out.tipo_documento=tipoDoc;
+
+  // Fecha nacimiento
+  out.fecha_nacimiento=fechaNacFmt;
+  if(!fechaNacFmt) rowFindings.push({type:'err',campo:'Fecha Nacimiento',msg:'Fecha de nacimiento vacía.'});
+
+  // Edad
+  const rawEdad=getVal(row,S.fieldMap.edad);
+  let edad=rawEdad?clean(rawEdad):'';
+  if(!edad&&fechaNacFmt){ edad=calcAge(fechaNacFmt); if(edad) rowFindings.push({type:'info',campo:'Edad',msg:`Calculada: ${edad} años.`}); }
+  out.edad=edad;
+
+  // Sexo
+  const rawSexo=getVal(row,S.fieldMap.sexo);
+  let sexo=normSexo(rawSexo);
+  if(!sexo){ const inf=inferSex(out.primer_nombre);
+    if(inf){ sexo=inf; rowFindings.push({type:'info',campo:'Sexo',msg:`Inferido por nombre "${out.primer_nombre}": ${inf}.`}); }
+    else rowFindings.push({type:'warn',campo:'Sexo',msg:`Sin sexo y no se pudo inferir.`}); }
+  out.sexo=sexo;
+
+  // Fecha registro
+  out.fecha_registro=fmtDate(getVal(row,S.fieldMap.fecha_registro));
+
+  // Documento
+  out.documento=cleanNum(getVal(row,S.fieldMap.documento),'Documento',rowFindings);
+  if(!out.documento) rowFindings.push({type:'err',campo:'Documento',msg:'Número de documento vacío.'});
+
+  // Numéricos
+  const numF={telefono:'telefono',celular:'celular',telefono_empresa:'telefono_empresa',tel_acompanante:'tel_acompanante',cel_acompanante:'cel_acompanante'};
+  for(const [o,m] of Object.entries(numF)) out[o]=cleanNum(getVal(row,S.fieldMap[m]),OUT.find(f=>f.id===o)?.label||o,rowFindings);
+
+  // Texto
+  const txtF={direccion:'direccion',email:'email',ocupacion:'ocupacion',lugar_nacimiento:'lugar_nacimiento',empresa:'empresa',nombre_acompanante:'nombre_acompanante',parentesco:'parentesco',remitido:'remitido',zona:'zona',nacionalidad:'nacionalidad',estado_civil:'estado_civil',observacion:'observacion',eps:'eps',tipo_eps:'tipo_eps',tipo_afiliacion:'tipo_afiliacion',facebook:'facebook',instagram:'instagram',twitter:'twitter'};
+  for(const [o,m] of Object.entries(txtF)) out[o]=getVal(row,S.fieldMap[m]);
+
+  if(!out.primer_nombre) rowFindings.push({type:'err',campo:'Primer Nombre',msg:'Primer nombre vacío.'});
+  if(!out.primer_apellido) rowFindings.push({type:'err',campo:'Primer Apellido',msg:'Primer apellido vacío.'});
+
+  return { out, rowFindings };
+}
+
+// ── COMPARAR ──
+function faltCompare(){
+  const A=faltState.A, B=faltState.B;
+  if(!A.docCol){ toast('Seleccione la columna de documento del Archivo A','err'); return; }
+  if(B.nameMode==='sep' && (!B.fieldMap.primer_nombre||!B.fieldMap.primer_apellido)){ toast('Mapee al menos Primer Nombre y Primer Apellido del Archivo B','err'); return; }
+  if(B.nameMode==='full' && !B.fullCol){ toast('Mapee la columna de nombre completo del Archivo B','err'); return; }
+  if(B.nameMode==='two' && (!B.nombresCol||!B.apellidosCol)){ toast('Mapee las columnas de nombres y apellidos del Archivo B','err'); return; }
+  if(!B.fieldMap.documento){ toast('Mapee la columna de Documento del Archivo B','err'); return; }
+  if(!B.fieldMap.fecha_nacimiento){ toast('Mapee la columna de Fecha de Nacimiento del Archivo B','err'); return; }
+
+  // Set de documentos existentes en DentOS (solo dígitos para comparación robusta)
+  const existing=new Set();
+  A.raw.forEach(r=>{ const d=onlyDigits(r[A.docCol]); if(d) existing.add(d); });
+
+  const faltantes=[], findings=[];
+  const seenInB=new Map();   // documento → fila (para duplicados dentro de B)
+  let yaExisten=0, dupes=0, fila=1;
+
+  B.raw.forEach((row, idx)=>{
+    const rn=idx+2;
+    const docDigits=onlyDigits(getVal(row, B.fieldMap.documento));
+    if(!docDigits){
+      findings.push({rowNum:rn,type:'err',campo:'Documento',msg:'Fila del cliente sin número de documento — omitida.'});
+      return;
+    }
+    // ¿ya está en DentOS?
+    if(existing.has(docDigits)){ yaExisten++; return; }
+    // ¿duplicado dentro del archivo del cliente?
+    if(seenInB.has(docDigits)){
+      dupes++;
+      findings.push({rowNum:rn,type:'dup',campo:'Duplicado',msg:`Documento ${docDigits} repetido en el archivo del cliente (también fila ${seenInB.get(docDigits)}). Se exporta solo una vez.`});
+      return;
+    }
+    seenInB.set(docDigits, rn);
+
+    // procesar al formato DentOS
+    const { out, rowFindings } = faltProcessRow(row, fila++);
+    out._rn = rn;
+    faltantes.push(out);
+    if(rowFindings.length) findings.push(...rowFindings.map(f=>({rowNum:rn, ...f})));
+  });
+
+  faltState.faltantes=faltantes;
+  faltState.findings=findings;
+  faltState.filtered=[...faltantes];
+  faltState.page=1;
+
+  document.getElementById('fst-totalB').textContent=B.raw.length;
+  document.getElementById('fst-exist').textContent=yaExisten;
+  document.getElementById('fst-falt').textContent=faltantes.length;
+  document.getElementById('fst-dup').textContent=dupes;
+
+  document.getElementById('falt-result').classList.remove('hidden');
+  faltSwitchTab('prev');
+  faltRenderTable();
+  faltRenderFindings();
+  document.getElementById('falt-result').scrollIntoView({behavior:'smooth'});
+  toast(`${faltantes.length} pacientes faltantes encontrados`, faltantes.length?'ok':'info');
+}
+
+// ── TABLA FALTANTES ──
+const FALT_VISIBLE=['fila','tipo_documento','documento','primer_nombre','segundo_nombre','primer_apellido','segundo_apellido','fecha_nacimiento','edad','sexo','telefono','celular','eps'];
+
+function faltRenderTable(){
+  const q=document.getElementById('falt-search').value.toLowerCase();
+  faltState.filtered = !q ? [...faltState.faltantes] : faltState.faltantes.filter(r=>{
+    return [r.documento,r.primer_nombre,r.segundo_nombre,r.primer_apellido,r.segundo_apellido,r.eps].join(' ').toLowerCase().includes(q);
+  });
+  faltState.page=1;
+
+  document.getElementById('falt-rows-lbl').textContent=`${faltState.filtered.length} faltantes`;
+  const errRows=new Set(faltState.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
+  const warnRows=new Set(faltState.findings.filter(f=>f.type==='warn').map(f=>f.rowNum));
+
+  document.getElementById('falt-tbl-head').innerHTML=`<tr><th class="n-row">#</th>${FALT_VISIBLE.map(id=>{
+    const f=OUT.find(x=>x.id===id); return `<th>${f?.label||id}</th>`;
+  }).join('')}</tr>`;
+
+  const start=(faltState.page-1)*FALT_PAGE, rows=faltState.filtered.slice(start,start+FALT_PAGE);
+  const tbody=document.getElementById('falt-tbl-body');
+  if(!rows.length){
+    tbody.innerHTML='';
+    document.querySelector('#falt-tab-prev .tbl-wrap').classList.add('hidden');
+    document.getElementById('falt-tbl-empty').classList.remove('hidden');
+    document.getElementById('falt-pagination').innerHTML='';
+    return;
+  }
+  document.querySelector('#falt-tab-prev .tbl-wrap').classList.remove('hidden');
+  document.getElementById('falt-tbl-empty').classList.add('hidden');
+
+  tbody.innerHTML=rows.map(row=>{
+    const cls=errRows.has(row._rn)?'row-e':warnRows.has(row._rn)?'row-w':'';
+    const tag=errRows.has(row._rn)?'<span class="tag tag-e">ERR</span>':warnRows.has(row._rn)?'<span class="tag tag-w">WARN</span>':'';
+    return `<tr class="${cls}"><td class="n-row">${row.fila}${tag}</td>${FALT_VISIBLE.map(id=>{
+      const v=esc(row[id]||'');
+      if(id==='fila') return '';
+      if(id==='documento') return `<td><span class="doc-badge">${v||'—'}</span></td>`;
+      if(id==='tipo_documento') return `<td style="font-weight:700;color:var(--blue-dark)">${v}</td>`;
+      if(id==='sexo') return `<td>${row[id]==='femenino'?'♀ F':row[id]==='masculino'?'♂ M':v}</td>`;
+      return `<td>${v}</td>`;
+    }).join('')}</tr>`;
+  }).join('');
+
+  faltRenderPagination();
+}
+
+function faltRenderPagination(){
+  const total=faltState.filtered.length, pages=Math.ceil(total/FALT_PAGE);
+  const pg=document.getElementById('falt-pagination');
+  if(pages<=1){ pg.innerHTML=''; return; }
+  const c=faltState.page;
+  let range; if(pages<=7) range=Array.from({length:pages},(_,i)=>i+1);
+  else if(c<=4) range=[1,2,3,4,5,'...',pages];
+  else if(c>=pages-3) range=[1,'...',pages-4,pages-3,pages-2,pages-1,pages];
+  else range=[1,'...',c-1,c,c+1,'...',pages];
+  pg.innerHTML=`<button class="pg-btn" onclick="faltGoPage(${c-1})" ${c===1?'disabled':''}>‹</button>
+    ${range.map(p=>p==='...'?`<span class="pg-info">…</span>`:`<button class="pg-btn ${p===c?'active':''}" onclick="faltGoPage(${p})">${p}</button>`).join('')}
+    <button class="pg-btn" onclick="faltGoPage(${c+1})" ${c===pages?'disabled':''}>›</button>
+    <span class="pg-info">Página ${c}/${pages}</span>`;
+}
+function faltGoPage(p){
+  const pages=Math.ceil(faltState.filtered.length/FALT_PAGE);
+  if(p<1||p>pages) return; faltState.page=p;
+  // re-render solo cuerpo (sin recalcular filtro)
+  const errRows=new Set(faltState.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
+  const warnRows=new Set(faltState.findings.filter(f=>f.type==='warn').map(f=>f.rowNum));
+  const start=(p-1)*FALT_PAGE, rows=faltState.filtered.slice(start,start+FALT_PAGE);
+  document.getElementById('falt-tbl-body').innerHTML=rows.map(row=>{
+    const cls=errRows.has(row._rn)?'row-e':warnRows.has(row._rn)?'row-w':'';
+    const tag=errRows.has(row._rn)?'<span class="tag tag-e">ERR</span>':warnRows.has(row._rn)?'<span class="tag tag-w">WARN</span>':'';
+    return `<tr class="${cls}"><td class="n-row">${row.fila}${tag}</td>${FALT_VISIBLE.map(id=>{
+      if(id==='fila') return ''; const v=esc(row[id]||'');
+      if(id==='documento') return `<td><span class="doc-badge">${v||'—'}</span></td>`;
+      if(id==='tipo_documento') return `<td style="font-weight:700;color:var(--blue-dark)">${v}</td>`;
+      if(id==='sexo') return `<td>${row[id]==='femenino'?'♀ F':row[id]==='masculino'?'♂ M':v}</td>`;
+      return `<td>${v}</td>`;
+    }).join('')}</tr>`;
+  }).join('');
+  faltRenderPagination();
+  document.querySelector('#falt-tab-prev .tbl-scroll').scrollTop=0;
+}
+
+function faltRenderFindings(){
+  const list=document.getElementById('falt-findings-list');
+  const empty=document.getElementById('falt-findings-empty');
+  if(!faltState.findings.length){ list.innerHTML=''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  list.innerHTML=faltState.findings.slice(0,500).map(f=>{
+    const cls=f.type==='dup'?'err':f.type;
+    const icon=f.type==='dup'?'🗑 ':f.type==='err'?'❌ ':f.type==='warn'?'⚠️ ':'🔧 ';
+    return `<div class="finding ${cls}"><span class="f-row">Fila ${f.rowNum}</span><span class="f-campo">${icon}${f.campo}</span><span class="f-msg">${f.msg}</span></div>`;
+  }).join('');
+  if(faltState.findings.length>500) list.innerHTML+=`<div class="finding warn"><span class="f-msg">… y ${faltState.findings.length-500} hallazgos más (incluidos en la descarga).</span></div>`;
+}
+
+function faltSwitchTab(id){
+  document.getElementById('falt-tab-prev-btn').classList.toggle('active',id==='prev');
+  document.getElementById('falt-tab-hall-btn').classList.toggle('active',id==='hall');
+  document.getElementById('falt-tab-prev').classList.toggle('active',id==='prev');
+  document.getElementById('falt-tab-hall').classList.toggle('active',id==='hall');
+}
+
+// ── EXPORTAR ──
+function faltExportTXT(){
+  if(!faltState.faltantes.length){ toast('No hay pacientes faltantes para exportar','info'); return; }
+  const name=(document.getElementById('falt-export-name').value.trim()||'pacientes_faltantes');
+  let fila=1;
+  const lines=faltState.faltantes.map(row=>{
+    const r={...row, fila:String(fila++)};
+    return OUT.map(f=>clean(String(r[f.id]??''))).join('\t');
+  });
+  const blob=new Blob([lines.join('\r\n')],{type:'text/plain;charset=utf-8'});
+  downloadBlob(blob, name+'.txt');
+  toast(`TXT exportado: ${faltState.faltantes.length} pacientes faltantes ✅`,'ok');
+}
+function faltExportFindings(){
+  if(!faltState.findings.length){ toast('No hay hallazgos para exportar','info'); return; }
+  const name=(document.getElementById('falt-export-name').value.trim()||'pacientes_faltantes')+'_hallazgos';
+  const header='Fila\tTipo\tCampo\tDescripción\r\n';
+  const lines=faltState.findings.map(f=>`${f.rowNum}\t${f.type==='err'?'Error':f.type==='warn'?'Advertencia':f.type==='dup'?'Duplicado':'Corrección automática'}\t${f.campo}\t${f.msg}`);
+  const blob=new Blob([header+lines.join('\r\n')],{type:'text/plain;charset=utf-8'});
+  downloadBlob(blob, name+'.txt');
+  toast('Hallazgos exportados ✅','ok');
 }
 </script>
 </body>
