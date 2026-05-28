@@ -149,6 +149,7 @@ tr:hover td{background:var(--blue-light);}
 tr.row-e td{background:#FEF2F2!important;}
 tr.row-w td{background:#FFFBEB!important;}
 tr.row-i td{background:#F0FDF4!important;}
+tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through;}
 .n-row{font-family:var(--mono);font-size:.63rem;color:var(--gray-400);width:36px;text-align:right;}
 .doc-badge{font-family:var(--mono);font-size:.67rem;background:var(--blue-light);
   color:var(--blue-dark);padding:2px 6px;border-radius:4px;font-weight:700;}
@@ -322,12 +323,13 @@ tr.row-i td{background:#F0FDF4!important;}
   <div id="step3" class="hidden">
 
     <!-- Stats -->
-    <div class="stats-row">
+    <div class="stats-row" style="grid-template-columns:repeat(6,1fr)">
       <div class="stat"><div class="stat-icon">👥</div><div class="stat-num blue" id="st-total">0</div><div class="stat-label">Total</div></div>
       <div class="stat"><div class="stat-icon">✅</div><div class="stat-num green" id="st-ok">0</div><div class="stat-label">Sin hallazgos</div></div>
       <div class="stat"><div class="stat-icon">🔧</div><div class="stat-num purple" id="st-corr">0</div><div class="stat-label">Corregidos</div></div>
       <div class="stat"><div class="stat-icon">⚠️</div><div class="stat-num yellow" id="st-warn">0</div><div class="stat-label">Advertencias</div></div>
       <div class="stat"><div class="stat-icon">❌</div><div class="stat-num red" id="st-err">0</div><div class="stat-label">Errores</div></div>
+      <div class="stat"><div class="stat-icon">🗑</div><div class="stat-num orange" id="st-dupes">0</div><div class="stat-label">Duplicados</div></div>
     </div>
 
     <div class="card">
@@ -354,6 +356,7 @@ tr.row-i td{background:#F0FDF4!important;}
             <option value="corr">Corregidos</option>
             <option value="warn">Advertencias</option>
             <option value="err">Errores</option>
+            <option value="dup">Duplicados 🗑</option>
           </select>
           <button class="btn btn-secondary" style="padding:7px 12px;font-size:.73rem;" onclick="clearFilters()">✕</button>
           <span class="rows-lbl" id="rows-lbl">0 filas</span>
@@ -1037,32 +1040,51 @@ function processData(){
     processed.push(out);
   });
 
+  // ── DUPLICADOS: detectar por número de documento ──────────────────────────
+  const seenDocs = new Map(); // documento → rowNum de la primera aparición
+  processed.forEach((row, idx) => {
+    const doc = row.documento;
+    if(!doc) return;
+    if(seenDocs.has(doc)){
+      row._isDuplicate = true;
+      findings.push({
+        rowNum: idx+2, type:'dup', campo:'Duplicado',
+        msg:`Documento ${doc} ya existe en fila ${seenDocs.get(doc)}. Este registro se elimina del exportable.`
+      });
+    } else {
+      seenDocs.set(doc, idx+2);
+    }
+  });
+
   st.processed = processed;
   st.findings = findings;
   st.filtered = [...processed];
   st.page = 1;
   st.sortCol = null;
 
+  const dupes = processed.filter(r=>r._isDuplicate).length;
   renderStats();
   renderTable();
   renderFindings();
   goStep(3);
-  toast(`Procesadas ${processed.length} filas · ${findings.length} hallazgos`,'ok');
+  toast(`Procesadas ${processed.length} filas · ${dupes} duplicados eliminados · ${findings.length} hallazgos`,'ok');
 }
 
 // ─── STATS ────────────────────────────────────────────────────────────────
 function renderStats(){
   const total = st.processed.length;
+  const dupes = st.processed.filter(r=>r._isDuplicate).length;
   const rowsWithFindings = new Set(st.findings.map(f=>f.rowNum));
-  const errs = new Set(st.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
+  const errs  = new Set(st.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
   const warns = new Set(st.findings.filter(f=>f.type==='warn').map(f=>f.rowNum));
-  const corr = new Set(st.findings.filter(f=>f.type==='info').map(f=>f.rowNum));
+  const corr  = new Set(st.findings.filter(f=>f.type==='info').map(f=>f.rowNum));
 
   document.getElementById('st-total').textContent = total;
   document.getElementById('st-ok').textContent = total - rowsWithFindings.size;
   document.getElementById('st-err').textContent = errs.size;
   document.getElementById('st-warn').textContent = warns.size;
   document.getElementById('st-corr').textContent = corr.size;
+  document.getElementById('st-dupes').textContent = dupes;
 }
 
 // ─── TABLA ────────────────────────────────────────────────────────────────
@@ -1116,8 +1138,10 @@ function renderTable(){
     // Actually let's use the position in processed array
     const idx = st.processed.indexOf(row);
     const origRow = idx+2;
-    const cls = errRows.has(origRow)?'row-e':warnRows.has(origRow)?'row-w':infoRows.has(origRow)?'row-i':'';
-    const tags = errRows.has(origRow)?'<span class="tag tag-e">ERR</span>':
+    const isDup = !!row._isDuplicate;
+    const cls = isDup?'row-d':errRows.has(origRow)?'row-e':warnRows.has(origRow)?'row-w':infoRows.has(origRow)?'row-i':'';
+    const tags = isDup?'<span class="tag" style="background:#FED7AA;color:#C2410C">DUP</span>':
+                 errRows.has(origRow)?'<span class="tag tag-e">ERR</span>':
                  warnRows.has(origRow)?'<span class="tag tag-w">WARN</span>':
                  infoRows.has(origRow)?'<span class="tag tag-i">CORR</span>':'';
     return `<tr class="${cls}">
@@ -1161,10 +1185,11 @@ function applyFilters(){
     }
     if(sex && row.sexo!==sex) return false;
     if(status){
-      if(status==='ok' && (errRows.has(origRow)||warnRows.has(origRow)||infoRows.has(origRow))) return false;
+      if(status==='ok' && (errRows.has(origRow)||warnRows.has(origRow)||infoRows.has(origRow)||row._isDuplicate)) return false;
       if(status==='err' && !errRows.has(origRow)) return false;
       if(status==='warn' && !warnRows.has(origRow)) return false;
       if(status==='corr' && !infoRows.has(origRow)) return false;
+      if(status==='dup' && !row._isDuplicate) return false;
     }
     return true;
   });
@@ -1202,12 +1227,15 @@ function renderFindings(){
   const empty=document.getElementById('findings-empty');
   if(!st.findings.length){ list.innerHTML=''; empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
-  list.innerHTML=st.findings.slice(0,500).map(f=>`
-    <div class="finding ${f.type}">
+  list.innerHTML=st.findings.slice(0,500).map(f=>{
+    const cls = f.type==='dup'?'err':f.type;
+    const icon = f.type==='dup'?'🗑 ':f.type==='err'?'❌ ':f.type==='warn'?'⚠️ ':'🔧 ';
+    return `<div class="finding ${cls}">
       <span class="f-row">Fila ${f.rowNum}</span>
-      <span class="f-campo">${f.campo}</span>
+      <span class="f-campo">${icon}${f.campo}</span>
       <span class="f-msg">${f.msg}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   if(st.findings.length>500) list.innerHTML+=`<div class="finding warn"><span class="f-msg">… y ${st.findings.length-500} hallazgos más (incluidos en la descarga).</span></div>`;
 }
 
@@ -1222,13 +1250,17 @@ function switchTab(id){
 function exportTXT(){
   if(!st.processed.length){ toast('Sin datos para exportar','err'); return; }
   const name=(document.getElementById('export-name').value.trim()||'migraciones_pacientes');
-  // 34 columnas, tab, sin encabezado, sin saltos de línea (reglas 7, 8, 10)
-  const lines = st.processed.map(row=>
-    OUT.map(f=>clean(String(row[f.id]??''))).join('\t')
-  );
+  // Excluir duplicados y renumerar columna Fila (reglas 7, 8, 9, 10)
+  let fila = 1;
+  const exportRows = st.processed.filter(r=>!r._isDuplicate);
+  const lines = exportRows.map(row=>{
+    const r = {...row, fila: String(fila++)};
+    return OUT.map(f=>clean(String(r[f.id]??''))).join('\t');
+  });
   const blob = new Blob([lines.join('\r\n')],{type:'text/plain;charset=utf-8'});
   downloadBlob(blob, name+'.txt');
-  toast('Archivo TXT exportado ✅','ok');
+  const dupes = st.processed.length - exportRows.length;
+  toast(`TXT exportado: ${exportRows.length} registros (${dupes} duplicados eliminados) ✅`,'ok');
 }
 
 // ─── EXPORTAR HALLAZGOS ───────────────────────────────────────────────────
