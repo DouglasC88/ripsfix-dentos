@@ -497,6 +497,7 @@ tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through
         </div>
 
         <div class="map-grid" id="fb-map-grid"></div>
+        <div id="fb-map-summary" style="margin-top:12px;"></div>
       </div>
     </div>
 
@@ -606,36 +607,36 @@ const OUT = [
 const MAPPABLE = OUT.filter(f => f.id !== 'fila');
 
 const ALIASES = {
-  tipo_documento:    ['tipo_doc','tipodoc','tipo de documento','tipo documento','type','tipo_id','tipo identificacion'],
-  documento:         ['documento','num_doc','numdoc','cedula','cedula ciudadania','nit','id','identificacion','numero documento','no_doc','no. documento','nro doc'],
-  primer_nombre:     ['primer_nombre','primer nombre','primernombre','nombre1','first_name','primer nom'],
-  segundo_nombre:    ['segundo_nombre','segundo nombre','segundonombre','nombre2','second_name','seg nombre'],
-  primer_apellido:   ['primer_apellido','primer apellido','primerapellido','apellido1','last_name','primer ape'],
-  segundo_apellido:  ['segundo_apellido','segundo apellido','segundoapellido','apellido2','second_last','seg apellido'],
-  fecha_registro:    ['fecha_registro','fecha registro','fecharegistro','fec_reg','fecha reg','registration_date','fecha_creacion'],
-  fecha_nacimiento:  ['fecha_nacimiento','fecha nacimiento','fechanacimiento','fec_nac','nacimiento','birthdate','dob','fecha nac'],
-  edad:              ['edad','age','anos','años'],
-  sexo:              ['sexo','genero','género','sex','gender'],
-  direccion:         ['direccion','dirección','address','dir','domicilio'],
-  telefono:          ['telefono','teléfono','tel','phone','fono','tel fijo'],
-  celular:           ['celular','movil','móvil','mobile','cell','cel','tel celular'],
-  email:             ['email','correo','e-mail','mail','correo electronico','correo_electronico'],
-  ocupacion:         ['ocupacion','ocupación','profesion','profesión','oficio','cargo','profession'],
-  lugar_nacimiento:  ['lugar_nacimiento','lugar nacimiento','lugar_nac','birthplace','ciudad nacimiento'],
-  empresa:           ['empresa','company','empleador','employer','entidad'],
-  telefono_empresa:  ['telefono_empresa','tel_empresa','tel empresa','empresa tel','phone_work'],
-  nombre_acompanante:['nombre_acompanante','acompanante','acompañante','companion','nombre acompañante'],
-  parentesco:        ['parentesco','relationship','parentesco_acompanante','parentesco acompañante'],
-  tel_acompanante:   ['tel_acompanante','telefono_acompanante','tel acompañante'],
-  cel_acompanante:   ['cel_acompanante','celular_acompanante','cel acompañante'],
-  remitido:          ['remitido','referred_by','referido','referencia'],
-  zona:              ['zona','zone','sector','area'],
-  nacionalidad:      ['nacionalidad','nationality','pais','país','country'],
-  estado_civil:      ['estado_civil','estado civil','estadocivil','civil_status','marital'],
-  observacion:       ['observacion','observación','notas','notes','comentarios','observation','obs'],
-  eps:               ['eps','aseguradora','seguro','insurance','health_plan','eps_nombre','entidad salud'],
-  tipo_eps:          ['tipo_eps','tipo eps','tipo de eps','eps_tipo','cotizante'],
-  tipo_afiliacion:   ['tipo_afiliacion','tipo afiliacion','tipo_afiliación','regimen','régimen','plan','afiliacion'],
+  tipo_documento:    ['tipo_documento','tipo_doc','tipodoc','tipo de documento','tipo documento','type','tipo_id','tipo identificacion','tipo de doc','t.d.','td','tp doc','tp_doc','clase documento','clase doc','tipo identificacion','tp. doc.','tipo_de_documento'],
+  documento:         ['documento','num_doc','numdoc','cedula','cedula ciudadania','nit','id','identificacion','numero documento','no_doc','no. documento','nro doc','numero doc','nro. doc','num documento','no documento','numero de documento','n documento','n. doc.','nro documento','numero_documento','cedula_ciudadania','cedula ciudadana'],
+  primer_nombre:     ['primer_nombre','primer nombre','primernombre','nombre1','first_name','primer nom','p nombre','p. nombre','1er nombre','pnombre','primer_nom'],
+  segundo_nombre:    ['segundo_nombre','segundo nombre','segundonombre','nombre2','second_name','seg nombre','s nombre','s. nombre','2do nombre','snombre','segundo_nom'],
+  primer_apellido:   ['primer_apellido','primer apellido','primerapellido','apellido1','last_name','primer ape','p apellido','p. apellido','1er apellido','papellido','primer_ape'],
+  segundo_apellido:  ['segundo_apellido','segundo apellido','segundoapellido','apellido2','second_last','seg apellido','s apellido','s. apellido','2do apellido','sapellido','segundo_ape'],
+  fecha_registro:    ['fecha_registro','fecha registro','fecharegistro','fec_reg','fecha reg','registration_date','fecha_creacion','fecha de registro','fecha creacion','f registro','f. registro'],
+  fecha_nacimiento:  ['fecha_nacimiento','fecha nacimiento','fechanacimiento','fec_nac','nacimiento','birthdate','dob','fecha nac','fecha de nacimiento','f nacimiento','f. nacimiento','fecha nac.','fecha de nac','fec nac','fecnac','fecha_nac'],
+  edad:              ['edad','age','anos','años','edad años','edad_anos'],
+  sexo:              ['sexo','genero','género','sex','gender','s','sx','sexo biologico','sexo biológico'],
+  direccion:         ['direccion','dirección','address','dir','domicilio','direccion residencia','direccion de residencia','dirección residencia'],
+  telefono:          ['telefono','teléfono','tel','phone','fono','tel fijo','telefono fijo','telef','telf','t fijo','t. fijo','telefono_fijo'],
+  celular:           ['celular','movil','móvil','mobile','cell','cel','tel celular','telefono celular','telf celular','n celular','cel.','celular_paciente'],
+  email:             ['email','correo','e-mail','mail','correo electronico','correo_electronico','email_paciente','correo electrónico'],
+  ocupacion:         ['ocupacion','ocupación','profesion','profesión','oficio','cargo','profession','actividad','actividad economica'],
+  lugar_nacimiento:  ['lugar_nacimiento','lugar nacimiento','lugar_nac','birthplace','ciudad nacimiento','lugar de nacimiento','ciudad de nacimiento','municipio nacimiento'],
+  empresa:           ['empresa','company','empleador','employer','entidad','lugar trabajo','lugar_trabajo'],
+  telefono_empresa:  ['telefono_empresa','tel_empresa','tel empresa','empresa tel','phone_work','tel trabajo','telefono trabajo'],
+  nombre_acompanante:['nombre_acompanante','acompanante','acompañante','companion','nombre acompañante','nombre acudiente','acudiente'],
+  parentesco:        ['parentesco','relationship','parentesco_acompanante','parentesco acompañante','parentesco acudiente'],
+  tel_acompanante:   ['tel_acompanante','telefono_acompanante','tel acompañante','tel acudiente','telefono acompañante'],
+  cel_acompanante:   ['cel_acompanante','celular_acompanante','cel acompañante','cel acudiente','celular acompañante'],
+  remitido:          ['remitido','referred_by','referido','referencia','remitido por','referido por'],
+  zona:              ['zona','zone','sector','area','barrio'],
+  nacionalidad:      ['nacionalidad','nationality','pais','país','country','pais de nacimiento','país de nacimiento'],
+  estado_civil:      ['estado_civil','estado civil','estadocivil','civil_status','marital','e civil','e. civil'],
+  observacion:       ['observacion','observación','notas','notes','comentarios','observation','obs','observaciones','nota'],
+  eps:               ['eps','aseguradora','seguro','insurance','health_plan','eps_nombre','entidad salud','entidad eps','eps_paciente','nombre eps'],
+  tipo_eps:          ['tipo_eps','tipo eps','tipo de eps','eps_tipo','cotizante','tipo cotizante'],
+  tipo_afiliacion:   ['tipo_afiliacion','tipo afiliacion','tipo_afiliación','regimen','régimen','plan','afiliacion','tipo de afiliacion','régimen salud','regimen salud'],
   facebook:          ['facebook','fb'],
   instagram:         ['instagram','ig','insta'],
   twitter:           ['twitter','tw'],
@@ -908,16 +909,11 @@ function autoDetect(){
     if(nomF&&apeF){ st.nameMode='two'; st.nombresCol=nomF; st.apellidosCol=apeF; }
   }
 
-  // Detect individual fields
+  // Detect individual fields (only exact alias matches — no fuzzy fallback)
   const fm = {};
   for(const fid in ALIASES){
     for(const a of ALIASES[fid]){
       if(nh[norm(a)]){ fm[fid]=nh[norm(a)]; break; }
-    }
-    if(!fm[fid]){
-      const n1 = norm(fid.replace(/_/g,' '));
-      const found = Object.keys(nh).find(k=>k.includes(n1)||n1.includes(k));
-      if(found) fm[fid]=nh[found];
     }
   }
   st.fieldMap = fm;
@@ -1043,11 +1039,22 @@ function inferDocType(dob){
 function normDocType(val){
   if(!val) return '';
   const v=clean(val).toUpperCase();
-  const MAP={'CEDULA':'CC','CÉDULA':'CC','C.C':'CC','C.C.':'CC','CEDULA CIUDADANIA':'CC',
-    'TARJETA IDENTIDAD':'TI','TARJETA DE IDENTIDAD':'TI','REGISTRO CIVIL':'RC',
-    'CEDULA EXTRANJERIA':'CE','CÉDULA DE EXTRANJERÍA':'CE','PASAPORTE':'PA',
-    'ADULTO SIN IDENTIFICACION':'AS','MENOR SIN IDENTIFICACION':'MS',
-    'NUMERO UNICO':'NU','NO REGISTRA':'NR','NUMERO IDENTIFICACION TRIBUTARIA':'NIT'};
+  const MAP={
+    'CC':'CC','C.C.':'CC','C.C':'CC','CEDULA':'CC','CÉDULA':'CC','CEDULA CIUDADANIA':'CC',
+    'CEDULA CIUDADANA':'CC','CÉDULA DE CIUDADANÍA':'CC','CÉDULA CIUDADANÍA':'CC',
+    'TI':'TI','T.I.':'TI','T.I':'TI','TARJETA IDENTIDAD':'TI','TARJETA DE IDENTIDAD':'TI',
+    'TARJETA DE IDENTIDAD':'TI','TARJETA_IDENTIDAD':'TI',
+    'RC':'RC','R.C.':'RC','R.C':'RC','REGISTRO CIVIL':'RC','REGISTRO_CIVIL':'RC',
+    'CE':'CE','C.E.':'CE','C.E':'CE','CEDULA EXTRANJERIA':'CE','CÉDULA EXTRANJERÍA':'CE',
+    'CÉDULA DE EXTRANJERÍA':'CE','CEDULA DE EXTRANJERIA':'CE',
+    'PA':'PA','PASAPORTE':'PA','PASSPORT':'PA',
+    'AS':'AS','ADULTO SIN IDENTIFICACION':'AS','ADULTO SIN IDENTIFICACIÓN':'AS',
+    'MS':'MS','MENOR SIN IDENTIFICACION':'MS','MENOR SIN IDENTIFICACIÓN':'MS',
+    'NU':'NU','NUMERO UNICO':'NU','NÚMERO ÚNICO':'NU',
+    'NR':'NR','NO REGISTRA':'NR','SIN DOCUMENTO':'NR',
+    'NIT':'NIT','NUMERO IDENTIFICACION TRIBUTARIA':'NIT','NÚMERO IDENTIFICACIÓN TRIBUTARIA':'NIT',
+    'PE':'PE','PERMISO ESPECIAL':'PE','PERMISO ESPECIAL DE PERMANENCIA':'PE','PEP':'PE',
+  };
   return MAP[v]||v;
 }
 
@@ -1581,9 +1588,9 @@ function faltRenderPreview(which){
   if(!S.raw.length){ wrap.innerHTML=''; return; }
   const rows=S.raw.slice(0,5);
   wrap.innerHTML=`
-    <div class="raw-preview-title">🔍 Vista previa <span style="font-weight:400;color:var(--gray-500);font-size:.72rem;">(primeras ${rows.length} filas)</span></div>
+    <div class="raw-preview-title">🔍 Vista previa <span style="font-weight:400;color:var(--gray-500);font-size:.72rem;">(primeras ${rows.length} filas — use esto para identificar cada columna)</span></div>
     <div class="raw-preview-scroll"><table>
-      <thead><tr>${S.headers.map((h,i)=>`<th><span class="col-num">${i+1}</span>${esc(colDisplay(h))}</th>`).join('')}</tr></thead>
+      <thead><tr>${S.headers.map((h,i)=>`<th><span class="col-num">${i+1}</span>${esc(colDisplay(h))}<small>${esc(faltColSamples(S,h,1)[0]||'')}</small></th>`).join('')}</tr></thead>
       <tbody>${rows.map(r=>`<tr>${S.headers.map(h=>`<td>${esc(String(r[h]??'').substring(0,30))}</td>`).join('')}</tr>`).join('')}</tbody>
     </table></div>`;
 }
@@ -1610,7 +1617,6 @@ function faltAutoDetect(){
   const fm={};
   for(const fid in ALIASES){
     for(const a of ALIASES[fid]){ if(nh[norm(a)]){ fm[fid]=nh[norm(a)]; break; } }
-    if(!fm[fid]){ const n1=norm(fid.replace(/_/g,' ')); const f=Object.keys(nh).find(k=>k.includes(n1)||n1.includes(k)); if(f) fm[fid]=nh[f]; }
   }
   S.fieldMap=fm;
 }
@@ -1624,19 +1630,19 @@ function faltRenderNameInputs(){
   const S=faltState.B, ni=document.getElementById('fb-name-inputs');
   if(S.nameMode==='full'){
     ni.innerHTML=`<div class="map-item"><span class="map-lbl">Nombre completo (4 partes) <span class="req">*</span></span>
-      <select class="map-sel ${S.fullCol?'ok':''}" onchange="faltState.B.fullCol=this.value;updateSelStyle(this)">${faltBuildOpts(S,S.fullCol)}</select></div>`;
+      <select class="map-sel ${S.fullCol?'ok':''}" onchange="faltState.B.fullCol=this.value;faltRenderMapSummary();updateSelStyle(this)">${faltBuildOpts(S,S.fullCol)}</select></div>`;
   } else if(S.nameMode==='two'){
     ni.innerHTML=`
       <div class="map-item"><span class="map-lbl">Columna Nombres <span class="req">*</span></span>
-        <select class="map-sel ${S.nombresCol?'ok':''}" onchange="faltState.B.nombresCol=this.value;updateSelStyle(this)">${faltBuildOpts(S,S.nombresCol)}</select></div>
+        <select class="map-sel ${S.nombresCol?'ok':''}" onchange="faltState.B.nombresCol=this.value;faltRenderMapSummary();updateSelStyle(this)">${faltBuildOpts(S,S.nombresCol)}</select></div>
       <div class="map-item"><span class="map-lbl">Columna Apellidos <span class="req">*</span></span>
-        <select class="map-sel ${S.apellidosCol?'ok':''}" onchange="faltState.B.apellidosCol=this.value;updateSelStyle(this)">${faltBuildOpts(S,S.apellidosCol)}</select></div>`;
+        <select class="map-sel ${S.apellidosCol?'ok':''}" onchange="faltState.B.apellidosCol=this.value;faltRenderMapSummary();updateSelStyle(this)">${faltBuildOpts(S,S.apellidosCol)}</select></div>`;
   } else {
     const fields=['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido'];
     ni.innerHTML=fields.map(fid=>{
       const f=OUT.find(x=>x.id===fid), cur=S.fieldMap[fid]||'';
       return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
-        <select class="map-sel ${cur?'ok':''}" onchange="faltState.B.fieldMap['${fid}']=this.value;updateSelStyle(this)">${faltBuildOpts(S,cur)}</select></div>`;
+        <select class="map-sel ${cur?'ok':''}" onchange="faltState.B.fieldMap['${fid}']=this.value;faltRenderMapSummary();updateSelStyle(this)">${faltBuildOpts(S,cur)}</select></div>`;
     }).join('');
   }
 }
@@ -1656,10 +1662,67 @@ function faltBuildMapGrid(){
       const f=OUT.find(x=>x.id===id); if(!f) return '';
       const cur=S.fieldMap[id]||'';
       return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
-        <select class="map-sel ${cur?'ok':''}" onchange="faltState.B.fieldMap['${id}']=this.value;updateSelStyle(this)">${faltBuildOpts(S,cur)}</select></div>`;
+        <select class="map-sel ${cur?'ok':''}" onchange="faltState.B.fieldMap['${id}']=this.value;faltRenderMapSummary();updateSelStyle(this)">${faltBuildOpts(S,cur)}</select></div>`;
     }).join('');
     return `<div class="section-sep">${g.label}</div>${items}`;
   }).join('');
+  faltRenderMapSummary();
+}
+
+function faltRenderMapSummary(){
+  const S=faltState.B;
+  const wrap=document.getElementById('fb-map-summary');
+  if(!wrap||!S.headers.length) return;
+
+  const REQUIRED=['documento','primer_nombre','primer_apellido','fecha_nacimiento'];
+  const IMPORTANT=['tipo_documento','sexo','celular','telefono','email','eps','fecha_registro'];
+  const mapped=[], missing=[];
+
+  if(S.nameMode==='full'){
+    if(S.fullCol) mapped.push({label:'Nombre completo',col:S.fullCol});
+    else missing.push('Nombre completo');
+  } else if(S.nameMode==='two'){
+    if(S.nombresCol) mapped.push({label:'Nombres',col:S.nombresCol}); else missing.push('Nombres');
+    if(S.apellidosCol) mapped.push({label:'Apellidos',col:S.apellidosCol}); else missing.push('Apellidos');
+  } else {
+    ['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido'].forEach(fid=>{
+      const f=OUT.find(x=>x.id===fid);
+      if(S.fieldMap[fid]) mapped.push({label:f?.label||fid,col:S.fieldMap[fid]});
+      else if(REQUIRED.includes(fid)) missing.push(f?.label||fid);
+    });
+  }
+  [...REQUIRED,...IMPORTANT].filter(fid=>!['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido'].includes(fid)).forEach(fid=>{
+    const f=OUT.find(x=>x.id===fid);
+    if(S.fieldMap[fid]) mapped.push({label:f?.label||fid,col:S.fieldMap[fid]});
+    else if(REQUIRED.includes(fid)) missing.push(f?.label||fid);
+  });
+
+  let html='';
+  if(missing.length){
+    html+=`<div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:9px;padding:10px 14px;margin-bottom:8px;font-size:.77rem;">
+      <b style="color:#92400E;">⚠️ Campos requeridos sin mapear:</b>
+      <span style="color:#92400E;"> ${missing.join(', ')}</span>
+      <span style="color:var(--gray-500);margin-left:6px;">— Selecciónelos manualmente en el mapa de campos arriba.</span>
+    </div>`;
+  }
+  if(mapped.length){
+    html+=`<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:9px;padding:10px 14px;font-size:.74rem;">
+      <div style="font-family:var(--display);font-weight:700;color:var(--gray-700);margin-bottom:8px;">
+        📋 Detección automática — verifique que el cruce sea correcto antes de comparar:
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${mapped.map(({label,col})=>{
+          const sample=faltColSamples(S,col,2);
+          return `<span style="background:var(--white);border:1px solid var(--gray-300);border-radius:6px;padding:3px 9px;white-space:nowrap;">
+            <span style="color:var(--gray-500);">${esc(label)}:</span>
+            <b style="color:var(--gray-900);">${esc(colDisplay(col))}</b>
+            ${sample.length?`<span style="color:var(--gray-400);font-size:.68rem;"> · ${esc(sample.join(', ').substring(0,30))}</span>`:''}
+          </span>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+  wrap.innerHTML=html;
 }
 
 function faltRenderConfig(which){
