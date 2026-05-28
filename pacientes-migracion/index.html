@@ -203,6 +203,21 @@ tr.row-i td{background:#F0FDF4!important;}
 .toast.err{background:var(--red);}
 .toast.info{background:var(--blue);}
 
+/* RAW PREVIEW */
+.raw-preview-wrap{margin-bottom:18px;}
+.raw-preview-title{font-family:var(--display);font-size:.78rem;font-weight:700;color:var(--gray-700);
+  margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.raw-preview-scroll{overflow-x:auto;border:1px solid var(--gray-200);border-radius:8px;max-height:180px;overflow-y:auto;}
+.raw-preview-scroll table{width:100%;border-collapse:collapse;font-size:.68rem;}
+.raw-preview-scroll th{background:var(--blue-light);color:var(--blue-dark);padding:5px 8px;
+  text-align:left;white-space:nowrap;border-bottom:1px solid var(--blue-mid);font-weight:700;position:sticky;top:0;}
+.raw-preview-scroll th small{display:block;font-size:.58rem;color:var(--gray-500);font-weight:400;margin-top:1px;}
+.raw-preview-scroll td{padding:4px 8px;border-bottom:1px solid var(--gray-100);color:var(--gray-700);
+  white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+.raw-preview-scroll tr:last-child td{border-bottom:none;}
+.col-num{font-family:var(--mono);font-size:.6rem;background:var(--gray-200);color:var(--gray-500);
+  padding:1px 5px;border-radius:3px;margin-right:4px;}
+
 /* MISC */
 .hidden{display:none!important;}
 .empty-state{text-align:center;padding:50px 20px;color:var(--gray-400);}
@@ -261,6 +276,9 @@ tr.row-i td{background:#F0FDF4!important;}
     <div class="card">
       <div class="card-title">🔗 Mapeo de columnas</div>
       <div class="card-sub">Indique cómo están organizados los nombres en su archivo y asigne cada columna fuente al campo correspondiente. Los campos con <span style="color:var(--red)">*</span> son obligatorios.</div>
+
+      <!-- Vista previa datos cargados -->
+      <div class="raw-preview-wrap" id="raw-preview-wrap"></div>
 
       <!-- Nombre mode -->
       <div style="margin-bottom:14px;">
@@ -584,6 +602,58 @@ function goStep(n){
 // ─── MAPPING UI ────────────────────────────────────────────────────────────
 function norm(s){ return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s_\-\.]+/g,'_').trim(); }
 
+// Nombre amigable para columnas sin encabezado (__EMPTY, __EMPTY_1, etc.)
+function colDisplay(h){
+  if(h==='__EMPTY') return 'Columna 1';
+  const m=h.match(/^__EMPTY_(\d+)$/); if(m) return `Columna ${parseInt(m[1])+2}`;
+  return h;
+}
+
+// Primeros 3 valores no vacíos de una columna
+function colSamples(col, max=3){
+  const vals=[];
+  for(const row of st.raw){
+    const v=String(row[col]??'').trim();
+    if(v && !vals.includes(v)) vals.push(v.substring(0,18));
+    if(vals.length>=max) break;
+  }
+  return vals;
+}
+
+// Opciones de dropdown con nombre + ejemplos de datos
+function buildOpts(selectedVal=''){
+  return ['<option value="">— No mapear —</option>',
+    ...st.headers.map(h=>{
+      const disp = colDisplay(h);
+      const samples = colSamples(h);
+      const label = samples.length ? `${disp}  ·  ${samples.join('  ·  ')}` : disp;
+      const sel = h===selectedVal?' selected':'';
+      return `<option value="${esc(h)}"${sel}>${esc(label)}</option>`;
+    })
+  ].join('');
+}
+
+// Tabla de vista previa de los datos cargados (primeras 5 filas)
+function renderRawPreview(){
+  const wrap = document.getElementById('raw-preview-wrap');
+  if(!st.raw.length){ wrap.innerHTML=''; return; }
+  const previewRows = st.raw.slice(0,5);
+  wrap.innerHTML=`
+    <div class="raw-preview-title">🔍 Vista previa del archivo cargado
+      <span style="font-weight:400;color:var(--gray-500);font-size:.72rem;">(primeras ${previewRows.length} filas — use esto para identificar cada columna)</span>
+    </div>
+    <div class="raw-preview-scroll">
+      <table>
+        <thead><tr>
+          ${st.headers.map((h,i)=>`<th><span class="col-num">${i+1}</span>${esc(colDisplay(h))}<small>${esc(colSamples(h,1)[0]||'')}</small></th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${previewRows.map(row=>`<tr>${st.headers.map(h=>`<td>${esc(String(row[h]??'').substring(0,30))}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
 function autoDetect(){
   const nh = {}; st.headers.forEach(h=>{ nh[norm(h)]=h; });
 
@@ -625,34 +695,30 @@ function setNameMode(m){
 
 function renderNameInputs(){
   const ni = document.getElementById('name-inputs');
-  const opts = ['<option value="">— No mapear —</option>',...st.headers.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`)].join('');
   if(st.nameMode==='full'){
     ni.innerHTML=`<div class="map-item"><span class="map-lbl">Nombre completo (4 partes) <span class="req">*</span></span>
-      <select class="map-sel ${st.fullCol?'ok':''}" id="nm-full-sel" onchange="st.fullCol=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(st.fullCol)}"`,`value="${esc(st.fullCol)}" selected`)}</select></div>`;
+      <select class="map-sel ${st.fullCol?'ok':''}" id="nm-full-sel" onchange="st.fullCol=this.value;updateSelStyle(this)">${buildOpts(st.fullCol)}</select></div>`;
   } else if(st.nameMode==='two'){
     ni.innerHTML=`
       <div class="map-item"><span class="map-lbl">Columna Nombres <span class="req">*</span></span>
-        <select class="map-sel ${st.nombresCol?'ok':''}" id="nm-nom-sel" onchange="st.nombresCol=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(st.nombresCol)}"`,`value="${esc(st.nombresCol)}" selected`)}</select></div>
+        <select class="map-sel ${st.nombresCol?'ok':''}" id="nm-nom-sel" onchange="st.nombresCol=this.value;updateSelStyle(this)">${buildOpts(st.nombresCol)}</select></div>
       <div class="map-item"><span class="map-lbl">Columna Apellidos <span class="req">*</span></span>
-        <select class="map-sel ${st.apellidosCol?'ok':''}" id="nm-ape-sel" onchange="st.apellidosCol=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(st.apellidosCol)}"`,`value="${esc(st.apellidosCol)}" selected`)}</select></div>`;
+        <select class="map-sel ${st.apellidosCol?'ok':''}" id="nm-ape-sel" onchange="st.apellidosCol=this.value;updateSelStyle(this)">${buildOpts(st.apellidosCol)}</select></div>`;
   } else {
     const nameFields = ['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido'];
     ni.innerHTML = nameFields.map(fid=>{
       const f = OUT.find(x=>x.id===fid); const cur = st.fieldMap[fid]||'';
       return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
-        <select class="map-sel ${cur?'ok':''}" data-fid="${fid}" onchange="st.fieldMap['${fid}']=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(cur)}"`,`value="${esc(cur)}" selected`)}</select></div>`;
+        <select class="map-sel ${cur?'ok':''}" data-fid="${fid}" onchange="st.fieldMap['${fid}']=this.value;updateSelStyle(this)">${buildOpts(cur)}</select></div>`;
     }).join('');
   }
 }
 
 function buildMappingUI(){
   autoDetect();
+  renderRawPreview();
   ['full','two','sep'].forEach(x=>document.getElementById('nm-'+x).classList.toggle('active',x===st.nameMode));
   renderNameInputs();
-
-  const nameIds = new Set(['primer_nombre','segundo_nombre','primer_apellido','segundo_apellido','fila']);
-  const fields = MAPPABLE.filter(f=>!nameIds.has(f.id));
-  const opts = ['<option value="">— No mapear —</option>',...st.headers.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`)].join('');
 
   const groups = [
     {label:'Identificación',ids:['tipo_documento','documento']},
@@ -670,7 +736,7 @@ function buildMappingUI(){
       const f = OUT.find(x=>x.id===id); if(!f) return '';
       const cur = st.fieldMap[id]||'';
       return `<div class="map-item"><span class="map-lbl">${f.label}${f.req?' <span class="req">*</span>':''}</span>
-        <select class="map-sel ${cur?'ok':''}" data-fid="${id}" onchange="st.fieldMap['${id}']=this.value;updateSelStyle(this)">${opts.replace(`value="${esc(cur)}"`,`value="${esc(cur)}" selected`)}</select></div>`;
+        <select class="map-sel ${cur?'ok':''}" data-fid="${id}" onchange="st.fieldMap['${id}']=this.value;updateSelStyle(this)">${buildOpts(cur)}</select></div>`;
     }).join('');
     return `<div class="section-sep">${g.label}</div>${items}`;
   }).join('');
