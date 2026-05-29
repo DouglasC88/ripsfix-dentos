@@ -1014,17 +1014,41 @@ function parseDate(val){
   const d=new Date(s); return isNaN(d.getTime())?null:d;
 }
 
+// Fecha de nacimiento predeterminada cuando el origen no trae una válida.
+const DEFAULT_DOB = '1900-01-01';
+
 // Deja solo dígitos — elimina espacios, letras, guiones, paréntesis, etc.
 function onlyDigits(val){
   return String(val??'').replace(/[^\d]/g,'');
+}
+// Detecta si un documento contiene letras (alfanumérico → pasaporte)
+function isAlphanumericDoc(val){
+  const s = clean(val);
+  return /[a-zA-Z]/.test(s);
 }
 // Aplica onlyDigits y registra hallazgo si hubo cambio
 function cleanNum(val, campo, rowFindings){
   const orig = clean(val);
   if(!orig) return '';
   const result = onlyDigits(orig);
-  if(result !== orig){
+  if(result !== orig && rowFindings){
     rowFindings.push({type:'info', campo, msg:`Caracteres no numéricos eliminados: "${orig}" → "${result}"`});
+  }
+  return result;
+}
+// Limpia el documento según el tipo: pasaporte conserva letras (alfanumérico),
+// el resto solo dígitos. Quita siempre espacios y símbolos.
+function cleanDoc(val, tipoDoc, rowFindings){
+  const orig = clean(val);
+  if(!orig) return '';
+  let result;
+  if(tipoDoc==='PA'){
+    result = orig.toUpperCase().replace(/[^A-Z0-9]/g,'');   // pasaporte: alfanumérico
+  } else {
+    result = onlyDigits(orig);                              // numérico
+  }
+  if(result !== orig && rowFindings){
+    rowFindings.push({type:'info', campo:'Documento', msg:`Documento limpiado: "${orig}" → "${result}"`});
   }
   return result;
 }
@@ -1051,19 +1075,22 @@ function inferDocType(dob){
 const FOREIGN_DOCS = new Set(['CE','PA','PE','PEP','PT','NIT','AS','MS','NU','NR']);
 
 // Resuelve el tipo de documento según reglas DANE.
-// La EDAD manda para los tipos colombianos (RC/TI/CC). Solo se conserva
-// el tipo del archivo de origen cuando es extranjero/especial (CE, PA, …),
-// porque esos no se pueden deducir de la edad. Valores como "OTRO" se descartan.
-function resolveDocType(rawDoc, fechaNacFmt){
+//  - Si el origen ya trae un tipo extranjero/especial válido (CE, PA, PE, NIT…) se respeta.
+//  - Si el NÚMERO de documento es alfanumérico (tiene letras) → PA (Pasaporte).
+//  - En los demás casos la EDAD manda: RC (0-6), TI (7-17), CC (18+).
+//  - Valores basura como "OTRO" se descartan a favor de la regla por edad.
+function resolveDocType(rawDoc, fechaNacFmt, docNum){
   const src = normDocType(rawDoc);            // tipo del origen, normalizado
   const dane = inferDocType(fechaNacFmt);     // tipo según edad (RC/TI/CC) o ''
   // 1) Tipo extranjero/especial válido en el origen → se respeta
   if(FOREIGN_DOCS.has(src)) return { tipo: src, reason: 'foreign', src, dane };
-  // 2) Si la edad permite deducir, ese tipo manda (corrige RC/TI/CC erróneos y "OTRO")
+  // 2) Documento alfanumérico → Pasaporte (PA)
+  if(isAlphanumericDoc(docNum)) return { tipo: 'PA', reason: 'passport', src, dane };
+  // 3) Si la edad permite deducir, ese tipo manda (corrige RC/TI/CC erróneos y "OTRO")
   if(dane) return { tipo: dane, reason: (src===dane?'match':(src?'corrected':'assigned')), src, dane };
-  // 3) Sin fecha válida: usa el de origen solo si es un tipo colombiano válido
+  // 4) Sin fecha válida: usa el de origen solo si es un tipo colombiano válido
   if(['CC','TI','RC'].includes(src)) return { tipo: src, reason: 'source-nodate', src, dane };
-  // 4) No se pudo determinar
+  // 5) No se pudo determinar
   return { tipo: '', reason: 'unknown', src, dane };
 }
 
@@ -1156,26 +1183,26 @@ function processData(){
       out.segundo_apellido= getVal(row, st.fieldMap.segundo_apellido);
     }
 
-    // TIPO DOCUMENTO (reglas 1 y 2) — la EDAD manda (regla DANE)
-    const rawDoc = getVal(row, st.fieldMap.tipo_documento);
+    // FECHA NACIMIENTO (regla 6) — con fecha predeterminada si falta o es inválida
     const docNum = getVal(row, st.fieldMap.documento);
-    const fechaNac = fmtDate(getVal(row, st.fieldMap.fecha_nacimiento)||'');
-
-    const dt = resolveDocType(rawDoc, fechaNac);
-    out.tipo_documento = dt.tipo;
-    if(dt.reason==='assigned') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Sin tipo de documento. Se asignó ${dt.tipo} según edad (DANE).`});
-    else if(dt.reason==='corrected') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Corregido por edad (DANE): "${rawDoc||dt.src}" → "${dt.tipo}".`});
-    else if(dt.reason==='unknown') rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin fecha de nacimiento válida; no se pudo determinar el tipo según edad.'});
-
-    // DOCUMENTO — la limpieza numérica se hace más abajo junto a los otros campos numéricos
-
-    // FECHA NACIMIENTO (regla 6)
     const fechaNacOrig = getVal(row, st.fieldMap.fecha_nacimiento);
-    const fechaNacFmt = fmtDate(fechaNacOrig);
-    out.fecha_nacimiento = fechaNacFmt;
-    if(fechaNacOrig && fechaNacFmt !== clean(fechaNacOrig))
+    let fechaNacFmt = fmtDate(fechaNacOrig);
+    if(!parseDate(fechaNacFmt)){
+      fechaNacFmt = DEFAULT_DOB;
+      rowFindings.push({type:'warn',campo:'Fecha Nacimiento',msg:`Sin fecha de nacimiento válida; se asignó la fecha predeterminada ${DEFAULT_DOB}.`});
+    } else if(fechaNacOrig && fechaNacFmt !== clean(fechaNacOrig)){
       rowFindings.push({type:'info',campo:'Fecha Nacimiento',msg:`Fecha reformateada: "${fechaNacOrig}" → "${fechaNacFmt}"`});
-    if(!fechaNacFmt) rowFindings.push({type:'err',campo:'Fecha Nacimiento',msg:'Fecha de nacimiento vacía.'});
+    }
+    out.fecha_nacimiento = fechaNacFmt;
+
+    // TIPO DOCUMENTO (reglas 1 y 2) — alfanumérico=PA, si no la EDAD manda (DANE)
+    const rawDoc = getVal(row, st.fieldMap.tipo_documento);
+    const dt = resolveDocType(rawDoc, fechaNacFmt, docNum);
+    out.tipo_documento = dt.tipo;
+    if(dt.reason==='passport') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Documento alfanumérico → Pasaporte (PA).`});
+    else if(dt.reason==='assigned') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Sin tipo de documento. Se asignó ${dt.tipo} según edad (DANE).`});
+    else if(dt.reason==='corrected') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Corregido por edad (DANE): "${rawDoc||dt.src}" → "${dt.tipo}".`});
+    else if(dt.reason==='unknown') rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'No se pudo determinar el tipo de documento.'});
 
     // EDAD (regla 3)
     const rawEdad = getVal(row, st.fieldMap.edad);
@@ -1205,8 +1232,8 @@ function processData(){
     if(frOrig && frFmt !== clean(frOrig))
       rowFindings.push({type:'info',campo:'Fecha Registro',msg:`Reformateada: "${frOrig}" → "${frFmt}"`});
 
-    // DOCUMENTO — solo dígitos (regla 7 + limpieza numérica)
-    out.documento = cleanNum(docNum, 'Documento', rowFindings);
+    // DOCUMENTO — pasaporte conserva letras; el resto solo dígitos (regla 7)
+    out.documento = cleanDoc(docNum, out.tipo_documento, rowFindings);
     if(!out.documento) rowFindings.push({type:'err',campo:'Documento',msg:'Número de documento vacío.'});
 
     // CAMPOS NUMÉRICOS — eliminar espacios y letras
@@ -1793,18 +1820,23 @@ function faltProcessRow(row, fila){
     out.segundo_apellido=getVal(row,S.fieldMap.segundo_apellido);
   }
 
-  // Tipo documento — la EDAD manda (regla DANE)
-  const rawDoc=getVal(row,S.fieldMap.tipo_documento);
-  const fechaNacFmt=fmtDate(getVal(row,S.fieldMap.fecha_nacimiento));
-  const dt=resolveDocType(rawDoc, fechaNacFmt);
-  out.tipo_documento=dt.tipo;
-  if(dt.reason==='assigned') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Asignado ${dt.tipo} según edad (DANE).`});
-  else if(dt.reason==='corrected') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Corregido por edad (DANE): "${rawDoc||dt.src}" → "${dt.tipo}".`});
-  else if(dt.reason==='unknown') rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin fecha de nacimiento válida; no se pudo determinar el tipo según edad.'});
-
-  // Fecha nacimiento
+  // Fecha de nacimiento (con default si falta) — regla 6
+  const rawDocNum=getVal(row,S.fieldMap.documento);
+  let fechaNacFmt=fmtDate(getVal(row,S.fieldMap.fecha_nacimiento));
+  if(!parseDate(fechaNacFmt)){
+    fechaNacFmt=DEFAULT_DOB;
+    rowFindings.push({type:'warn',campo:'Fecha Nacimiento',msg:`Sin fecha de nacimiento válida; se asignó la fecha predeterminada ${DEFAULT_DOB}.`});
+  }
   out.fecha_nacimiento=fechaNacFmt;
-  if(!fechaNacFmt) rowFindings.push({type:'err',campo:'Fecha Nacimiento',msg:'Fecha de nacimiento vacía.'});
+
+  // Tipo documento — alfanumérico=PA, si no la EDAD manda (regla DANE)
+  const rawDoc=getVal(row,S.fieldMap.tipo_documento);
+  const dt=resolveDocType(rawDoc, fechaNacFmt, rawDocNum);
+  out.tipo_documento=dt.tipo;
+  if(dt.reason==='passport') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Documento alfanumérico → Pasaporte (PA).`});
+  else if(dt.reason==='assigned') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Asignado ${dt.tipo} según edad (DANE).`});
+  else if(dt.reason==='corrected') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Corregido por edad (DANE): "${rawDoc||dt.src}" → "${dt.tipo}".`});
+  else if(dt.reason==='unknown') rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'No se pudo determinar el tipo de documento.'});
 
   // Edad
   const rawEdad=getVal(row,S.fieldMap.edad);
@@ -1823,8 +1855,8 @@ function faltProcessRow(row, fila){
   // Fecha registro
   out.fecha_registro=fmtDate(getVal(row,S.fieldMap.fecha_registro));
 
-  // Documento
-  out.documento=cleanNum(getVal(row,S.fieldMap.documento),'Documento',rowFindings);
+  // Documento (pasaporte conserva letras; el resto solo dígitos)
+  out.documento=cleanDoc(rawDocNum, out.tipo_documento, rowFindings);
   if(!out.documento) rowFindings.push({type:'err',campo:'Documento',msg:'Número de documento vacío.'});
 
   // Numéricos
