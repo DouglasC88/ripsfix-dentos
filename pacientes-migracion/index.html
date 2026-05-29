@@ -324,6 +324,24 @@ tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through
         </span>
       </div>
 
+      <!-- Selector de filas a saltar después del encabezado -->
+      <div style="background:#fffbeb;border:1px solid #f5d652;border-radius:9px;
+           padding:11px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-family:var(--display);font-size:.8rem;font-weight:700;color:#7c5c00;">
+          ¿Cuántas filas de descripción hay después de los títulos?
+        </span>
+        <div style="display:flex;gap:6px;">
+          <button class="mode-btn" id="skip-btn-0" onclick="changeSkipAfterHeader(0)">0 (ninguna)</button>
+          <button class="mode-btn" id="skip-btn-1" onclick="changeSkipAfterHeader(1)">1 fila</button>
+          <button class="mode-btn" id="skip-btn-2" onclick="changeSkipAfterHeader(2)">2 filas</button>
+          <button class="mode-btn" id="skip-btn-3" onclick="changeSkipAfterHeader(3)">3 filas</button>
+          <button class="mode-btn" id="skip-btn-4" onclick="changeSkipAfterHeader(4)">4 filas</button>
+        </div>
+        <span style="font-size:.72rem;color:#7c5c00;opacity:.8;">
+          Use esto si el archivo tiene filas de "texto", "YYYY-MM-DD", etc. entre el encabezado y los datos reales.
+        </span>
+      </div>
+
       <!-- Vista previa datos cargados -->
       <div class="raw-preview-wrap" id="raw-preview-wrap"></div>
 
@@ -718,6 +736,7 @@ const st = {
   matrix: [],              // array de arrays (todas las filas, sin procesar)
   raw: [], headers: [], filename: '',
   headerRow: 1,            // fila donde están los títulos (1-based)
+  skipAfterHeader: 0,      // filas a omitir después del encabezado (filas de descripción del template)
   nameMode: 'sep',
   fullCol: '', nombresCol: '', apellidosCol: '',
   fieldMap: {},
@@ -796,8 +815,8 @@ function applyHeaderRow(rowNum){
     return s || `Columna_${i+1}`;
   });
 
-  // Las filas de datos son las que vienen DESPUÉS de la fila de títulos
-  st.raw = st.matrix.slice(idx+1)
+  // Las filas de datos son las que vienen DESPUÉS de la fila de títulos (+ saltar filas de descripción)
+  st.raw = st.matrix.slice(idx + 1 + (st.skipAfterHeader||0))
     .filter(row => row.some(c => String(c||'').trim() !== ''))  // omitir filas vacías
     .map(row => {
       const obj = {};
@@ -824,6 +843,15 @@ function changeHeaderRow(n){
   } else {
     applyHeaderRow(num);
   }
+  st.fieldMap={}; st.fullCol=''; st.nombresCol=''; st.apellidosCol='';
+  buildMappingUI();
+}
+
+function changeSkipAfterHeader(n){
+  st.skipAfterHeader = parseInt(n)||0;
+  // Re-apply current header row with new skip value
+  if(st.headerRow > 0) applyHeaderRow(st.headerRow);
+  else changeHeaderRow(0);
   st.fieldMap={}; st.fullCol=''; st.nombresCol=''; st.apellidosCol='';
   buildMappingUI();
 }
@@ -956,6 +984,11 @@ function buildMappingUI(){
   [0,1,2,3].forEach(i=>{
     const b=document.getElementById('hr-btn-'+i);
     if(b) b.classList.toggle('active', st.headerRow===i);
+  });
+  // Marcar botón de saltar filas activo
+  [0,1,2,3,4].forEach(i=>{
+    const b=document.getElementById('skip-btn-'+i);
+    if(b) b.classList.toggle('active', (st.skipAfterHeader||0)===i);
   });
   autoDetect();
   renderRawPreview();
