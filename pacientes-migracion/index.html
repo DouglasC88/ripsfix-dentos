@@ -1879,7 +1879,7 @@ function faltCompare(){
 }
 
 // ── TABLA FALTANTES ──
-const FALT_VISIBLE=['fila','tipo_documento','documento','primer_nombre','segundo_nombre','primer_apellido','segundo_apellido','fecha_nacimiento','edad','sexo','telefono','celular','eps'];
+const FALT_VISIBLE=['tipo_documento','documento','primer_nombre','segundo_nombre','primer_apellido','segundo_apellido','fecha_nacimiento','edad','sexo','telefono','celular','eps'];
 
 function faltRenderTable(){
   const q=document.getElementById('falt-search').value.toLowerCase();
@@ -1913,7 +1913,6 @@ function faltRenderTable(){
     const tag=errRows.has(row._rn)?'<span class="tag tag-e">ERR</span>':warnRows.has(row._rn)?'<span class="tag tag-w">WARN</span>':'';
     return `<tr class="${cls}"><td class="n-row">${row.fila}${tag}</td>${FALT_VISIBLE.map(id=>{
       const v=esc(row[id]||'');
-      if(id==='fila') return '';
       if(id==='documento') return `<td><span class="doc-badge">${v||'—'}</span></td>`;
       if(id==='tipo_documento') return `<td style="font-weight:700;color:var(--blue-dark)">${v}</td>`;
       if(id==='sexo') return `<td>${row[id]==='femenino'?'♀ F':row[id]==='masculino'?'♂ M':v}</td>`;
