@@ -990,16 +990,27 @@ function updateSelStyle(sel){ sel.classList.toggle('ok', !!sel.value); }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function clean(v){ return String(v??'').replace(/[\r\n\t]/g,' ').trim(); }
 
+// Construye una fecha válida desde año/mes/día; null si la fecha no existe
+// (ej. 00/00/0000, día 31 en mes de 30, mes 13, año absurdo).
+function mkDate(y,mo,da){
+  y=+y; mo=+mo; da=+da;
+  if(!y||!mo||!da) return null;
+  if(y<1900||y>2100||mo<1||mo>12||da<1||da>31) return null;
+  const d=new Date(y, mo-1, da);
+  // Verifica que JS no haya "corregido" la fecha (ej. 31 feb → 3 mar)
+  if(d.getFullYear()!==y||d.getMonth()!==mo-1||d.getDate()!==da) return null;
+  return d;
+}
 function parseDate(val){
   if(!val) return null;
   if(val instanceof Date) return isNaN(val.getTime())?null:val;
   const s = String(val).trim();
   if(!s) return null;
   let m;
-  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s+'T00:00:00');
-  m=s.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})$/); if(m) return new Date(`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}T00:00:00`);
-  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if(m) return new Date(`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}T00:00:00`);
-  if(/^\d{8}$/.test(s)) return new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`);
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return mkDate(m[1],m[2],m[3]);
+  m=s.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})$/); if(m) return mkDate(m[1],m[2],m[3]);
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if(m) return mkDate(m[3],m[2],m[1]);
+  if(/^\d{8}$/.test(s)) return mkDate(s.slice(0,4),s.slice(4,6),s.slice(6,8));
   const d=new Date(s); return isNaN(d.getTime())?null:d;
 }
 
@@ -1034,6 +1045,26 @@ function calcAge(dob){
 function inferDocType(dob){
   const age=parseInt(calcAge(dob),10); if(isNaN(age)||age<0) return '';
   if(age<=6) return 'RC'; if(age<=17) return 'TI'; return 'CC';
+}
+
+// Tipos NO determinados por la edad (extranjeros / especiales): se respetan del origen.
+const FOREIGN_DOCS = new Set(['CE','PA','PE','PEP','PT','NIT','AS','MS','NU','NR']);
+
+// Resuelve el tipo de documento según reglas DANE.
+// La EDAD manda para los tipos colombianos (RC/TI/CC). Solo se conserva
+// el tipo del archivo de origen cuando es extranjero/especial (CE, PA, …),
+// porque esos no se pueden deducir de la edad. Valores como "OTRO" se descartan.
+function resolveDocType(rawDoc, fechaNacFmt){
+  const src = normDocType(rawDoc);            // tipo del origen, normalizado
+  const dane = inferDocType(fechaNacFmt);     // tipo según edad (RC/TI/CC) o ''
+  // 1) Tipo extranjero/especial válido en el origen → se respeta
+  if(FOREIGN_DOCS.has(src)) return { tipo: src, reason: 'foreign', src, dane };
+  // 2) Si la edad permite deducir, ese tipo manda (corrige RC/TI/CC erróneos y "OTRO")
+  if(dane) return { tipo: dane, reason: (src===dane?'match':(src?'corrected':'assigned')), src, dane };
+  // 3) Sin fecha válida: usa el de origen solo si es un tipo colombiano válido
+  if(['CC','TI','RC'].includes(src)) return { tipo: src, reason: 'source-nodate', src, dane };
+  // 4) No se pudo determinar
+  return { tipo: '', reason: 'unknown', src, dane };
 }
 
 function normDocType(val){
@@ -1125,20 +1156,16 @@ function processData(){
       out.segundo_apellido= getVal(row, st.fieldMap.segundo_apellido);
     }
 
-    // TIPO DOCUMENTO (reglas 1 y 2)
+    // TIPO DOCUMENTO (reglas 1 y 2) — la EDAD manda (regla DANE)
     const rawDoc = getVal(row, st.fieldMap.tipo_documento);
-    let tipoDoc = normDocType(rawDoc);
     const docNum = getVal(row, st.fieldMap.documento);
     const fechaNac = fmtDate(getVal(row, st.fieldMap.fecha_nacimiento)||'');
 
-    if(!tipoDoc){
-      const inf = inferDocType(fechaNac);
-      if(inf){ tipoDoc=inf; rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Sin tipo de documento. Se asignó ${inf} según fecha de nacimiento (DANE).`}); }
-      else rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin tipo de documento y no se pudo inferir (fecha de nacimiento inválida o ausente).'});
-    } else if(rawDoc.trim()!==tipoDoc){
-      rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Normalizado a mayúsculas: "${rawDoc}" → "${tipoDoc}"`});
-    }
-    out.tipo_documento = tipoDoc;
+    const dt = resolveDocType(rawDoc, fechaNac);
+    out.tipo_documento = dt.tipo;
+    if(dt.reason==='assigned') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Sin tipo de documento. Se asignó ${dt.tipo} según edad (DANE).`});
+    else if(dt.reason==='corrected') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Corregido por edad (DANE): "${rawDoc||dt.src}" → "${dt.tipo}".`});
+    else if(dt.reason==='unknown') rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin fecha de nacimiento válida; no se pudo determinar el tipo según edad.'});
 
     // DOCUMENTO — la limpieza numérica se hace más abajo junto a los otros campos numéricos
 
@@ -1766,18 +1793,14 @@ function faltProcessRow(row, fila){
     out.segundo_apellido=getVal(row,S.fieldMap.segundo_apellido);
   }
 
-  // Tipo documento
+  // Tipo documento — la EDAD manda (regla DANE)
   const rawDoc=getVal(row,S.fieldMap.tipo_documento);
-  let tipoDoc=normDocType(rawDoc);
   const fechaNacFmt=fmtDate(getVal(row,S.fieldMap.fecha_nacimiento));
-  if(!tipoDoc){
-    const inf=inferDocType(fechaNacFmt);
-    if(inf){ tipoDoc=inf; rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Asignado ${inf} según fecha de nacimiento (DANE).`}); }
-    else rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin tipo de documento y no se pudo inferir.'});
-  } else if(rawDoc.trim()!==tipoDoc){
-    rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Normalizado: "${rawDoc}" → "${tipoDoc}"`});
-  }
-  out.tipo_documento=tipoDoc;
+  const dt=resolveDocType(rawDoc, fechaNacFmt);
+  out.tipo_documento=dt.tipo;
+  if(dt.reason==='assigned') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Asignado ${dt.tipo} según edad (DANE).`});
+  else if(dt.reason==='corrected') rowFindings.push({type:'info',campo:'Tipo Documento',msg:`Corregido por edad (DANE): "${rawDoc||dt.src}" → "${dt.tipo}".`});
+  else if(dt.reason==='unknown') rowFindings.push({type:'warn',campo:'Tipo Documento',msg:'Sin fecha de nacimiento válida; no se pudo determinar el tipo según edad.'});
 
   // Fecha nacimiento
   out.fecha_nacimiento=fechaNacFmt;
