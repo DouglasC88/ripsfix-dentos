@@ -1021,10 +1021,12 @@ const DEFAULT_DOB = '1900-01-01';
 function onlyDigits(val){
   return String(val??'').replace(/[^\d]/g,'');
 }
-// Detecta si un documento contiene letras (alfanumérico → pasaporte)
-function isAlphanumericDoc(val){
-  const s = clean(val);
-  return /[a-zA-Z]/.test(s);
+// Detecta formato REAL de pasaporte: 1-2 letras al inicio seguidas solo de dígitos
+// (ej. AB123456, C4731176, AA0333058). NO marca como pasaporte los documentos
+// sucios tipo "número + ciudad" (52724958BOGOTA) ni con texto al final.
+function isPassportPattern(val){
+  const s = clean(val).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'');
+  return /^[A-Z]{1,2}\d{4,}$/.test(s);
 }
 // Aplica onlyDigits y registra hallazgo si hubo cambio
 function cleanNum(val, campo, rowFindings){
@@ -1043,9 +1045,10 @@ function cleanDoc(val, tipoDoc, rowFindings){
   if(!orig) return '';
   let result;
   if(tipoDoc==='PA'){
-    result = orig.toUpperCase().replace(/[^A-Z0-9]/g,'');   // pasaporte: alfanumérico
+    // pasaporte: alfanumérico — sin tildes, espacios ni símbolos
+    result = orig.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'');
   } else {
-    result = onlyDigits(orig);                              // numérico
+    result = onlyDigits(orig);                              // numérico (quita ciudad/letras)
   }
   if(result !== orig && rowFindings){
     rowFindings.push({type:'info', campo:'Documento', msg:`Documento limpiado: "${orig}" → "${result}"`});
@@ -1076,7 +1079,8 @@ const FOREIGN_DOCS = new Set(['CE','PA','PE','PEP','PT','NIT','AS','MS','NU','NR
 
 // Resuelve el tipo de documento según reglas DANE.
 //  - Si el origen ya trae un tipo extranjero/especial válido (CE, PA, PE, NIT…) se respeta.
-//  - Si el NÚMERO de documento es alfanumérico (tiene letras) → PA (Pasaporte).
+//  - Si el NÚMERO tiene formato de pasaporte (1-2 letras + dígitos) → PA. Los documentos
+//    sucios tipo "número + ciudad" (52724958BOGOTA) NO son pasaporte: se les quita la ciudad.
 //  - En los demás casos la EDAD manda: RC (0-6), TI (7-17), CC (18+).
 //  - Valores basura como "OTRO" se descartan a favor de la regla por edad.
 function resolveDocType(rawDoc, fechaNacFmt, docNum){
@@ -1084,8 +1088,8 @@ function resolveDocType(rawDoc, fechaNacFmt, docNum){
   const dane = inferDocType(fechaNacFmt);     // tipo según edad (RC/TI/CC) o ''
   // 1) Tipo extranjero/especial válido en el origen → se respeta
   if(FOREIGN_DOCS.has(src)) return { tipo: src, reason: 'foreign', src, dane };
-  // 2) Documento alfanumérico → Pasaporte (PA)
-  if(isAlphanumericDoc(docNum)) return { tipo: 'PA', reason: 'passport', src, dane };
+  // 2) Documento con formato de pasaporte (1-2 letras + dígitos) → Pasaporte (PA)
+  if(isPassportPattern(docNum)) return { tipo: 'PA', reason: 'passport', src, dane };
   // 3) Si la edad permite deducir, ese tipo manda (corrige RC/TI/CC erróneos y "OTRO")
   if(dane) return { tipo: dane, reason: (src===dane?'match':(src?'corrected':'assigned')), src, dane };
   // 4) Sin fecha válida: usa el de origen solo si es un tipo colombiano válido
