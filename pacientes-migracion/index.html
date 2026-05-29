@@ -1553,30 +1553,24 @@ function exportFindings(){
   const allSet  = new Set(st.findings.map(f=>f.rowNum));
   const today   = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
 
-  const tipoLabel = t =>
-    t==='err'  ? 'Error' :
-    t==='warn' ? 'Advertencia' :
-    t==='dup'  ? 'Duplicado' : 'Corrección automática';
-  const tipoBadge = t =>
-    t==='err'  ? `<span class="badge badge-err">Error</span>` :
-    t==='warn' ? `<span class="badge badge-warn">Advertencia</span>` :
-    t==='dup'  ? `<span class="badge badge-dup">Duplicado</span>` :
-                 `<span class="badge badge-corr">Corrección</span>`;
+  // Recopilar campos únicos para el selector
+  const camposUnicos = [...new Set(st.findings.map(f=>f.campo))].sort();
 
-  const rows = st.findings.map(f => {
+  // Datos serializados para el JS del reporte
+  const datos = st.findings.map(f => {
     const r = rowMap[f.rowNum];
-    const nombre = r ? [r.primer_nombre,r.segundo_nombre,r.primer_apellido,r.segundo_apellido].filter(Boolean).join(' ') : '—';
-    return `<tr class="row-${f.type}">
-      <td class="tc">${f.rowNum}</td>
-      <td><strong>${nombre||'—'}</strong></td>
-      <td class="tc">${r?.tipo_documento||'—'}</td>
-      <td>${r?.documento||'—'}</td>
-      <td class="tc">${r?.fecha_nacimiento||'—'}</td>
-      <td class="tc">${tipoBadge(f.type)}</td>
-      <td>${f.campo}</td>
-      <td>${f.msg}</td>
-    </tr>`;
-  }).join('');
+    const nombre = r ? [r.primer_nombre,r.segundo_nombre,r.primer_apellido,r.segundo_apellido].filter(Boolean).join(' ') : '';
+    return {
+      fila: f.rowNum,
+      nombre: nombre||'—',
+      tipoDoc: r?.tipo_documento||'—',
+      documento: r?.documento||'—',
+      fechaNac: r?.fecha_nacimiento||'—',
+      tipo: f.type,
+      campo: f.campo,
+      msg: f.msg,
+    };
+  });
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -1586,44 +1580,74 @@ function exportFindings(){
 <title>Reporte de Hallazgos — ${baseName}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;background:#f8fafc;color:#1e293b;padding:28px 32px}
-  h1{font-size:1.35rem;font-weight:800;color:#0f172a;margin-bottom:4px}
-  .meta{font-size:.8rem;color:#64748b;margin-bottom:24px}
-  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:28px}
-  .stat{background:#fff;border-radius:10px;padding:14px 10px;text-align:center;border:1px solid #e2e8f0}
-  .stat .num{font-size:1.5rem;font-weight:800;margin-bottom:3px}
-  .stat .lbl{font-size:.68rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.03em}
-  .c-blue{color:#2563eb} .c-green{color:#16a34a} .c-purple{color:#7c3aed}
-  .c-yellow{color:#d97706} .c-red{color:#dc2626} .c-orange{color:#ea580c}
-  .legend{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:24px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-  .legend h2{font-size:.78rem;font-weight:700;color:#374151;grid-column:1/-1;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
-  .legend-item{display:flex;align-items:flex-start;gap:8px;font-size:.78rem;color:#374151}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;background:#f8fafc;color:#1e293b;padding:24px 32px}
+  h1{font-size:1.3rem;font-weight:800;color:#0f172a;margin-bottom:4px}
+  .meta{font-size:.78rem;color:#64748b;margin-bottom:20px}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}
+  .stat{background:#fff;border-radius:10px;padding:13px 8px;text-align:center;border:1px solid #e2e8f0;cursor:pointer;transition:box-shadow .15s}
+  .stat:hover{box-shadow:0 2px 10px rgba(0,0,0,.1)}
+  .stat.active{outline:2px solid #2563eb}
+  .stat .num{font-size:1.4rem;font-weight:800;margin-bottom:2px}
+  .stat .lbl{font-size:.65rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+  .c-blue{color:#2563eb}.c-green{color:#16a34a}.c-purple{color:#7c3aed}
+  .c-yellow{color:#d97706}.c-red{color:#dc2626}.c-orange{color:#ea580c}
+  .legend{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 18px;margin-bottom:18px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .legend h2{font-size:.73rem;font-weight:700;color:#374151;grid-column:1/-1;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+  .legend-item{display:flex;align-items:flex-start;gap:8px;font-size:.77rem;color:#374151}
+  /* BARRA DE FILTROS */
+  .filters{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .filters label{font-size:.72rem;font-weight:700;color:#475569}
+  .filters input,.filters select{padding:6px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:.78rem;color:#1e293b;outline:none;background:#f8fafc}
+  .filters input:focus,.filters select:focus{border-color:#2563eb;background:#fff}
+  #f-search{width:230px}
+  .btn-clear{padding:6px 12px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;font-size:.75rem;font-weight:600;cursor:pointer;color:#475569}
+  .btn-clear:hover{background:#e2e8f0}
+  .result-count{margin-left:auto;font-size:.75rem;color:#64748b;font-weight:600}
+  /* TABLA */
+  .tbl-wrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
   thead tr{background:#1e293b;color:#fff}
-  th{padding:9px 11px;text-align:left;font-size:.72rem;font-weight:700;white-space:nowrap}
-  td{padding:8px 11px;border-bottom:1px solid #f1f5f9;vertical-align:top;line-height:1.4}
+  th{padding:9px 11px;text-align:left;font-size:.71rem;font-weight:700;white-space:nowrap}
+  td{padding:7px 11px;border-bottom:1px solid #f1f5f9;vertical-align:top;line-height:1.4}
   tr.row-err{background:#fff8f8} tr.row-warn{background:#fffdf0} tr.row-dup{background:#fff7ed}
-  tr:hover td{background:rgba(0,0,0,.025)}
+  tr:hover td{filter:brightness(.97)}
   .tc{text-align:center}
-  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.68rem;font-weight:700;white-space:nowrap}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.67rem;font-weight:700;white-space:nowrap}
   .badge-err{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
   .badge-warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
   .badge-dup{background:#fff7ed;color:#c2410c;border:1px solid #fdba74}
   .badge-corr{background:#f5f3ff;color:#6d28d9;border:1px solid #c4b5fd}
-  @media print{body{padding:10px;background:#fff}.stats .stat{break-inside:avoid}}
+  .empty{text-align:center;padding:40px;color:#94a3b8;font-size:.9rem}
+  @media print{.filters{display:none!important}body{padding:10px;background:#fff}}
 </style>
 </head>
 <body>
 <h1>Reporte de Hallazgos — Migración de Pacientes</h1>
-<div class="meta">Archivo: <strong>${baseName}</strong> &nbsp;·&nbsp; Generado: <strong>${today}</strong> &nbsp;·&nbsp; Total hallazgos: <strong>${st.findings.length}</strong></div>
+<div class="meta">
+  Archivo: <strong>${baseName}</strong> &nbsp;·&nbsp;
+  Generado: <strong>${today}</strong> &nbsp;·&nbsp;
+  Total hallazgos: <strong>${st.findings.length}</strong>
+</div>
 
 <div class="stats">
-  <div class="stat"><div class="num c-blue">${total}</div><div class="lbl">Total</div></div>
-  <div class="stat"><div class="num c-green">${total - allSet.size}</div><div class="lbl">Sin hallazgos</div></div>
-  <div class="stat"><div class="num c-purple">${corrSet.size}</div><div class="lbl">Corregidos</div></div>
-  <div class="stat"><div class="num c-yellow">${warnSet.size}</div><div class="lbl">Advertencias</div></div>
-  <div class="stat"><div class="num c-red">${errSet.size}</div><div class="lbl">Errores</div></div>
-  <div class="stat"><div class="num c-orange">${dupes}</div><div class="lbl">Duplicados</div></div>
+  <div class="stat" onclick="filtrarTipo('')" id="st-todos">
+    <div class="num c-blue">${total}</div><div class="lbl">Total registros</div>
+  </div>
+  <div class="stat" onclick="filtrarTipo('')" id="st-ok">
+    <div class="num c-green">${total - allSet.size}</div><div class="lbl">Sin hallazgos</div>
+  </div>
+  <div class="stat" onclick="filtrarTipo('info')" id="st-corr">
+    <div class="num c-purple">${corrSet.size}</div><div class="lbl">Corregidos</div>
+  </div>
+  <div class="stat" onclick="filtrarTipo('warn')" id="st-warn">
+    <div class="num c-yellow">${warnSet.size}</div><div class="lbl">Advertencias</div>
+  </div>
+  <div class="stat" onclick="filtrarTipo('err')" id="st-err">
+    <div class="num c-red">${errSet.size}</div><div class="lbl">Errores</div>
+  </div>
+  <div class="stat" onclick="filtrarTipo('dup')" id="st-dup">
+    <div class="num c-orange">${dupes}</div><div class="lbl">Duplicados</div>
+  </div>
 </div>
 
 <div class="legend">
@@ -1634,6 +1658,31 @@ function exportFindings(){
   <div class="legend-item"><span class="badge badge-dup">Duplicado</span><span>Número de documento repetido. El registro fue eliminado del archivo de exportación.</span></div>
 </div>
 
+<!-- BARRA DE FILTROS -->
+<div class="filters">
+  <label>🔍</label>
+  <input id="f-search" type="text" placeholder="Buscar por nombre o documento..." oninput="aplicarFiltros()">
+
+  <label>Tipo:</label>
+  <select id="f-tipo" onchange="aplicarFiltros()">
+    <option value="">Todos</option>
+    <option value="err">Error</option>
+    <option value="warn">Advertencia</option>
+    <option value="info">Corrección</option>
+    <option value="dup">Duplicado</option>
+  </select>
+
+  <label>Campo:</label>
+  <select id="f-campo" onchange="aplicarFiltros()">
+    <option value="">Todos los campos</option>
+    ${camposUnicos.map(c=>`<option value="${c}">${c}</option>`).join('')}
+  </select>
+
+  <button class="btn-clear" onclick="limpiarFiltros()">✕ Limpiar</button>
+  <span class="result-count" id="result-count"></span>
+</div>
+
+<div class="tbl-wrap">
 <table>
   <thead>
     <tr>
@@ -1647,12 +1696,81 @@ function exportFindings(){
       <th>Descripción del hallazgo</th>
     </tr>
   </thead>
-  <tbody>${rows}</tbody>
+  <tbody id="tbody"></tbody>
 </table>
+<div class="empty" id="empty" style="display:none">Sin resultados con los filtros aplicados.</div>
+</div>
+
+<script>
+const DATOS = ${JSON.stringify(datos)};
+
+function badgeHtml(tipo){
+  if(tipo==='err')  return '<span class="badge badge-err">Error</span>';
+  if(tipo==='warn') return '<span class="badge badge-warn">Advertencia</span>';
+  if(tipo==='dup')  return '<span class="badge badge-dup">Duplicado</span>';
+  return '<span class="badge badge-corr">Corrección</span>';
+}
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function aplicarFiltros(){
+  const busq = document.getElementById('f-search').value.toLowerCase().trim();
+  const tipo  = document.getElementById('f-tipo').value;
+  const campo = document.getElementById('f-campo').value;
+
+  const filtrados = DATOS.filter(d => {
+    if(tipo  && d.tipo  !== tipo)  return false;
+    if(campo && d.campo !== campo) return false;
+    if(busq){
+      const haystack = (d.nombre+' '+d.documento).toLowerCase();
+      if(!haystack.includes(busq)) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById('tbody');
+  if(!filtrados.length){
+    tbody.innerHTML='';
+    document.getElementById('empty').style.display='block';
+  } else {
+    document.getElementById('empty').style.display='none';
+    tbody.innerHTML = filtrados.map(d=>\`<tr class="row-\${d.tipo}">
+      <td class="tc">\${d.fila}</td>
+      <td><strong>\${esc(d.nombre)}</strong></td>
+      <td class="tc">\${esc(d.tipoDoc)}</td>
+      <td>\${esc(d.documento)}</td>
+      <td class="tc">\${esc(d.fechaNac)}</td>
+      <td class="tc">\${badgeHtml(d.tipo)}</td>
+      <td>\${esc(d.campo)}</td>
+      <td>\${esc(d.msg)}</td>
+    </tr>\`).join('');
+  }
+  document.getElementById('result-count').textContent =
+    filtrados.length === DATOS.length
+      ? DATOS.length + ' hallazgos'
+      : filtrados.length + ' de ' + DATOS.length + ' hallazgos';
+}
+
+function filtrarTipo(tipo){
+  document.getElementById('f-tipo').value = tipo;
+  document.getElementById('f-search').value = '';
+  document.getElementById('f-campo').value = '';
+  aplicarFiltros();
+}
+
+function limpiarFiltros(){
+  document.getElementById('f-search').value = '';
+  document.getElementById('f-tipo').value   = '';
+  document.getElementById('f-campo').value  = '';
+  aplicarFiltros();
+}
+
+// Render inicial
+aplicarFiltros();
+</script>
 </body></html>`;
 
   downloadBlob(new Blob([html],{type:'text/html;charset=utf-8'}), name+'.html');
-  toast(`Reporte exportado: ${st.findings.length} hallazgos ✅`,'ok');
+  toast(\`Reporte exportado: \${st.findings.length} hallazgos ✅\`,'ok');
 }
 
 function downloadBlob(blob, filename){
