@@ -434,7 +434,7 @@ tr.row-d td{background:#FFF7ED!important;opacity:.7;text-decoration:line-through
         <input type="text" class="export-input" id="export-name" placeholder="Nombre del archivo">
         <span class="export-ext">.txt</span>
         <button class="btn btn-green" onclick="showExportReview()">⬇ Exportar TXT (tabulación)</button>
-        <button class="btn btn-yellow" onclick="exportFindings()">📄 Descargar hallazgos</button>
+        <button class="btn btn-yellow" onclick="exportFindings()">📊 Descargar reporte de hallazgos (.xlsx)</button>
         <button class="btn btn-secondary" onclick="goStep(1)">🔄 Nuevo archivo</button>
       </div>
     </div>
@@ -1533,15 +1533,89 @@ function exportTXT(){
   toast(`TXT exportado: ${exportRows.length} registros (${dupes} duplicados eliminados) ✅`,'ok');
 }
 
-// ─── EXPORTAR HALLAZGOS ───────────────────────────────────────────────────
+// ─── EXPORTAR HALLAZGOS (Excel con resumen + detalle) ────────────────────
 function exportFindings(){
-  const name=(document.getElementById('export-name').value.trim()||'migraciones_pacientes')+'_hallazgos';
+  const baseName = document.getElementById('export-name').value.trim()||'migraciones_pacientes';
+  const name = baseName + '_hallazgos';
   if(!st.findings.length){ toast('No hay hallazgos para exportar','info'); return; }
-  const header='Fila\tTipo\tCampo\tDescripción\r\n';
-  const lines=st.findings.map(f=>`${f.rowNum}\t${f.type==='err'?'Error':f.type==='warn'?'Advertencia':'Corrección automática'}\t${f.campo}\t${f.msg}`);
-  const blob=new Blob([header+lines.join('\r\n')],{type:'text/plain;charset=utf-8'});
-  downloadBlob(blob, name+'.txt');
-  toast('Hallazgos exportados ✅','ok');
+
+  // Mapa rowNum → fila procesada (para incluir datos del paciente)
+  const rowMap = {};
+  st.processed.forEach(r => { if(r._rowNum) rowMap[r._rowNum] = r; });
+
+  // Estadísticas
+  const total = st.processed.length;
+  const dupes = st.processed.filter(r=>r._isDuplicate).length;
+  const errSet  = new Set(st.findings.filter(f=>f.type==='err').map(f=>f.rowNum));
+  const warnSet = new Set(st.findings.filter(f=>f.type==='warn').map(f=>f.rowNum));
+  const corrSet = new Set(st.findings.filter(f=>f.type==='info').map(f=>f.rowNum));
+  const allSet  = new Set(st.findings.map(f=>f.rowNum));
+  const today   = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Hoja 1: Resumen ──────────────────────────────────────────────────────
+  const resumenData = [
+    ['REPORTE DE HALLAZGOS — MIGRACIÓN DE PACIENTES'],
+    [],
+    ['Archivo fuente', baseName],
+    ['Fecha de generación', today],
+    [],
+    ['RESUMEN ESTADÍSTICO', ''],
+    ['Total de registros procesados', total],
+    ['Sin hallazgos', total - allSet.size],
+    ['Corregidos automáticamente', corrSet.size],
+    ['Con advertencias', warnSet.size],
+    ['Con errores', errSet.size],
+    ['Duplicados eliminados', dupes],
+    [],
+    ['Total de hallazgos registrados', st.findings.length],
+    [],
+    ['TIPOS DE HALLAZGO', ''],
+    ['Error', 'Campo obligatorio vacío (documento, nombre). El registro NO puede migrarse sin corrección.'],
+    ['Advertencia', 'Dato faltante o inconsistente (fecha futura, sexo sin inferir). Se asignó valor predeterminado.'],
+    ['Corrección automática', 'Dato normalizado automáticamente (fecha reformateada, tipo de documento ajustado por DANE, etc.).'],
+    ['Duplicado', 'Número de documento ya existe en otro registro. El duplicado fue eliminado del archivo de exportación.'],
+  ];
+  const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
+  wsResumen['!cols'] = [{wch:38},{wch:90}];
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+
+  // ── Hoja 2: Hallazgos Detallados ─────────────────────────────────────────
+  const colHeader = [
+    'N° Fila','Nombre Completo','Tipo Documento','N° Documento',
+    'Fecha Nacimiento','Tipo Hallazgo','Campo Afectado','Descripción del Hallazgo'
+  ];
+  const tipoLabel = t =>
+    t==='err'  ? 'Error' :
+    t==='warn' ? 'Advertencia' :
+    t==='dup'  ? 'Duplicado' : 'Corrección automática';
+
+  const detailRows = st.findings.map(f => {
+    const r = rowMap[f.rowNum];
+    const nombre = r
+      ? [r.primer_nombre,r.segundo_nombre,r.primer_apellido,r.segundo_apellido].filter(Boolean).join(' ')
+      : '—';
+    return [
+      f.rowNum,
+      nombre || '—',
+      r?.tipo_documento || '—',
+      r?.documento      || '—',
+      r?.fecha_nacimiento || '—',
+      tipoLabel(f.type),
+      f.campo,
+      f.msg,
+    ];
+  });
+
+  const wsDetalle = XLSX.utils.aoa_to_sheet([colHeader, ...detailRows]);
+  wsDetalle['!cols'] = [{wch:8},{wch:32},{wch:14},{wch:16},{wch:14},{wch:22},{wch:20},{wch:80}];
+  // Freeze primera fila
+  wsDetalle['!freeze'] = {xSplit:0, ySplit:1};
+  XLSX.utils.book_append_sheet(wb, wsDetalle, 'Hallazgos Detallados');
+
+  XLSX.writeFile(wb, name+'.xlsx');
+  toast(`Reporte exportado: ${st.findings.length} hallazgos en ${name}.xlsx ✅`,'ok');
 }
 
 function downloadBlob(blob, filename){
