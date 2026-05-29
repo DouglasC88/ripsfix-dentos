@@ -1220,13 +1220,17 @@ function processData(){
       out.segundo_apellido= getVal(row, st.fieldMap.segundo_apellido);
     }
 
-    // FECHA NACIMIENTO (regla 6) — con fecha predeterminada si falta o es inválida
+    // FECHA NACIMIENTO (regla 6) — con fecha predeterminada si falta, es inválida o está en el futuro
     const docNum = getVal(row, st.fieldMap.documento);
     const fechaNacOrig = getVal(row, st.fieldMap.fecha_nacimiento);
     let fechaNacFmt = fmtDate(fechaNacOrig);
-    if(!parseDate(fechaNacFmt)){
+    const _parsedFec = parseDate(fechaNacFmt);
+    if(!_parsedFec){
       fechaNacFmt = DEFAULT_DOB;
       rowFindings.push({type:'warn',campo:'Fecha Nacimiento',msg:`Sin fecha de nacimiento válida; se asignó la fecha predeterminada ${DEFAULT_DOB}.`});
+    } else if(_parsedFec > new Date()){
+      rowFindings.push({type:'warn',campo:'Fecha Nacimiento',msg:`Fecha de nacimiento futura (${fechaNacFmt}) es inválida; se asignó la fecha predeterminada ${DEFAULT_DOB}.`});
+      fechaNacFmt = DEFAULT_DOB;
     } else if(fechaNacOrig && fechaNacFmt !== clean(fechaNacOrig)){
       rowFindings.push({type:'info',campo:'Fecha Nacimiento',msg:`Fecha reformateada: "${fechaNacOrig}" → "${fechaNacFmt}"`});
     }
@@ -1858,12 +1862,16 @@ function faltProcessRow(row, fila){
     out.segundo_apellido=getVal(row,S.fieldMap.segundo_apellido);
   }
 
-  // Fecha de nacimiento (con default si falta) — regla 6
+  // Fecha de nacimiento (con default si falta, inválida o futura) — regla 6
   const rawDocNum=getVal(row,S.fieldMap.documento);
   let fechaNacFmt=fmtDate(getVal(row,S.fieldMap.fecha_nacimiento));
-  if(!parseDate(fechaNacFmt)){
+  const _parsedFecF=parseDate(fechaNacFmt);
+  if(!_parsedFecF){
     fechaNacFmt=DEFAULT_DOB;
     rowFindings.push({type:'warn',campo:'Fecha Nacimiento',msg:`Sin fecha de nacimiento válida; se asignó la fecha predeterminada ${DEFAULT_DOB}.`});
+  } else if(_parsedFecF > new Date()){
+    rowFindings.push({type:'warn',campo:'Fecha Nacimiento',msg:`Fecha de nacimiento futura (${fechaNacFmt}) es inválida; se asignó la fecha predeterminada ${DEFAULT_DOB}.`});
+    fechaNacFmt=DEFAULT_DOB;
   }
   out.fecha_nacimiento=fechaNacFmt;
 
