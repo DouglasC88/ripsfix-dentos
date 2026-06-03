@@ -134,7 +134,7 @@ code.ok{color:var(--green);background:#F0FDF4;}
 .log-item.err .log-dot{background:var(--red);}
 .log-item.skip .log-dot{background:var(--gray-300);}
 .log-item.warn .log-dot{background:var(--yellow);}
-.stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px 0;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin:14px 0;}
 .stat{background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:12px 6px;text-align:center;box-shadow:var(--shadow-sm);}
 .stat-icon{font-size:1.2rem;margin-bottom:3px;}
 .stat-num{font-family:var(--display);font-size:1.5rem;font-weight:800;line-height:1;}
@@ -383,6 +383,7 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
         <div class="stat"><div class="stat-icon">🪪</div><div class="stat-num orange" id="r-cob">0</div><div class="stat-label">Tipo Usr</div></div>
         <div class="stat"><div class="stat-icon">💰</div><div class="stat-num yellow" id="r-vr">0</div><div class="stat-label">Valor Serv</div></div>
         <div class="stat"><div class="stat-icon">⚠️</div><div class="stat-num red" id="r-err">0</div><div class="stat-label">Errores</div></div>
+        <div class="stat"><div class="stat-icon">🚫</div><div class="stat-num" style="color:#EA580C" id="r-exc">0</div><div class="stat-label">Excluidas</div></div>
       </div>
       <div id="r-detail"></div>
       <div class="btn-row">
@@ -786,10 +787,11 @@ function fixJson(data,xml){
 }
 
 // ═══ FILE SYSTEM ═══
-async function findJsonFiles(dh,results=[]){
+async function findJsonFiles(dh,results=[],parent=null,dirName=null){
   for await(const[name,handle]of dh.entries()){
-    if(handle.kind==='file'&&name.toLowerCase().endsWith('.json'))results.push({name,handle,dirHandle:dh});
-    else if(handle.kind==='directory')await findJsonFiles(handle,results);
+    if(name==='_EXCLUIDOS')continue;
+    if(handle.kind==='file'&&name.toLowerCase().endsWith('.json'))results.push({name,handle,dirHandle:dh,parentHandle:parent,dirName:dirName});
+    else if(handle.kind==='directory')await findJsonFiles(handle,results,dh,name);
   }return results;
 }
 async function findXml(dh,jn){
@@ -798,10 +800,40 @@ async function findXml(dh,jn){
   for await(const[n,h]of dh.entries()){if(h.kind==='file'&&n.toLowerCase().endsWith('.xml'))return h;}
   return null;
 }
+function fechaDia(v){var m=String(v||'').match(/(\d{4})-(\d{1,2})-(\d{1,2})/);return m?(m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2)):null;}
+function fechasAntesCorte(json){
+  var out=[];
+  (json.usuarios||[]).forEach(function(u){
+    var s=u.servicios||{};
+    ['procedimientos','consultas','urgencias','hospitalizacion','otrosServicios'].forEach(function(k){
+      (s[k]||[]).forEach(function(it){var d=fechaDia(it.fechaInicioAtencion);if(d&&d<FECHA_CORTE_MSPS)out.push(d);});
+    });
+    (s.medicamentos||[]).forEach(function(it){var d=fechaDia(it.fechaDispensAdmon);if(d&&d<FECHA_CORTE_MSPS)out.push(d);});
+  });
+  return out;
+}
+async function copyDir(src,dst){
+  for await(const[name,h]of src.entries()){
+    if(h.kind==='file'){const f=await h.getFile();const w=await(await dst.getFileHandle(name,{create:true})).createWritable();await w.write(await f.arrayBuffer());await w.close();}
+    else if(h.kind==='directory'){const sub=await dst.getDirectoryHandle(name,{create:true});await copyDir(h,sub);}
+  }
+}
+async function moverAExcluidos(rootDh,parentDh,folderName,folderHandle){
+  if(!parentDh||!folderName)return false;
+  try{
+    const ex=await rootDh.getDirectoryHandle('_EXCLUIDOS',{create:true});
+    const dst=await ex.getDirectoryHandle(folderName,{create:true});
+    await copyDir(folderHandle,dst);
+    await parentDh.removeEntry(folderName,{recursive:true});
+    return true;
+  }catch(e){return false;}
+}
 
 // ═══ STATE ═══
-let stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};
+let stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};
 let allDetails=[];
+let allExcluded=[];
+const FECHA_CORTE_MSPS='2024-10-01';
 
 // ═══ UI ═══
 function show(id){document.getElementById(id).classList.remove('hidden');}
@@ -832,21 +864,33 @@ function switchTab(t) {
 async function startProcessing(){
   if(!window.showDirectoryPicker){alert('Esta función requiere Google Chrome o Microsoft Edge.');return;}
   let dh;try{dh=await window.showDirectoryPicker({mode:'readwrite'});}catch(e){if(e.name!=='AbortError')alert('Error: '+e.message);return;}
-  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};allDetails=[];
+  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};allDetails=[];allExcluded=[];const movedSet=new Set();
   document.getElementById('proc-log').innerHTML='';
   hide('step-select');show('step-progress');
   const files=await findJsonFiles(dh);stats.total=files.length;
   if(!files.length){document.getElementById('prog-title').textContent='No se encontraron archivos';document.getElementById('pbar-label').textContent='Verifique la carpeta seleccionada.';return;}
   setProgress(0,files.length);
   for(let i=0;i<files.length;i++){
-    const{name,handle,dirHandle:fdh}=files[i];
+    const{name,handle,dirHandle:fdh,parentHandle:pdh,dirName}=files[i];
     try{
+      if(dirName&&movedSet.has(dirName)){setProgress(i+1,files.length);await tick();continue;}
       const file=await handle.getFile();let json;
       try{json=JSON.parse(await file.text());}catch{logItem(name,'JSON inválido','err');stats.err++;setProgress(i+1,files.length);await tick();continue;}
       if(!json.numFactura&&!json.numDocumentoIdObligado){logItem(name,'Omitido','skip');setProgress(i+1,files.length);await tick();continue;}
+      const xh=await findXml(fdh,name);
+      const fechasViejas=fechasAntesCorte(json);
+      const motivoExc = !xh ? 'Sin XML (factura)' : (fechasViejas.length ? ('Atención anterior al '+FECHA_CORTE_MSPS) : null);
+      if(motivoExc){
+        let movida=false;
+        if(dirName&&pdh){movida=await moverAExcluidos(dh,pdh,dirName,fdh);if(movida)movedSet.add(dirName);}
+        allExcluded.push({file:dirName||name,motivo:motivoExc,evidencia:fechasViejas,movida:movida});
+        stats.exc++;
+        logItem(name,'🚫 Excluida · '+motivoExc+(movida?' → _EXCLUIDOS':''),'warn');
+        setProgress(i+1,files.length);await tick();continue;
+      }
       const __before=JSON.parse(JSON.stringify(json));
       let xml={issueDate:null,periodStart:null,periodEnd:null,coberturaId:null,payableAmount:null};
-      try{const xh=await findXml(fdh,name);if(xh){xml=parseXML(await(await xh.getFile()).text());}}catch(e){}
+      try{if(xh){xml=parseXML(await(await xh.getFile()).text());}}catch(e){}
       const{data,fC,cC,cobC,vC,invC,cobL,docL}=fixJson(json,xml);
       const chg=diffJson(__before,data);
       const wr=await handle.createWritable();await wr.write(JSON.stringify(data,null,2));await wr.close();
@@ -920,19 +964,26 @@ function showResults(){
   hide('step-progress');show('step-results');
   var g=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;};
   g('r-total',stats.total);g('r-fmt',stats.fmt);g('r-cie',stats.cie);
-  g('r-cob',stats.cob);g('r-vr',stats.vr);g('r-err',stats.err);
+  g('r-cob',stats.cob);g('r-vr',stats.vr);g('r-err',stats.err);g('r-exc',stats.exc||0);
   var det=document.getElementById('r-detail');if(!det)return;
   var nFiles=allDetails.length;
   var nChg=allDetails.reduce(function(a,d){return a+(d.chg?d.chg.length:0);},0);
   var nPend=allDetails.reduce(function(a,d){return a+(d.invC?d.invC.length:0);},0);
-  if(!nFiles){det.innerHTML='<div style="padding:18px;text-align:center;color:var(--gray-500);font-size:.82rem;">✅ No se requirieron cambios en ningún archivo.</div>';return;}
+  var nExc=allExcluded.length;
   var h='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0 10px;">'
     +'<div style="font-family:var(--display);font-weight:700;font-size:.9rem;">📋 Hallazgos</div>'
-    +'<span style="font-size:.74rem;color:var(--gray-500);">'+nFiles+' archivo(s) · '+nChg+' cambio(s) · '+nPend+' pendiente(s)</span>'
+    +'<span style="font-size:.74rem;color:var(--gray-500);">'+nFiles+' con cambios · '+nChg+' cambio(s) · '+nPend+' pendiente(s) · '+nExc+' excluida(s)</span>'
     +'<div style="flex:1"></div>'
     +'<button onclick="abrirReporte()" style="padding:8px 14px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">📄 Ver reporte</button>'
     +'<button onclick="descargarReporte()" style="padding:8px 14px;background:#fff;border:1.5px solid var(--blue);border-radius:8px;color:var(--blue);font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">⬇️ Descargar HTML</button>'
-    +'</div><div style="max-height:340px;overflow:auto;border:1px solid var(--gray-200);border-radius:10px;">';
+    +'</div>';
+  if(!nFiles&&!nExc){det.innerHTML=h+'<div style="padding:14px;text-align:center;color:var(--gray-500);font-size:.82rem;border:1px solid var(--gray-200);border-radius:10px;">✅ No se requirieron cambios ni exclusiones.</div>';return;}
+  h+='<div style="max-height:340px;overflow:auto;border:1px solid var(--gray-200);border-radius:10px;">';
+  allExcluded.forEach(function(x){
+    h+='<div style="border-bottom:1px solid var(--gray-100);padding:10px 14px;background:#FFF7ED;">'
+      +'<div style="font-family:var(--mono);font-size:.76rem;font-weight:700;color:#EA580C;margin-bottom:3px;">🚫 '+esc(x.file)+(x.movida?' <span style="font-weight:400;color:var(--gray-500);">→ _EXCLUIDOS</span>':'')+'</div>'
+      +'<div style="font-size:.72rem;color:#9A3412;">'+esc(x.motivo)+((x.evidencia&&x.evidencia.length)?(' · fechas: '+esc(x.evidencia.join(', '))):'')+'</div></div>';
+  });
   allDetails.forEach(function(d){
     h+='<div style="border-bottom:1px solid var(--gray-100);padding:10px 14px;">'
       +'<div style="font-family:var(--mono);font-size:.76rem;font-weight:700;color:var(--blue-dark);margin-bottom:6px;">📄 '+esc(d.file)+'</div>';
@@ -959,7 +1010,14 @@ function buildReporteHTML(){
   var nFiles=allDetails.length;
   var nChg=allDetails.reduce(function(a,d){return a+(d.chg?d.chg.length:0);},0);
   var nPend=allDetails.reduce(function(a,d){return a+(d.invC?d.invC.length:0);},0);
+  var nExc=allExcluded.length;
   var body='';
+  if(nExc){
+    body+='<section class="excsec"><h2>🚫 Carpetas excluidas ('+nExc+')</h2>';
+    body+='<table><thead><tr><th>Carpeta</th><th>Motivo</th><th>Evidencia</th><th>Acción</th></tr></thead><tbody>';
+    allExcluded.forEach(function(x){body+='<tr><td><code>'+esc(x.file)+'</code></td><td>'+esc(x.motivo)+'</td><td>'+esc((x.evidencia&&x.evidencia.length)?x.evidencia.join(', '):'—')+'</td><td>'+(x.movida?'Movida a _EXCLUIDOS':'No movida')+'</td></tr>';});
+    body+='</tbody></table></section>';
+  }
   allDetails.forEach(function(d){
     body+='<section><h2>📄 '+esc(d.file)+'</h2>';
     if((d.chg||[]).length){
@@ -991,6 +1049,7 @@ function buildReporteHTML(){
     +'.old{color:#EF4444;text-decoration:line-through;}.new{color:#16A34A;font-weight:700;}'
     +'.tag{background:#E8F6FD;color:#1B7FC4;border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700;}'
     +'.pend th{background:#FFFBEB;color:#92400E;}.none{color:#6B8599;font-size:.8rem;margin:0;}'
+    +'.excsec{border-color:#FED7AA;}.excsec h2{color:#EA580C;}.excsec th{background:#FFF7ED;color:#9A3412;}'
     +'@media print{body{background:#fff;}header,.kpi,th,.tag{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
   return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reporte de hallazgos RIPS</title><style>'+css+'</style></head><body><div class="wrap">'
     +'<header><h1>Reporte de hallazgos · Corrección RIPS</h1><p>DentOS · Validador y Corrector RIPS · Generado el '+esc(fecha)+'</p></header>'
@@ -1000,6 +1059,7 @@ function buildReporteHTML(){
     +'<div class="kpi"><b>'+nChg+'</b><span>Cambios totales</span></div>'
     +'<div class="kpi"><b>'+nPend+'</b><span>Pendientes</span></div>'
     +'<div class="kpi"><b>'+stats.err+'</b><span>Errores</span></div>'
+    +'<div class="kpi"><b style="color:#EA580C">'+nExc+'</b><span>Excluidas</span></div>'
     +'</div>'+body+'</div></body></html>';
 }
 function abrirReporte(){
@@ -1018,7 +1078,7 @@ function descargarReporte(){
 function resetProc(){
   hide('step-results');hide('step-progress');show('step-select');
   var log=document.getElementById('proc-log');if(log)log.innerHTML='';
-  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};allDetails=[];
+  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};allDetails=[];allExcluded=[];
 }
 function resetApp(){resetProc();}
 function resetCliente(){
