@@ -327,7 +327,7 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
     <!-- SIDEBAR -->
     <nav class="sidebar">
       <div class="sidebar-group">Principal</div>
-      <button class="nav-item active" id="nav-proc" onclick="switchTab('proc')"><span class="nav-icon">⚙️</span>Procesar RIPS</button>
+      <button class="nav-item active" id="nav-proc" onclick="switchTab('proc')"><span class="nav-icon">⚙️</span>RIPS Particulares</button>
       <button class="nav-item" id="nav-convenios" onclick="switchTab('convenios')"><span class="nav-icon">🤝</span>RIPS Convenios</button>
       <button class="nav-item" id="nav-sinfactura" onclick="switchTab('sinfactura')"><span class="nav-icon">📄</span>RIPS sin Factura</button>
       <div class="sidebar-group">Consultas</div>
@@ -844,17 +844,19 @@ async function startProcessing(){
       const file=await handle.getFile();let json;
       try{json=JSON.parse(await file.text());}catch{logItem(name,'JSON inválido','err');stats.err++;setProgress(i+1,files.length);await tick();continue;}
       if(!json.numFactura&&!json.numDocumentoIdObligado){logItem(name,'Omitido','skip');setProgress(i+1,files.length);await tick();continue;}
+      const __before=JSON.parse(JSON.stringify(json));
       let xml={issueDate:null,periodStart:null,periodEnd:null,coberturaId:null,payableAmount:null};
       try{const xh=await findXml(fdh,name);if(xh){xml=parseXML(await(await xh.getFile()).text());}}catch(e){}
       const{data,fC,cC,cobC,vC,invC,cobL,docL}=fixJson(json,xml);
+      const chg=diffJson(__before,data);
       const wr=await handle.createWritable();await wr.write(JSON.stringify(data,null,2));await wr.close();
       stats.fmt+=fC;stats.cie+=cC;stats.cob+=cobC;stats.vr+=vC;
       const parts=[];
       if(fC)parts.push(`${fC} formato`);if(cC)parts.push(`${cC} CIE-10`);
       if(cobC)parts.push(`${cobC} tipo usuario`);if(vC)parts.push(`${vC} valor servicio`);
       if(invC.length)parts.push(`${invC.length} pendiente(s)`);
-      const hD=cobL.length||docL.length||invC.length;
-      if(hD){allDetails.push({file:name,cobL,docL,invC});logItem(name,parts.join(' · '),'warn');}
+      const hD=chg.length||invC.length;
+      if(hD){allDetails.push({file:name,chg,invC});logItem(name,parts.join(' · '),'warn');}
       else{logItem(name,parts.length?parts.join(' · '):'Sin cambios requeridos','ok');}
     }catch(e){logItem(name,e.message,'err');stats.err++;}
     setProgress(i+1,files.length);await tick();
@@ -863,6 +865,168 @@ async function startProcessing(){
 }
 
 function tick(){return new Promise(r=>setTimeout(r,0));}
+
+// ═══ RESULTADOS Y REPORTE DE HALLAZGOS ═══
+function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function vDisp(v){return (v==null||v==='')?'(vacío)':String(v);}
+function chgTipo(c){
+  if(/^fecha/i.test(c))return'Formato fecha';
+  if(/codDiagnostico|codComplicacion/i.test(c))return'CIE-10';
+  if(/tipoUsuario/i.test(c))return'Tipo usuario';
+  if(/tipoDocumento/i.test(c))return'Documento';
+  if(/codSexo/i.test(c))return'Sexo';
+  if(/^(vr|valor|cantidad)/i.test(c))return'Valor';
+  if(/cod(Procedimiento|Consulta|Tecnologia)/i.test(c))return'CUPS';
+  return'Otro';
+}
+function prettyLoc(p){
+  var s=p.replace(/usuarios\[(\d+)\]/g,'Usuario $1')
+    .replace(/\.servicios/g,'')
+    .replace(/procedimientos\[(\d+)\]/g,'Procedimiento $1')
+    .replace(/consultas\[(\d+)\]/g,'Consulta $1')
+    .replace(/urgencias\[(\d+)\]/g,'Urgencia $1')
+    .replace(/hospitalizacion\[(\d+)\]/g,'Hospitalización $1')
+    .replace(/otrosServicios\[(\d+)\]/g,'Otro servicio $1')
+    .replace(/medicamentos\[(\d+)\]/g,'Medicamento $1')
+    .replace(/recienNacidos\[(\d+)\]/g,'Recién nacido $1')
+    .replace(/\.[A-Za-z0-9]+$/,'')
+    .replace(/\./g,' › ').trim();
+  return s||'General';
+}
+// Compara el JSON original vs el corregido y devuelve [{loc,campo,antes,despues,tipo}]
+function diffJson(a,b,path,out){
+  out=out||[]; path=path||'';
+  if(a===b)return out;
+  var oa=a&&typeof a==='object', ob=b&&typeof b==='object';
+  if(oa&&ob){
+    if(Array.isArray(a)||Array.isArray(b)){
+      var n=Math.max((a||[]).length,(b||[]).length);
+      for(var i=0;i<n;i++)diffJson(a?a[i]:undefined,b?b[i]:undefined,path+'['+(i+1)+']',out);
+    }else{
+      var ks={};Object.keys(a||{}).forEach(function(k){ks[k]=1;});Object.keys(b||{}).forEach(function(k){ks[k]=1;});
+      Object.keys(ks).forEach(function(k){diffJson((a||{})[k],(b||{})[k],path?path+'.'+k:k,out);});
+    }
+    return out;
+  }
+  if(a!==b){
+    if(String(a==null?'':a)===String(b==null?'':b))return out; // ignora cambios solo de tipo
+    var campo=path.replace(/\[\d+\]$/,'').split('.').pop()||path;
+    out.push({loc:prettyLoc(path),campo:campo,antes:a,despues:b,tipo:chgTipo(campo)});
+  }
+  return out;
+}
+
+function showResults(){
+  hide('step-progress');show('step-results');
+  var g=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;};
+  g('r-total',stats.total);g('r-fmt',stats.fmt);g('r-cie',stats.cie);
+  g('r-cob',stats.cob);g('r-vr',stats.vr);g('r-err',stats.err);
+  var det=document.getElementById('r-detail');if(!det)return;
+  var nFiles=allDetails.length;
+  var nChg=allDetails.reduce(function(a,d){return a+(d.chg?d.chg.length:0);},0);
+  var nPend=allDetails.reduce(function(a,d){return a+(d.invC?d.invC.length:0);},0);
+  if(!nFiles){det.innerHTML='<div style="padding:18px;text-align:center;color:var(--gray-500);font-size:.82rem;">✅ No se requirieron cambios en ningún archivo.</div>';return;}
+  var h='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0 10px;">'
+    +'<div style="font-family:var(--display);font-weight:700;font-size:.9rem;">📋 Hallazgos</div>'
+    +'<span style="font-size:.74rem;color:var(--gray-500);">'+nFiles+' archivo(s) · '+nChg+' cambio(s) · '+nPend+' pendiente(s)</span>'
+    +'<div style="flex:1"></div>'
+    +'<button onclick="abrirReporte()" style="padding:8px 14px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">📄 Ver reporte</button>'
+    +'<button onclick="descargarReporte()" style="padding:8px 14px;background:#fff;border:1.5px solid var(--blue);border-radius:8px;color:var(--blue);font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">⬇️ Descargar HTML</button>'
+    +'</div><div style="max-height:340px;overflow:auto;border:1px solid var(--gray-200);border-radius:10px;">';
+  allDetails.forEach(function(d){
+    h+='<div style="border-bottom:1px solid var(--gray-100);padding:10px 14px;">'
+      +'<div style="font-family:var(--mono);font-size:.76rem;font-weight:700;color:var(--blue-dark);margin-bottom:6px;">📄 '+esc(d.file)+'</div>';
+    (d.chg||[]).forEach(function(c){
+      h+='<div style="font-size:.73rem;margin:3px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+        +'<span style="background:var(--blue-light);color:var(--blue-dark);border-radius:4px;padding:0 5px;font-weight:700;font-size:.66rem;">'+esc(c.tipo)+'</span>'
+        +'<span style="color:var(--gray-400);font-size:.68rem;">'+esc(c.loc)+'</span>'
+        +'<code>'+esc(c.campo)+'</code>'
+        +'<span style="color:var(--red);text-decoration:line-through;">'+esc(vDisp(c.antes))+'</span>'
+        +'<span style="color:var(--gray-400);">→</span>'
+        +'<span style="color:var(--green);font-weight:700;">'+esc(vDisp(c.despues))+'</span></div>';
+    });
+    (d.invC||[]).forEach(function(p){
+      h+='<div style="font-size:.73rem;color:#92400E;margin:3px 0;">⚠️ Pendiente · <code>'+esc(p.campo)+'</code> = '+esc(vDisp(p.valor))+' <span style="color:var(--gray-400);">('+esc(p.tipo)+')</span></div>';
+    });
+    h+='</div>';
+  });
+  h+='</div>';
+  det.innerHTML=h;
+}
+
+function buildReporteHTML(){
+  var fecha=new Date().toLocaleString('es-CO');
+  var nFiles=allDetails.length;
+  var nChg=allDetails.reduce(function(a,d){return a+(d.chg?d.chg.length:0);},0);
+  var nPend=allDetails.reduce(function(a,d){return a+(d.invC?d.invC.length:0);},0);
+  var body='';
+  allDetails.forEach(function(d){
+    body+='<section><h2>📄 '+esc(d.file)+'</h2>';
+    if((d.chg||[]).length){
+      body+='<table><thead><tr><th>Tipo</th><th>Ubicación</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>';
+      d.chg.forEach(function(c){body+='<tr><td><span class="tag">'+esc(c.tipo)+'</span></td><td>'+esc(c.loc)+'</td><td><code>'+esc(c.campo)+'</code></td><td class="old">'+esc(vDisp(c.antes))+'</td><td class="new">'+esc(vDisp(c.despues))+'</td></tr>';});
+      body+='</tbody></table>';
+    }
+    if((d.invC||[]).length){
+      body+='<table class="pend"><thead><tr><th>Pendiente · Campo</th><th>Valor</th><th>Tipo</th></tr></thead><tbody>';
+      d.invC.forEach(function(p){body+='<tr><td><code>'+esc(p.campo)+'</code></td><td>'+esc(vDisp(p.valor))+'</td><td>'+esc(p.tipo)+'</td></tr>';});
+      body+='</tbody></table>';
+    }
+    if(!(d.chg||[]).length&&!(d.invC||[]).length)body+='<p class="none">Sin cambios.</p>';
+    body+='</section>';
+  });
+  var css='*{box-sizing:border-box;}body{font-family:"Nunito Sans",Arial,sans-serif;color:#1A2E3D;margin:0;background:#F8FAFC;}'
+    +'.wrap{max-width:1000px;margin:0 auto;padding:24px;}'
+    +'header{background:#29ABE2;color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:18px;}'
+    +'header h1{margin:0;font-size:1.25rem;}header p{margin:5px 0 0;opacity:.92;font-size:.83rem;}'
+    +'.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}'
+    +'.kpi{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:12px 16px;flex:1;min-width:110px;}'
+    +'.kpi b{display:block;font-size:1.5rem;color:#1B7FC4;}.kpi span{font-size:.72rem;color:#6B8599;}'
+    +'section{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:14px 18px;margin-bottom:14px;}'
+    +'section h2{font-size:.9rem;margin:0 0 10px;font-family:"Courier New",monospace;color:#1B7FC4;}'
+    +'table{width:100%;border-collapse:collapse;font-size:.8rem;margin:0 0 8px;}'
+    +'th{background:#E8F6FD;color:#1B7FC4;text-align:left;padding:7px 9px;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;}'
+    +'td{padding:7px 9px;border-top:1px solid #F0F4F8;vertical-align:top;}'
+    +'code{font-family:"Courier New",monospace;background:#F0F4F8;padding:1px 5px;border-radius:4px;font-size:.78rem;}'
+    +'.old{color:#EF4444;text-decoration:line-through;}.new{color:#16A34A;font-weight:700;}'
+    +'.tag{background:#E8F6FD;color:#1B7FC4;border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700;}'
+    +'.pend th{background:#FFFBEB;color:#92400E;}.none{color:#6B8599;font-size:.8rem;margin:0;}'
+    +'@media print{body{background:#fff;}header,.kpi,th,.tag{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
+  return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reporte de hallazgos RIPS</title><style>'+css+'</style></head><body><div class="wrap">'
+    +'<header><h1>Reporte de hallazgos · Corrección RIPS</h1><p>DentOS · Validador y Corrector RIPS · Generado el '+esc(fecha)+'</p></header>'
+    +'<div class="kpis">'
+    +'<div class="kpi"><b>'+stats.total+'</b><span>Archivos procesados</span></div>'
+    +'<div class="kpi"><b>'+nFiles+'</b><span>Con cambios</span></div>'
+    +'<div class="kpi"><b>'+nChg+'</b><span>Cambios totales</span></div>'
+    +'<div class="kpi"><b>'+nPend+'</b><span>Pendientes</span></div>'
+    +'<div class="kpi"><b>'+stats.err+'</b><span>Errores</span></div>'
+    +'</div>'+body+'</div></body></html>';
+}
+function abrirReporte(){
+  var b=new Blob([buildReporteHTML()],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(b);window.open(url,'_blank');
+  setTimeout(function(){URL.revokeObjectURL(url);},60000);
+}
+function descargarReporte(){
+  var b=new Blob([buildReporteHTML()],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(b);var a=document.createElement('a');
+  a.href=url;a.download='reporte_hallazgos_rips_'+new Date().toISOString().slice(0,10)+'.html';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},3000);
+}
+
+function resetProc(){
+  hide('step-results');hide('step-progress');show('step-select');
+  var log=document.getElementById('proc-log');if(log)log.innerHTML='';
+  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0};allDetails=[];
+}
+function resetApp(){resetProc();}
+function resetCliente(){
+  resetProc();
+  patientSexMap=new Map();patientNameMap=new Map();
+  var pf=document.getElementById('patient-file');if(pf)pf.value='';
+  var ps=document.getElementById('patient-status');if(ps){ps.className='';ps.textContent='Sin archivo cargado';}
+}
 
 // ═══ SEARCH ═══
 let searchMode='cups';
