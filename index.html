@@ -766,19 +766,20 @@ function fixJson(data,xml){
     const cD=correctDoc(usr.tipoDocumentoIdentificacion,age);
     if(cD){docL.push({u:ui+1,antes:usr.tipoDocumentoIdentificacion,despues:cD,edad:age});usr.tipoDocumentoIdentificacion=cD;fC++;}
     if(!usr.codSexo){const sx=getSexo(usr.numDocumentoIdentificacion);if(sx){usr.codSexo=sx;fC++;}else invC.push({campo:`U${ui+1}.codSexo`,valor:'(vacío)',tipo:'OBLIGATORIO'});}
-    function pS(arr,cf){
+    function pS(arr,cf,esCons){
       if(!Array.isArray(arr))return;
       arr.forEach((s,i)=>{
         fC+=aF(s,'fechaInicioAtencion',toSD);fC+=aF(s,'fechaFinAtencion',toSD);
         if(cf&&s[cf]){const r=fCUPS(s[cf]);if(r.c){s[cf]=r.v;fC++;}}
         ['codDiagnosticoPrincipal','codDiagnosticoRelacionado','codDiagnosticoRelacionado1','codDiagnosticoRelacionado2','codDiagnosticoRelacionado3','codComplicacion'].forEach(f=>{if(s[f]){const r=fCIE(s[f]);if(r.c){s[f]=r.v;fC++;}}});
         fC+=aF(s,'vrServicio',eNum);fC+=aF(s,'valorPagoModerador',dZ);fC+=aF(s,'codServicio',eInt);fC+=aF(s,'consecutivo',eInt);
+        if(esCons){if(!s.causaMotivoAtencion){s.causaMotivoAtencion='26';fC++;}if(!s.tipoDiagnosticoPrincipal){s.tipoDiagnosticoPrincipal='02';fC++;}}
         if(!s.codDiagnosticoPrincipal){const c=getCie10(cf?s[cf]:null);if(c){s.codDiagnosticoPrincipal=c;cC++;}}
         if(s.codDiagnosticoPrincipal&&!CIE10_DATA[s.codDiagnosticoPrincipal])invC.push({campo:`[${i+1}].codDiag`,valor:s.codDiagnosticoPrincipal,tipo:'CIE-10'});
         if(iSD&&periodStart&&periodEnd){const fa=s.fechaInicioAtencion;if(fa&&isOut(fa,periodStart,periodEnd)){s.fechaInicioAtencion=iSD;fC++;}if(s.fechaFinAtencion&&isOut(s.fechaFinAtencion,periodStart,periodEnd)){s.fechaFinAtencion=iSD;fC++;}}
       });
     }
-    pS(svc.procedimientos,'codProcedimiento');pS(svc.consultas,'codConsulta');
+    pS(svc.procedimientos,'codProcedimiento');pS(svc.consultas,'codConsulta',true);
     pS(svc.urgencias,null);pS(svc.hospitalizacion,null);pS(svc.otrosServicios,'codTecnologiaSalud');
     if(Array.isArray(svc.recienNacidos)){svc.recienNacidos.forEach(r=>{fC+=aF(r,'fechaNacimiento',toDO);if(r.codDiagnosticoPrincipal){const f=fCIE(r.codDiagnosticoPrincipal);if(f.c){r.codDiagnosticoPrincipal=f.v;fC++;}}if(!r.codDiagnosticoPrincipal){r.codDiagnosticoPrincipal='K089';cC++;}fC+=aF(r,'vrServicio',eNum);fC+=aF(r,'valorPagoModerador',dZ);fC+=aF(r,'consecutivo',eInt);});}
     if(Array.isArray(svc.medicamentos)){svc.medicamentos.forEach(m=>{fC+=aF(m,'fechaDispensAdmon',toSD);fC+=aF(m,'vrServicio',eNum);fC+=aF(m,'valorPagoModerador',dZ);fC+=aF(m,'cantidadMedicamento',eNum);fC+=aF(m,'vrUnitMedicamento',eNum);fC+=aF(m,'consecutivo',eInt);});}
