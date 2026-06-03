@@ -360,8 +360,13 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
         <div class="rule-item"><strong>🪪 Tipo de usuario (RVC005)</strong><span>Corrige <code>tipoUsuario</code> según cobertura del XML</span></div>
         <div class="rule-item"><strong>👤 Tipo doc · sexo · edad</strong><span>Corrige documento por edad · <code>codSexo</code> desde CSV o nombre</span></div>
       </div>
-      <button class="btn-primary" onclick="startProcessing()">📂 Seleccionar carpeta y procesar</button>
-      <div class="warn-box" style="margin-top:10px;">⚠️ Requiere Chrome o Edge · Los archivos JSON se sobreescriben · El XML no se modifica</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+        <button class="upload-btn" onclick="agregarCarpeta()" style="font-size:.82rem;padding:10px 16px;">➕ Agregar carpeta</button>
+        <span style="font-size:.74rem;color:var(--gray-500);">Agrega varias y se procesan juntas.</span>
+      </div>
+      <div id="cola-carpetas"></div>
+      <button class="btn-primary" id="btn-procesar" onclick="procesarTodas()" disabled style="opacity:.5;">⚡ Procesar carpetas</button>
+      <div class="warn-box" style="margin-top:10px;">⚠️ Requiere Chrome o Edge · Los JSON se corrigen y sobreescriben · El XML no se modifica · Las carpetas sin XML o con fecha anterior al 01-oct-2024 se <strong>eliminan</strong></div>
     </div>
     <div class="card hidden" id="step-progress">
       <div class="card-title">⏳ <span id="prog-title">Procesando archivos...</span></div>
@@ -821,6 +826,7 @@ async function eliminarCarpeta(parentDh,folderName){
 let stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};
 let allDetails=[];
 let allExcluded=[];
+let selectedDirs=[];
 const FECHA_CORTE_MSPS='2024-10-01';
 
 // ═══ UI ═══
@@ -849,20 +855,39 @@ function switchTab(t) {
 }
 
 // ═══ MAIN FLOW ═══
-async function startProcessing(){
+async function agregarCarpeta(){
   if(!window.showDirectoryPicker){alert('Esta función requiere Google Chrome o Microsoft Edge.');return;}
   let dh;try{dh=await window.showDirectoryPicker({mode:'readwrite'});}catch(e){if(e.name!=='AbortError')alert('Error: '+e.message);return;}
+  if(!selectedDirs.some(function(d){return d.name===dh.name;}))selectedDirs.push(dh);
+  renderCola();
+}
+function quitarCarpeta(i){selectedDirs.splice(i,1);renderCola();}
+function renderCola(){
+  var c=document.getElementById('cola-carpetas'),b=document.getElementById('btn-procesar');if(!c)return;
+  if(!selectedDirs.length){c.innerHTML='';if(b){b.disabled=true;b.style.opacity='.5';b.textContent='⚡ Procesar carpetas';}return;}
+  var h='<div style="margin:10px 0;display:flex;flex-direction:column;gap:5px;">';
+  selectedDirs.forEach(function(d,i){h+='<div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:7px 12px;"><span>📁</span><span style="flex:1;font-size:.8rem;font-weight:600;color:var(--gray-700);">'+esc(d.name)+'</span><button onclick="quitarCarpeta('+i+')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;line-height:1;">✕</button></div>';});
+  c.innerHTML=h+'</div>';
+  if(b){b.disabled=false;b.style.opacity='1';b.textContent='⚡ Procesar '+selectedDirs.length+' carpeta'+(selectedDirs.length>1?'s':'');}
+}
+async function procesarTodas(){
+  if(!selectedDirs.length){alert('Agrega al menos una carpeta.');return;}
   stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};allDetails=[];allExcluded=[];const movedSet=new Set();
-  try{await dh.removeEntry('_EXCLUIDOS',{recursive:true});}catch(e){} // limpia _EXCLUIDOS de versiones anteriores
   document.getElementById('proc-log').innerHTML='';
   hide('step-select');show('step-progress');
-  const files=await findJsonFiles(dh);stats.total=files.length;
-  if(!files.length){document.getElementById('prog-title').textContent='No se encontraron archivos';document.getElementById('pbar-label').textContent='Verifique la carpeta seleccionada.';return;}
+  document.getElementById('prog-title').textContent='Procesando archivos...';
+  let files=[];
+  for(const dh of selectedDirs){
+    try{await dh.removeEntry('_EXCLUIDOS',{recursive:true});}catch(e){}
+    await findJsonFiles(dh,files);
+  }
+  stats.total=files.length;
+  if(!files.length){document.getElementById('prog-title').textContent='No se encontraron archivos';document.getElementById('pbar-label').textContent='Verifique las carpetas seleccionadas.';return;}
   setProgress(0,files.length);
   for(let i=0;i<files.length;i++){
     const{name,handle,dirHandle:fdh,parentHandle:pdh,dirName}=files[i];
     try{
-      if(dirName&&movedSet.has(dirName)){setProgress(i+1,files.length);await tick();continue;}
+      if(movedSet.has(fdh)){setProgress(i+1,files.length);await tick();continue;}
       const file=await handle.getFile();let json;
       try{json=JSON.parse(await file.text());}catch{logItem(name,'JSON inválido','err');stats.err++;setProgress(i+1,files.length);await tick();continue;}
       if(!json.numFactura&&!json.numDocumentoIdObligado){logItem(name,'Omitido','skip');setProgress(i+1,files.length);await tick();continue;}
@@ -871,7 +896,7 @@ async function startProcessing(){
       const motivoExc = !xh ? 'Sin XML (factura)' : (fechasViejas.length ? ('Atención anterior al '+FECHA_CORTE_MSPS) : null);
       if(motivoExc){
         let eliminada=false;
-        if(dirName&&pdh){eliminada=await eliminarCarpeta(pdh,dirName);if(eliminada)movedSet.add(dirName);}
+        if(dirName&&pdh){eliminada=await eliminarCarpeta(pdh,dirName);if(eliminada)movedSet.add(fdh);}
         allExcluded.push({file:dirName||name,motivo:motivoExc,evidencia:fechasViejas,eliminada:eliminada});
         stats.exc++;
         logItem(name,'🚫 Excluida'+(eliminada?' y eliminada del origen':' (no se pudo borrar)')+' · '+motivoExc,'warn');
@@ -1067,7 +1092,7 @@ function descargarReporte(){
 function resetProc(){
   hide('step-results');hide('step-progress');show('step-select');
   var log=document.getElementById('proc-log');if(log)log.innerHTML='';
-  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};allDetails=[];allExcluded=[];
+  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};allDetails=[];allExcluded=[];selectedDirs=[];renderCola();
 }
 function resetApp(){resetProc();}
 function resetCliente(){
