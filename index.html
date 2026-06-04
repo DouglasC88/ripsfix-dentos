@@ -1144,10 +1144,10 @@ function cvUV(){
   if(!vX||!vR)return;
   var tot=vR.reduce(function(acc,r){return acc+r.valor;},0);
   var df=Math.abs(tot-vX.py);
-  var noC=[],seen={};vR.forEach(function(r){if(!seen[r.cups]&&!C10[r.cups]){seen[r.cups]=1;noC.push(r.cups);}});
+  var sinDx=vR.filter(function(r){return!(r.dx&&CIE10_DATA[r.dx]);}).length;
   var sf=vR.filter(function(r){return!exDate(r.fecha);}).length;
   function vi(ok,t,d){return'<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-100);font-size:.8rem;"><span style="color:'+(ok?'var(--green)':'var(--yellow)')+'">'+(ok?'OK':'AV')+'</span><span>'+t+'<div style="font-size:.7rem;color:var(--gray-400);font-family:var(--mono);margin-top:1px;">'+d+'</div></span></div>';}
-  document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(noC.length===0,'CIE-10',noC.length?noC.length+' sin mapeo: '+noC.join(', '):'Todos mapeados')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas');
+  document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(true,'Diagnóstico (CIE-10)',sinDx?(sinDx+' sin CIE-10 propio → se asigna K088 automáticamente'):'Todos con diagnóstico del Excel')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas');
   var btn=document.getElementById('cv-btn');if(btn){btn.disabled=false;btn.style.opacity='1';}
 }
 // Tabla de equivalencias exactas CUPS 7->6 digitos
