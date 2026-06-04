@@ -261,6 +261,8 @@ header .pill{background:rgba(255,255,255,.12)!important;color:#D9CDA6!important;
 header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!important;border-color:rgba(240,223,160,.45)!important;}
 .nav-item.active,.tab.active,.btn-primary,.btn-login{color:#23200F!important;}
 .panel.active{animation:dacpFade .28s ease both;}@keyframes dacpFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}.card{transition:box-shadow .2s ease,transform .2s ease;}.nav-item,.btn-primary,.btn-login,.upload-btn,.btn-secondary,.btn-logout{transition:all .2s ease;}.stat{transition:transform .15s ease;}.stat:hover{transform:translateY(-2px);}
+
+.hl-chip{font-family:var(--display);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:20px;border:1.5px solid var(--gray-200);background:#fff;color:var(--gray-700);cursor:pointer;transition:all .15s;}.hl-chip:hover{border-color:var(--blue);}.hl-chip.active{background:var(--blue);color:#23200F;border-color:var(--blue);}.hl-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.73rem;padding:8px 14px;border-bottom:1px solid var(--gray-100);}.hl-tag{background:var(--blue-light);color:var(--blue-dark);border-radius:4px;padding:0 6px;font-weight:700;font-size:.66rem;}.hl-file{font-family:var(--mono);font-weight:700;color:var(--blue-dark);font-size:.7rem;}.hl-mut{color:var(--gray-500);font-size:.69rem;}.hl-old{color:var(--red);text-decoration:line-through;}.hl-new{color:var(--green);font-weight:700;}.hl-arr{color:var(--gray-400);}.rule-item[title],.pill[title]{cursor:help;}
 </style>
 </head>
 <body>
@@ -276,8 +278,8 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
         <h1><span>Validador y Corrector RIPS</span></h1>
         <p>Facturación Electrónica en Salud</p>
         <div class="catalog-pills">
-          <span class="pill">Res. 2275/2023</span>
-          <span class="pill active">Res. 948/2026</span>
+          <span class="pill" title="Norma anterior del RIPS-FEV (referencia)">Res. 2275/2023</span>
+          <span class="pill active" title="Norma vigente del RIPS-FEV desde 2026 (deroga la 2275/2023)">Res. 948/2026</span>
           <span class="pill active">CUPS 13,640</span>
           <span class="pill active">CIE-10 12,634</span>
           <span class="pill active">2,786 mapeos</span>
@@ -324,12 +326,12 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
       </div>
       <div id="patient-status">Sin archivo cargado</div>
       <div class="rules-grid" style="margin-top:14px">
-        <div class="rule-item"><strong>📅 Formato de fechas</strong><span>Normaliza al formato SISPRO: <code>AAAA-MM-DD HH:MM</code></span></div>
-        <div class="rule-item"><strong>📅 Validación de período</strong><span>Fechas fuera del período XML corregidas a fecha de emisión</span></div>
-        <div class="rule-item"><strong>🔬 CIE-10 automático</strong><span>Asigna diagnóstico desde 2,786 mapeos cuando el campo es nulo</span></div>
-        <div class="rule-item"><strong>💰 Valor del servicio (RVC034)</strong><span>Distribuye valor total del XML entre procedimientos con valor cero</span></div>
-        <div class="rule-item"><strong>🪪 Tipo de usuario (RVC005)</strong><span>Corrige <code>tipoUsuario</code> según cobertura del XML</span></div>
-        <div class="rule-item"><strong>👤 Tipo doc · sexo · edad</strong><span>Corrige documento por edad · <code>codSexo</code> desde CSV o nombre</span></div>
+        <div class="rule-item" title="Convierte cualquier fecha al formato exacto del MSPS (AAAA-MM-DD HH:MM)."><strong>📅 Formato de fechas</strong><span>Normaliza al formato SISPRO: <code>AAAA-MM-DD HH:MM</code></span></div>
+        <div class="rule-item" title="Si una atención cae fuera del período de la factura (XML), la ajusta a la fecha de emisión."><strong>📅 Validación de período</strong><span>Fechas fuera del período XML corregidas a fecha de emisión</span></div>
+        <div class="rule-item" title="Cuando el diagnóstico viene vacío, lo asigna desde los 2.786 mapeos CUPS→CIE-10."><strong>🔬 CIE-10 automático</strong><span>Asigna diagnóstico desde 2,786 mapeos cuando el campo es nulo</span></div>
+        <div class="rule-item" title="Reparte el valor total de la factura (XML) entre los procedimientos que quedaron en cero."><strong>💰 Valor del servicio (RVC034)</strong><span>Distribuye valor total del XML entre procedimientos con valor cero</span></div>
+        <div class="rule-item" title="Ajusta el tipoUsuario del paciente según la cobertura declarada en el XML."><strong>🪪 Tipo de usuario (RVC005)</strong><span>Corrige <code>tipoUsuario</code> según cobertura del XML</span></div>
+        <div class="rule-item" title="Corrige el tipo de documento según la edad y completa el sexo desde el CSV o el nombre."><strong>👤 Tipo doc · sexo · edad</strong><span>Corrige documento por edad · <code>codSexo</code> desde CSV o nombre</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;">
         <button class="upload-btn" onclick="agregarCarpeta()" style="font-size:.82rem;padding:10px 16px;">➕ Agregar carpeta</button>
@@ -750,20 +752,26 @@ function renderCola(){
 }
 async function procesarTodas(){
   if(!selectedDirs.length){alert('Agrega al menos una carpeta.');return;}
-  stats={total:0,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};allDetails=[];allExcluded=[];const movedSet=new Set();
   document.getElementById('proc-log').innerHTML='';
   hide('step-select');show('step-progress');
-  document.getElementById('prog-title').textContent='Procesando archivos...';
+  document.getElementById('prog-title').textContent='Analizando carpetas...';
+  document.getElementById('pbar-label').textContent='';
   let files=[];
-  for(const dh of selectedDirs){
+  for(let r=0;r<selectedDirs.length;r++){
+    const dh=selectedDirs[r];
     try{await dh.removeEntry('_EXCLUIDOS',{recursive:true});}catch(e){}
+    const ini=files.length;
     await findJsonFiles(dh,files);
+    for(let k=ini;k<files.length;k++){files[k].rootName=dh.name;files[k].rootIdx=r;}
   }
-  stats.total=files.length;
   if(!files.length){document.getElementById('prog-title').textContent='No se encontraron archivos';document.getElementById('pbar-label').textContent='Verifique las carpetas seleccionadas.';return;}
+  if(!confirm('Se procesarán '+files.length+' archivo(s) en '+selectedDirs.length+' carpeta(s).\n\n⚠️ Las carpetas SIN XML o con fecha de atención anterior al '+FECHA_CORTE_MSPS+' se ELIMINARÁN del origen (quedan registradas en el reporte de hallazgos).\n\n¿Continuar?')){hide('step-progress');show('step-select');return;}
+  stats={total:files.length,fmt:0,cie:0,cob:0,vr:0,err:0,exc:0};allDetails=[];allExcluded=[];const movedSet=new Set();
+  let lastRoot=-1;
   setProgress(0,files.length);
   for(let i=0;i<files.length;i++){
-    const{name,handle,dirHandle:fdh,parentHandle:pdh,dirName}=files[i];
+    const{name,handle,dirHandle:fdh,parentHandle:pdh,dirName,rootName,rootIdx}=files[i];
+    if(rootIdx!==lastRoot){lastRoot=rootIdx;document.getElementById('prog-title').textContent='Carpeta '+(rootIdx+1)+' de '+selectedDirs.length+' · '+(rootName||'');}
     try{
       if(movedSet.has(fdh)){setProgress(i+1,files.length);await tick();continue;}
       const file=await handle.getFile();let json;
@@ -870,31 +878,43 @@ function showResults(){
     +'<button onclick="descargarReporte()" style="padding:8px 14px;background:#fff;border:1.5px solid var(--blue);border-radius:8px;color:var(--blue);font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">⬇️ Descargar HTML</button>'
     +'</div>';
   if(!nFiles&&!nExc){det.innerHTML=h+'<div style="padding:14px;text-align:center;color:var(--gray-500);font-size:.82rem;border:1px solid var(--gray-200);border-radius:10px;">✅ No se requirieron cambios ni exclusiones.</div>';return;}
-  h+='<div style="max-height:340px;overflow:auto;border:1px solid var(--gray-200);border-radius:10px;">';
+  var rows=[];
   allExcluded.forEach(function(x){
-    h+='<div style="border-bottom:1px solid var(--gray-100);padding:10px 14px;background:#FFF7ED;">'
-      +'<div style="font-family:var(--mono);font-size:.76rem;font-weight:700;color:#EA580C;margin-bottom:3px;">🚫 '+esc(x.file)+(x.eliminada?' <span style="font-weight:400;color:var(--gray-500);">eliminada del origen</span>':' <span style="font-weight:400;color:var(--red);">(no se pudo borrar)</span>')+'</div>'
-      +'<div style="font-size:.72rem;color:#9A3412;">'+esc(x.motivo)+((x.evidencia&&x.evidencia.length)?(' · fechas: '+esc(x.evidencia.join(', '))):'')+'</div></div>';
+    rows.push({t:'Excluida',
+      html:'<span class="hl-tag" style="background:#FFE6D5;color:#EA580C;">Excluida</span><span class="hl-file">🚫 '+esc(x.file)+'</span><span class="hl-mut">'+esc(x.motivo)+((x.evidencia&&x.evidencia.length)?(' · '+esc(x.evidencia.join(', '))):'')+(x.eliminada?' · eliminada del origen':' · no se pudo borrar')+'</span>',
+      text:(x.file+' '+x.motivo+' excluida '+(x.evidencia||[]).join(' ')).toLowerCase()});
   });
   allDetails.forEach(function(d){
-    h+='<div style="border-bottom:1px solid var(--gray-100);padding:10px 14px;">'
-      +'<div style="font-family:var(--mono);font-size:.76rem;font-weight:700;color:var(--blue-dark);margin-bottom:6px;">📄 '+esc(d.file)+'</div>';
     (d.chg||[]).forEach(function(c){
-      h+='<div style="font-size:.73rem;margin:3px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
-        +'<span style="background:var(--blue-light);color:var(--blue-dark);border-radius:4px;padding:0 5px;font-weight:700;font-size:.66rem;">'+esc(c.tipo)+'</span>'
-        +'<span style="color:var(--gray-400);font-size:.68rem;">'+esc(c.loc)+'</span>'
-        +'<code>'+esc(c.campo)+'</code>'
-        +'<span style="color:var(--red);text-decoration:line-through;">'+esc(vDisp(c.antes))+'</span>'
-        +'<span style="color:var(--gray-400);">→</span>'
-        +'<span style="color:var(--green);font-weight:700;">'+esc(vDisp(c.despues))+'</span></div>';
+      rows.push({t:c.tipo,
+        html:'<span class="hl-tag">'+esc(c.tipo)+'</span><span class="hl-file">'+esc(d.file)+'</span><span class="hl-mut">'+esc(c.loc)+'</span><code>'+esc(c.campo)+'</code><span class="hl-old">'+esc(vDisp(c.antes))+'</span><span class="hl-arr">→</span><span class="hl-new">'+esc(vDisp(c.despues))+'</span>',
+        text:(d.file+' '+c.tipo+' '+c.loc+' '+c.campo+' '+vDisp(c.antes)+' '+vDisp(c.despues)).toLowerCase()});
     });
     (d.invC||[]).forEach(function(p){
-      h+='<div style="font-size:.73rem;color:#92400E;margin:3px 0;">⚠️ Pendiente · <code>'+esc(p.campo)+'</code> = '+esc(vDisp(p.valor))+' <span style="color:var(--gray-400);">('+esc(p.tipo)+')</span></div>';
+      rows.push({t:'Pendiente',
+        html:'<span class="hl-tag" style="background:#FEF3C7;color:#92400E;">Pendiente</span><span class="hl-file">'+esc(d.file)+'</span><code>'+esc(p.campo)+'</code><span class="hl-mut">= '+esc(vDisp(p.valor))+' ('+esc(p.tipo)+')</span>',
+        text:(d.file+' pendiente '+p.campo+' '+vDisp(p.valor)+' '+p.tipo).toLowerCase()});
     });
-    h+='</div>';
   });
+  var tipos={};rows.forEach(function(r){tipos[r.t]=(tipos[r.t]||0)+1;});
+  var chips='<button class="hl-chip active" data-c="" onclick="filtrarHallazgos(this)">Todos ('+rows.length+')</button>';
+  Object.keys(tipos).forEach(function(t){chips+='<button class="hl-chip" data-c="'+esc(t)+'" onclick="filtrarHallazgos(this)">'+esc(t)+' ('+tipos[t]+')</button>';});
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">'+chips+'<input id="hl-search" oninput="filtrarHallazgos()" placeholder="🔎 Buscar archivo, campo, valor..." style="flex:1;min-width:150px;margin-left:auto;padding:7px 11px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.78rem;outline:none;"></div>';
+  h+='<div id="hl-list" style="max-height:340px;overflow:auto;border:1px solid var(--gray-200);border-radius:10px;">';
+  rows.forEach(function(r){h+='<div class="hl-row" data-t="'+esc(r.t)+'" data-f="'+esc(r.text)+'">'+r.html+'</div>';});
   h+='</div>';
   det.innerHTML=h;
+}
+function filtrarHallazgos(btn){
+  if(btn){var cs=document.querySelectorAll('.hl-chip');for(var k=0;k<cs.length;k++)cs[k].classList.remove('active');btn.classList.add('active');}
+  var act=document.querySelector('.hl-chip.active');var t=act?act.getAttribute('data-c'):'';
+  var q=(document.getElementById('hl-search')||{}).value||'';q=q.trim().toLowerCase();
+  var rows=document.querySelectorAll('#hl-list .hl-row');
+  for(var i=0;i<rows.length;i++){
+    var okT=!t||rows[i].getAttribute('data-t')===t;
+    var okQ=!q||rows[i].getAttribute('data-f').indexOf(q)>=0;
+    rows[i].style.display=(okT&&okQ)?'':'none';
+  }
 }
 
 function buildReporteHTML(){
