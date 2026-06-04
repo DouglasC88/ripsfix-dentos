@@ -1146,8 +1146,10 @@ function cvUV(){
   var df=Math.abs(tot-vX.py);
   var sinDx=vR.filter(function(r){return!(r.dx&&CIE10_DATA[r.dx]);}).length;
   var sf=vR.filter(function(r){return!exDate(r.fecha);}).length;
+  var un=function(v){return /^\d$/.test(String(v==null?'':v).trim());};
+  var corr=vR.filter(function(r){return un(r.mod)||un(r.tu)||un(r.con)||un(r.grupo)||un(r.via)||un(r.tdx)||un(r.causa)||un(r.fin);}).length;
   function vi(ok,t,d){return'<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-100);font-size:.8rem;"><span style="color:'+(ok?'var(--green)':'var(--yellow)')+'">'+(ok?'OK':'AV')+'</span><span>'+t+'<div style="font-size:.7rem;color:var(--gray-400);font-family:var(--mono);margin-top:1px;">'+d+'</div></span></div>';}
-  document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(true,'Diagnóstico (CIE-10)',sinDx?(sinDx+' sin CIE-10 propio → se asigna K088 automáticamente'):'Todos con diagnóstico del Excel')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas');
+  document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(true,'Diagnóstico (CIE-10)',sinDx?(sinDx+' sin CIE-10 propio → se asigna K088 automáticamente'):'Todos con diagnóstico del Excel')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas')+vi(true,'Códigos a 2 dígitos',corr?(corr+' servicios con código de 1 dígito → corregidos automáticamente ("1"→"01")'):'Formato correcto (tipoUsuario, modalidad, etc.)');
   var btn=document.getElementById('cv-btn');if(btn){btn.disabled=false;btn.style.opacity='1';}
 }
 // Tabla de equivalencias exactas CUPS 7->6 digitos
@@ -1278,6 +1280,8 @@ function cups6(c){
   return c.substring(0,6);
 }
 
+// Normaliza códigos de 1 dígito a 2 caracteres (ej. "1"->"01", "2"->"02"). Exige el validador MSPS (RVG01).
+function pad2(v){v=String(v==null?'':v).trim();return /^\d$/.test(v)?('0'+v):v;}
 window.cvGenerar=function(){
   if(!vX||!vR)return;
   var inp=document.getElementById('cv-numfact');
@@ -1294,10 +1298,10 @@ window.cvGenerar=function(){
       var ft=exDate(rw.fecha);ft=ft?ft+' 00:00':(vX.st+' 00:00');
       if(vX.st&&ft.substring(0,10)<vX.st)ft=vX.st+' 00:00';if(vX.en&&ft.substring(0,10)>vX.en)ft=vX.en+' 00:00';
       var au=ca(rw.aut);var cups=cups6(rw.cups);var esCons=(rw.tipo&&rw.tipo.toLowerCase().indexOf('consulta')>-1)||ic(cups);
-      if(esCons){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:rw.mod||'01',grupoServicios:rw.grupo||'01',codServicio:parseInt(rw.cserv)||371,finalidadTecnologiaSalud:rw.fin||'15',causaMotivoAtencion:rw.causa||'26',codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:rw.tdx||'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,conceptoRecaudo:rw.con||'05',consecutivo:ci2++});}
-      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:rw.via||'01',modalidadGrupoServicioTecSal:rw.mod||'01',grupoServicios:rw.grupo||'01',codServicio:parseInt(rw.cserv)||371,finalidadTecnologiaSalud:rw.fin||'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:rw.con||'05',valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,consecutivo:pi++});}
+      if(esCons){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:parseInt(rw.cserv)||371,finalidadTecnologiaSalud:pad2(rw.fin)||'15',causaMotivoAtencion:pad2(rw.causa)||'26',codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:pad2(rw.tdx)||'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,conceptoRecaudo:pad2(rw.con)||'05',consecutivo:ci2++});}
+      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:pad2(rw.via)||'01',modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:parseInt(rw.cserv)||371,finalidadTecnologiaSalud:pad2(rw.fin)||'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:pad2(rw.con)||'05',valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,consecutivo:pi++});}
     });
-    return{tipoDocumentoIdentificacion:p.td||'CC',numDocumentoIdentificacion:p.doc,tipoUsuario:p.tu||tu,fechaNacimiento:nac,codSexo:sx,codPaisResidencia:'170',codMunicipioResidencia:p.mun||mn,codZonaTerritorialResidencia:'01',incapacidad:'NO',codPaisOrigen:'170',consecutivo:idx+1,servicios:{consultas:cs.length?cs:null,procedimientos:ps.length?ps:null}};
+    return{tipoDocumentoIdentificacion:p.td||'CC',numDocumentoIdentificacion:p.doc,tipoUsuario:pad2(p.tu)||tu,fechaNacimiento:nac,codSexo:sx,codPaisResidencia:'170',codMunicipioResidencia:p.mun||mn,codZonaTerritorialResidencia:'01',incapacidad:'NO',codPaisOrigen:'170',consecutivo:idx+1,servicios:{consultas:cs.length?cs:null,procedimientos:ps.length?ps:null}};
   });
   vJ={numDocumentoIdObligado:vX.nP,numFactura:vX.nF,tipoNota:null,numNota:null,usuarios:us};
   var tot=vR.reduce(function(acc,r){return acc+r.valor;},0),nc=vR.filter(function(r){return ic(r.cups);}).length;
