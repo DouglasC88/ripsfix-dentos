@@ -429,10 +429,11 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
             <input type="file" id="cvi2" accept=".xlsx,.xls" style="display:none">
             <div style="font-size:22px;margin-bottom:5px;">📊</div>
             <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> o arrastra el Excel</div>
-            <div style="font-size:.68rem;color:var(--gray-400);margin-top:2px;">Columnas fijas 0-11: FECHA · TD · DOC · NOMBRE · PLAN · PIN · VALID · PROC · CUPS · DIENTE · AUT · VALOR</div>
+            <div style="font-size:.68rem;color:var(--gray-400);margin-top:2px;">El sistema detecta las columnas por su encabezado · puedes ajustar el mapeo abajo</div>
           </div>
           <div id="cverr" style="display:none;padding:8px 12px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:.78rem;color:var(--red);margin-top:8px;"></div>
           <div id="cvxlout"></div>
+          <div id="cv-mapeo" style="display:none;"></div>
         </div>
       </div>
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
@@ -1045,7 +1046,7 @@ function copyCode(code){
 // === RIPS CONVENIOS v21 ===
 (function(){
 var C10={'890203':'K021','890204':'K021','890217':'K051','890218':'K051','890219':'K051','890221':'K053','890224':'K088','890303':'K021','890304':'K021','890324':'K088','1000034':'K088','237101':'K040','237102':'K040','237201':'K045','237301':'K041','237302':'K041','237303':'K041','237304':'K040','237305':'K041','237307':'K041','237401':'K046','237901':'K037','237903':'K037','232101':'K021','232102':'K021','232103':'K021','1005310':'K021','1005311':'K021','1005312':'K021','234101':'K083','234103':'K083','234106':'K083','233101':'K083','233201':'K083','1005350':'K083','1005333':'K083','234201':'K081','234301':'K081','234302':'K081','234303':'K081','234401':'K081','234402':'K081','234403':'K081','230103':'K029','230203':'K006','231100':'K029','231201':'K029','231301':'K011','231401':'K011','1005277':'K011','1005278':'K011','231500':'K010','255006':'K130','274101':'K130','270101':'K122','243502':'K102','240300':'K053','242101':'K053','242103':'K053','242201':'K053','1005374':'K053','1005544':'K053','247101':'K073','247301':'K073','893106':'K073','1005385':'K073','1005386':'K073','1005387':'K073','1005388':'K073','1005389':'K073','1005390':'K073','1005391':'K073','1005392':'K073','1005393':'K073','1005394':'K073','1005421':'K073','997103':'K020','997105':'K020','997301':'K036','870114':'K088','870440':'K088','870451':'K088','870452':'K088','870453':'K088','870454':'K088','870460':'K088','236300':'K081'};
-var vX=null,vR=null,vC={},vJ=null;
+var vX=null,vR=null,vC={},vJ=null,cvRows=[],cvHi=0,cvHdr=[],cvMap={};
 function fm(n){return'$'+Number(n).toLocaleString('es-CO');}
 function ic(c){return/^890/.test(String(c));}
 function ck(c){return C10[String(c).trim()]||'K088';}
@@ -1083,6 +1084,14 @@ window.cvLX=function(f){
   };
   rd.readAsText(f);
 };
+var CVFIELDS=[['doc','Documento usuario',['nodocumentousuario','nodocumento','numerodocumento','documento']],['td','Tipo documento',['tipodocumentousuario','tipodocumento']],['ape1','Primer apellido',['primerapellido']],['ape2','Segundo apellido',['segundoapellido']],['nom1','Primer nombre',['primernombreusuario','primernombre']],['nom2','Segundo nombre',['segundonombreusuario','segundonombre']],['nac','Fecha nacimiento',['fechanacimiento']],['sexo','Sexo',['sexo']],['tu','Tipo usuario',['tipousuario']],['mun','Municipio',['codigomunicipioresidencia','codigomunicipio','municipio']],['fecha','Fecha atencion',['fechainicioatencion','fechaatencion']],['aut','N autorizacion',['numeroautorizacion','autorizacion']],['cups','CUPS / codigo',['cups','codprocedimiento','codigocups']],['dx','Diagnostico ppal',['codigodiagnosticoprincipal','codigodiagnosticoppal','codigodiagnostico','diagnostico']],['causa','Causa motivo',['causamotivoatencion']],['tdx','Tipo diagnostico',['tipodiagnosticoprincipal','tipodiagnostico']],['cserv','Cod servicio',['codservicio']],['fin','Finalidad',['finalidadtecnologiasalud','finalidad']],['mod','Modalidad grupo',['modalidadgruposerviciotecsal','modalidadgrupo']],['via','Via ingreso',['viaingresoserviciosalud','viaingreso']],['grupo','Grupo servicios',['gruposervicios','gruposervicio']],['valor','Valor servicio',['valorservicio','valor']],['con','Concepto recaudo',['conceptorecaudo']],['vpm','Valor pago moderador',['valorpagomoderador']],['tipo','Tipo servicio (Cons/Proc)',['tipo_servicio','tiposervicio']]];
+function cvNorm(s){return String(s).toLowerCase().replace(/[^a-z0-9]/g,'');}
+function cvAutoMap(hdr){var H=hdr.map(cvNorm),M={};CVFIELDS.forEach(function(fd){var kws=fd[2],idx=-1,a,i,k;for(a=0;a<kws.length&&idx<0;a++){k=cvNorm(kws[a]);for(i=0;i<H.length;i++){if(H[i]===k){idx=i;break;}}}if(idx<0)for(a=0;a<kws.length&&idx<0;a++){k=cvNorm(kws[a]);for(i=0;i<H.length;i++){if(H[i].indexOf(k)>-1){idx=i;break;}}}M[fd[0]]=idx;});return M;}
+function renderCvMapeo(){var el=document.getElementById('cv-mapeo');if(!el)return;var opt=function(sel){var o='<option value="-1">- (no usar) -</option>',i;for(i=0;i<cvHdr.length;i++)o+='<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(cvHdr[i]||('Col '+i))+'</option>';return o;};var h='<div style="border:1px solid var(--gray-200);border-radius:10px;margin-top:10px;padding:12px 14px;"><div style="font-family:var(--display);font-weight:700;font-size:.82rem;margin-bottom:4px;">Mapeo de columnas</div><div style="font-size:.72rem;color:var(--gray-500);margin-bottom:10px;">Detecte las columnas automaticamente. Ajusta cualquier campo si tu archivo es distinto.</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">';CVFIELDS.forEach(function(fd){h+='<div><label style="display:block;font-size:.7rem;font-weight:700;color:var(--gray-700);margin-bottom:3px;">'+esc(fd[1])+'</label><select id="cvmap-'+fd[0]+'" onchange="cvApplyMap()" style="width:100%;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:7px;font-size:.74rem;background:var(--white);color:var(--gray-900);">'+opt(cvMap[fd[0]])+'</select></div>';});h+='</div></div>';el.style.display='block';el.innerHTML=h;}
+function exDate(v){if(v==null||v==='')return '';if(typeof v==='number'&&v>20000){var d=new Date(Math.round((v-25569)*86400000));return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);}var m=String(v).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);return '';}
+function mapSexoCv(s){s=String(s||'').trim().toUpperCase();if(s==='H')return 'M';if(s==='M')return 'F';if(s==='F')return 'F';if(s.indexOf('MASC')===0||s.indexOf('HOMB')===0)return 'M';if(s.indexOf('FEM')===0||s.indexOf('MUJ')===0)return 'F';return '';}
+function cvGet(f){var sel=document.getElementById('cvmap-'+f);if(sel)return parseInt(sel.value);return cvMap[f]==null?-1:cvMap[f];}
+function cvApplyMap(){if(!cvRows.length)return;vR=[];for(var j=cvHi+1;j<cvRows.length;j++){var r=cvRows[j];if(!r)continue;var g=function(f){var i=cvGet(f);return(i>=0&&i<r.length)?r[i]:'';};var fn=function(f){return String(g(f)).trim().replace(/\.0$/,'');};var doc=fn('doc'),cups=fn('cups');if(!doc&&!cups)continue;vR.push({doc:doc,td:fn('td')||'CC',nombre:[g('ape1'),g('ape2'),g('nom1'),g('nom2')].map(function(x){return String(x||'').trim();}).join(' ').replace(/\s+/g,' ').trim(),nac:exDate(g('nac')),sexo:String(g('sexo')).trim(),tu:fn('tu'),mun:fn('mun'),fecha:g('fecha'),aut:fn('aut'),cups:cups,dx:String(g('dx')).trim().toUpperCase(),causa:fn('causa'),tdx:fn('tdx'),cserv:fn('cserv'),fin:fn('fin'),mod:fn('mod'),via:fn('via'),grupo:fn('grupo'),valor:parseFloat(String(g('valor')).replace(/[^0-9.]/g,''))||0,con:fn('con'),vpm:parseFloat(String(g('vpm')).replace(/[^0-9.]/g,''))||0,tipo:String(g('tipo')).trim()});}var out=document.getElementById('cvxlout');if(!vR.length){if(out)out.innerHTML='<div style="font-size:.76rem;color:var(--red);margin-top:8px;">No se detectaron filas. Revisa el mapeo (Documento y CUPS).</div>';return;}var pacs={};vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={total:0,n:0};pacs[rw.doc].total+=rw.valor;pacs[rw.doc].n++;});var nPac=Object.keys(pacs).length,tot=vR.reduce(function(a,r){return a+r.valor;},0);if(out)out.innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+cvI('Pacientes',''+nPac,'mono')+cvI('Servicios',''+vR.length,'mono')+cvI('Total',fm(tot),'')+'</div>';cvUV();}
 window.cvLE=function(f){
   var errEl=document.getElementById('cverr');errEl.style.display='none';
   var rd=new FileReader();
@@ -1091,26 +1100,13 @@ window.cvLE=function(f){
       if(typeof XLSX==='undefined')throw new Error('XLSX.js no cargado.');
       var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',raw:true});
       var ws=wb.Sheets[wb.SheetNames[0]];
-      var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
-      var s=1;
-      for(var i=0;i<Math.min(10,rows.length);i++){if(rows[i]&&!isNaN(Number(rows[i][0]))&&Number(rows[i][0])>40000){s=i;break;}}
-      vR=[];
-      for(var j=s;j<rows.length;j++){
-        var rw=rows[j],cups=String(rw[8]||'').trim(),doc=String(rw[2]||'').trim();
-        if(!cups||!doc)continue;
-        vR.push({fecha:rw[0],td:String(rw[1]||'CC').trim(),doc:doc,nombre:String(rw[3]||'').trim(),pin:String(rw[5]||'').trim(),aut:String(rw[10]||'').trim(),cups:cups,valor:parseFloat(String(rw[11]).replace(/[^0-9.]/g,''))||0});
-      }
-      if(!vR.length)throw new Error('No se encontraron datos. Verifica el Excel.');
-      var pacs={};
-      vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={td:rw.td,doc:rw.doc,nombre:rw.nombre,total:0,n:0};pacs[rw.doc].total+=rw.valor;pacs[rw.doc].n++;});
-      var nPac=Object.keys(pacs).length,tot=vR.reduce(function(acc,r){return acc+r.valor;},0);
-      var match=vX&&Math.abs(tot-vX.py)<1;
-      var tbl='<table style="width:100%;border-collapse:collapse;font-size:.76rem;margin-top:10px;"><thead><tr style="background:var(--gray-50);"><th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--gray-200);font-size:.67rem;color:var(--gray-500);">Paciente</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--gray-200);font-size:.67rem;color:var(--gray-500);">Doc</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--gray-200);font-size:.67rem;color:var(--gray-500);">Proc</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--gray-200);font-size:.67rem;color:var(--gray-500);">Total</th></tr></thead><tbody>';
-      Object.values(pacs).forEach(function(p){tbl+='<tr><td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);">'+p.nombre+'</td><td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);font-family:var(--mono);font-size:.72rem;">'+p.td+' '+p.doc+'</td><td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);">'+p.n+'</td><td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);font-family:var(--mono);">'+fm(p.total)+'</td></tr>';});
-      tbl+='</tbody></table>';
-      var alrt='<div style="padding:8px 12px;border-radius:8px;font-size:.78rem;margin-top:8px;'+(match?'background:#F0FDF4;border:1px solid #BBF7D0;color:var(--green);':'background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;')+'">'+(match?'Suma coincide con XML ('+fm(tot)+')':'Diferencia de '+fm(Math.abs(tot-(vX?vX.py:0)))+' entre Excel y XML')+'</div>';
-      document.getElementById('cvxlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+cvI('Pacientes',''+nPac,'mono')+cvI('Procedimientos',''+vR.length,'mono')+cvI('Total',fm(tot),match?'green':'')+'</div>'+tbl+(vX?alrt:'');
-      sok(2,'OK '+nPac+' pac');cvUV();
+      cvRows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+      cvHi=0;
+      for(var i=0;i<Math.min(8,cvRows.length);i++){var jr=(cvRows[i]||[]).map(function(x){return String(x).toLowerCase();}).join('|');if(jr.indexOf('cups')>-1||jr.indexOf('documento')>-1){cvHi=i;break;}}
+      cvHdr=(cvRows[cvHi]||[]).map(function(x){return String(x).trim();});
+      if(cvHdr.length<3)throw new Error('No se detectaron columnas con encabezado. Verifica el Excel.');
+      cvMap=cvAutoMap(cvHdr);renderCvMapeo();cvApplyMap();
+      sok(2,cvHdr.length+' columnas');
     }catch(er){errEl.style.display='block';errEl.textContent='Error: '+er.message;console.error(er);}
   };
   rd.readAsArrayBuffer(f);
@@ -1149,7 +1145,7 @@ function cvUV(){
   var tot=vR.reduce(function(acc,r){return acc+r.valor;},0);
   var df=Math.abs(tot-vX.py);
   var noC=[],seen={};vR.forEach(function(r){if(!seen[r.cups]&&!C10[r.cups]){seen[r.cups]=1;noC.push(r.cups);}});
-  var sf=vR.filter(function(r){return!r.fecha||isNaN(Number(r.fecha));}).length;
+  var sf=vR.filter(function(r){return!exDate(r.fecha);}).length;
   function vi(ok,t,d){return'<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-100);font-size:.8rem;"><span style="color:'+(ok?'var(--green)':'var(--yellow)')+'">'+(ok?'OK':'AV')+'</span><span>'+t+'<div style="font-size:.7rem;color:var(--gray-400);font-family:var(--mono);margin-top:1px;">'+d+'</div></span></div>';}
   document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(noC.length===0,'CIE-10',noC.length?noC.length+' sin mapeo: '+noC.join(', '):'Todos mapeados')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas');
   var btn=document.getElementById('cv-btn');if(btn){btn.disabled=false;btn.style.opacity='1';}
@@ -1290,19 +1286,18 @@ window.cvGenerar=function(){
   var pf=document.getElementById('cv-prof').value.trim()||'00000000';
   var mn=document.getElementById('cv-mun').value.trim()||'68001';
   var tu=document.getElementById('cv-tusr').value||'04';
-  var pacs={};vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={td:rw.td,doc:rw.doc,procs:[]};pacs[rw.doc].procs.push(rw);});
+  var pacs={};vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={td:rw.td,doc:rw.doc,nombre:rw.nombre,nac:rw.nac,sexo:rw.sexo,tu:rw.tu,mun:rw.mun,procs:[]};pacs[rw.doc].procs.push(rw);});
   var us=Object.values(pacs).map(function(p,idx){
-    var cv=vC[p.doc]||{},nac=cv.nac||'1980-01-01',sx=cv.sx||'M',cs=[],ps=[],ci2=1,pi=1;
+    var cv=vC[p.doc]||{};var nac=(p.nac&&/\d{4}-\d{2}-\d{2}/.test(p.nac))?p.nac:(cv.nac||'1980-01-01');var sx=mapSexoCv(p.sexo)||cv.sx||'M';var cs=[],ps=[],ci2=1,pi=1;
     p.procs.forEach(function(rw){
-      var c10=ck(rw.cups);
-      var ft=ed(rw.fecha)||(vX.st+' 00:00');
-      if(ft&&vX.st&&ft.substring(0,10)<vX.st)ft=vX.st+' 00:00';
-      if(ft&&vX.en&&ft.substring(0,10)>vX.en)ft=vX.en+' 00:00';
-      var au=ca(rw.pin)||ca(rw.aut);
-      var cups=cups6(rw.cups);if(ic(cups)){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:'01',grupoServicios:'01',codServicio:371,finalidadTecnologiaSalud:'15',causaMotivoAtencion:'26',codDiagnosticoPrincipal:c10,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:0,numFEVPagoModerador:null,conceptoRecaudo:'05',consecutivo:ci2++});}
-      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:'01',modalidadGrupoServicioTecSal:'01',grupoServicios:'01',codServicio:371,finalidadTecnologiaSalud:'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:c10,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:'05',valorPagoModerador:0,numFEVPagoModerador:null,consecutivo:pi++});}
+      var dx=(rw.dx&&CIE10_DATA[rw.dx])?rw.dx:ck(rw.cups);
+      var ft=exDate(rw.fecha);ft=ft?ft+' 00:00':(vX.st+' 00:00');
+      if(vX.st&&ft.substring(0,10)<vX.st)ft=vX.st+' 00:00';if(vX.en&&ft.substring(0,10)>vX.en)ft=vX.en+' 00:00';
+      var au=ca(rw.aut);var cups=cups6(rw.cups);var esCons=(rw.tipo&&rw.tipo.toLowerCase().indexOf('consulta')>-1)||ic(cups);
+      if(esCons){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:rw.mod||'01',grupoServicios:rw.grupo||'01',codServicio:parseInt(rw.cserv)||371,finalidadTecnologiaSalud:rw.fin||'15',causaMotivoAtencion:rw.causa||'26',codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:rw.tdx||'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,conceptoRecaudo:rw.con||'05',consecutivo:ci2++});}
+      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:rw.via||'01',modalidadGrupoServicioTecSal:rw.mod||'01',grupoServicios:rw.grupo||'01',codServicio:parseInt(rw.cserv)||371,finalidadTecnologiaSalud:rw.fin||'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:rw.con||'05',valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,consecutivo:pi++});}
     });
-    return{tipoDocumentoIdentificacion:p.td,numDocumentoIdentificacion:p.doc,tipoUsuario:tu,fechaNacimiento:nac,codSexo:sx,codPaisResidencia:'170',codMunicipioResidencia:mn,codZonaTerritorialResidencia:'01',incapacidad:'NO',codPaisOrigen:'170',consecutivo:idx+1,servicios:{consultas:cs.length?cs:null,procedimientos:ps.length?ps:null}};
+    return{tipoDocumentoIdentificacion:p.td||'CC',numDocumentoIdentificacion:p.doc,tipoUsuario:p.tu||tu,fechaNacimiento:nac,codSexo:sx,codPaisResidencia:'170',codMunicipioResidencia:p.mun||mn,codZonaTerritorialResidencia:'01',incapacidad:'NO',codPaisOrigen:'170',consecutivo:idx+1,servicios:{consultas:cs.length?cs:null,procedimientos:ps.length?ps:null}};
   });
   vJ={numDocumentoIdObligado:vX.nP,numFactura:vX.nF,tipoNota:null,numNota:null,usuarios:us};
   var tot=vR.reduce(function(acc,r){return acc+r.valor;},0),nc=vR.filter(function(r){return ic(r.cups);}).length;
