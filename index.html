@@ -11,9 +11,9 @@
 
 <style>
 :root{
-  --blue:#C8A03C;--blue-dark:#96751B;--blue-light:#FBF3DC;--blue-mid:#EFE0B4;
-  --white:#FFFFFF;--gray-50:#F8FAFC;--gray-100:#F0F4F8;--gray-200:#E2EAF0;
-  --gray-300:#CFC9B7;--gray-500:#7C7665;--gray-700:#494331;--gray-900:#23200F;
+  --blue:#C8A03C;--blue-dark:#E2BC55;--blue-light:#2B2412;--blue-mid:#3A3015;
+  --white:#1B1B20;--gray-50:#100F13;--gray-100:#1E1D23;--gray-200:#2E2C34;
+  --gray-300:#433F49;--gray-500:#9E988C;--gray-700:#CFC8B6;--gray-900:#F2EBD7;
   --green:#22C55E;--yellow:#F59E0B;--red:#E0533D;--purple:#8B5CF6;--orange:#F97316;--dark:#161616;--dark-2:#3b3115;
   --shadow-sm:0 1px 3px rgba(200,160,60,.12),0 1px 2px rgba(0,0,0,.06);
   --shadow:0 4px 16px rgba(200,160,60,.15),0 2px 8px rgba(0,0,0,.06);
@@ -263,6 +263,14 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
 .panel.active{animation:dacpFade .28s ease both;}@keyframes dacpFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}.card{transition:box-shadow .2s ease,transform .2s ease;}.nav-item,.btn-primary,.btn-login,.upload-btn,.btn-secondary,.btn-logout{transition:all .2s ease;}.stat{transition:transform .15s ease;}.stat:hover{transform:translateY(-2px);}
 
 .hl-chip{font-family:var(--display);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:20px;border:1.5px solid var(--gray-200);background:#fff;color:var(--gray-700);cursor:pointer;transition:all .15s;}.hl-chip:hover{border-color:var(--blue);}.hl-chip.active{background:var(--blue);color:#23200F;border-color:var(--blue);}.hl-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.73rem;padding:8px 14px;border-bottom:1px solid var(--gray-100);}.hl-tag{background:var(--blue-light);color:var(--blue-dark);border-radius:4px;padding:0 6px;font-weight:700;font-size:.66rem;}.hl-file{font-family:var(--mono);font-weight:700;color:var(--blue-dark);font-size:.7rem;}.hl-mut{color:var(--gray-500);font-size:.69rem;}.hl-old{color:var(--red);text-decoration:line-through;}.hl-new{color:var(--green);font-weight:700;}.hl-arr{color:var(--gray-400);}.rule-item[title],.pill[title]{cursor:help;}
+
+/* ── TEMA OSCURO: superficies claras hardcodeadas ── */
+.warn-box{background:#2a2208!important;border-color:#5c4a12!important;color:#E6C97A!important;}
+.search-input,#hl-search,input[type=text],input[type=number],input[type=password],input[type=email],select,textarea{background:var(--white)!important;color:var(--gray-900)!important;border-color:var(--gray-200)!important;}
+.search-results{background:var(--white);}.sr-item:hover{background:var(--gray-100);}
+.hl-chip{background:var(--white)!important;}
+#cv-result,#cc-result{background:#13251a!important;border-color:#235c34!important;}
+.copied-toast{color:#23200F;}
 </style>
 </head>
 <body>
@@ -875,7 +883,7 @@ function showResults(){
     +'<span style="font-size:.74rem;color:var(--gray-500);">'+nFiles+' con cambios · '+nChg+' cambio(s) · '+nPend+' pendiente(s) · '+nExc+' excluida(s)</span>'
     +'<div style="flex:1"></div>'
     +'<button onclick="abrirReporte()" style="padding:8px 14px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">📄 Ver reporte</button>'
-    +'<button onclick="descargarReporte()" style="padding:8px 14px;background:#fff;border:1.5px solid var(--blue);border-radius:8px;color:var(--blue);font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">⬇️ Descargar HTML</button>'
+    +'<button onclick="descargarReporte()" style="padding:8px 14px;background:var(--white);border:1.5px solid var(--blue);border-radius:8px;color:var(--blue-dark);font-family:var(--display);font-size:.76rem;font-weight:700;cursor:pointer;">⬇️ Descargar HTML</button>'
     +'</div>';
   if(!nFiles&&!nExc){det.innerHTML=h+'<div style="padding:14px;text-align:center;color:var(--gray-500);font-size:.82rem;border:1px solid var(--gray-200);border-radius:10px;">✅ No se requirieron cambios ni exclusiones.</div>';return;}
   var rows=[];
