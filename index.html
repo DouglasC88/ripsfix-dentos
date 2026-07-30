@@ -464,8 +464,29 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
               <input id="cv-prof" type="text" placeholder="Documento profesional" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Municipio pacientes</label>
               <input id="cv-mun" type="text" value="68001" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
-            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Tipo usuario (según convenio)</label>
-              <select id="cv-tusr" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Convenio / Cobertura</label>
+              <select id="cv-convenio" onchange="cvConvenioChange()" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+                <option value="prepagada" data-tu="11" data-con="03" selected>Medicina prepagada / pólizas / plan complementario (Colsanitas, Medisanitas...)</option>
+                <option value="particular" data-tu="12" data-con="05">Particular (pago directo del paciente)</option>
+                <option value="contrib-cot" data-tu="01" data-con="01">EPS Contributivo — cotizante</option>
+                <option value="contrib-ben" data-tu="02" data-con="01">EPS Contributivo — beneficiario</option>
+                <option value="contrib-adic" data-tu="03" data-con="01">EPS Contributivo — adicional</option>
+                <option value="subsidiado" data-tu="04" data-con="02">EPS-S Subsidiado</option>
+                <option value="no-afiliado" data-tu="05" data-con="05">No afiliado (PPNA / vinculados)</option>
+                <option value="especial-cot" data-tu="06" data-con="05">Régimen Especial/Excepción — cotizante (FF.MM, Policía, Magisterio, Ecopetrol, universidades)</option>
+                <option value="especial-ben" data-tu="07" data-con="05">Régimen Especial/Excepción — beneficiario</option>
+                <option value="especial-nocot" data-tu="13" data-con="05">Régimen Especial/Excepción — no cotizante (Ley 352/1997)</option>
+                <option value="ppl" data-tu="08" data-con="05">PPL — Fondo Nacional de Salud (INPEC)</option>
+                <option value="arl" data-tu="09" data-con="05">ARL — riesgos laborales</option>
+                <option value="soat" data-tu="10" data-con="05">SOAT — accidentes de tránsito</option>
+                <option value="personalizado" data-tu="" data-con="">Personalizado (elegir manualmente)</option>
+              </select>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;" id="cv-convenio-hint"></div>
+            </div>
+          </div>
+          <div id="cv-manual" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--gray-200);grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;">
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Tipo usuario (manual)</label>
+              <select id="cv-tusr-manual" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
                 <option value="01">01 — Contributivo cotizante</option>
                 <option value="02">02 — Contributivo beneficiario</option>
                 <option value="03">03 — Contributivo adicional</option>
@@ -477,9 +498,18 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
                 <option value="08">08 — PPL a cargo del Fondo Nacional de Salud</option>
                 <option value="09">09 — Tomador/Amparado ARL</option>
                 <option value="10">10 — Tomador/Amparado SOAT</option>
-                <option value="11" selected>11 — Planes Voluntarios de Salud (medicina prepagada / pólizas / complementarios)</option>
+                <option value="11">11 — Planes Voluntarios de Salud</option>
                 <option value="12">12 — Particular</option>
               </select></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Concepto recaudo por defecto (manual)</label>
+              <select id="cv-con-manual" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+                <option value="01">01 — Cuota moderadora (solo Contributivo)</option>
+                <option value="02">02 — Copago</option>
+                <option value="03">03 — Pagos compartidos (planes voluntarios)</option>
+                <option value="05" selected>05 — Otro / no aplica</option>
+              </select>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">El concepto 04 (anticipos) nunca se usa aquí: solo aplica en la FEV.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1069,7 +1099,34 @@ document.addEventListener('DOMContentLoaded',function(){
   var i1=document.getElementById('cvi1');if(i1)i1.addEventListener('change',function(){if(this.files[0])cvLX(this.files[0]);});
   var i2=document.getElementById('cvi2');if(i2)i2.addEventListener('change',function(){if(this.files[0])cvLE(this.files[0]);});
   var i3=document.getElementById('cvi3');if(i3)i3.addEventListener('change',function(){if(this.files[0])cvLC(this.files[0]);});
+  var tm=document.getElementById('cv-tusr-manual');if(tm)tm.addEventListener('change',function(){if(typeof cvUV==='function')cvUV();});
+  var cm=document.getElementById('cv-con-manual');if(cm)cm.addEventListener('change',function(){if(typeof cvUV==='function')cvUV();});
+  window.cvConvenioChange&&window.cvConvenioChange();
 });
+var CONCEPTO_NOMBRES={'01':'Cuota moderadora','02':'Copago','03':'Pagos compartidos (planes voluntarios)','05':'Otro / no aplica'};
+// Devuelve {tu, con} según el convenio elegido, o los campos manuales si el usuario eligió "Personalizado".
+function cvConvenioSel(){
+  var sel=document.getElementById('cv-convenio');
+  var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
+  if(!opt||opt.value==='personalizado'){
+    var tuM=document.getElementById('cv-tusr-manual'),conM=document.getElementById('cv-con-manual');
+    return{tu:(tuM&&tuM.value)||'12',con:(conM&&conM.value)||'05',label:'Personalizado'};
+  }
+  return{tu:opt.dataset.tu,con:opt.dataset.con,label:opt.textContent};
+}
+window.cvConvenioChange=function(){
+  var sel=document.getElementById('cv-convenio');
+  var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
+  var manual=document.getElementById('cv-manual');
+  var isCustom=opt&&opt.value==='personalizado';
+  if(manual)manual.style.display=isCustom?'grid':'none';
+  var hint=document.getElementById('cv-convenio-hint');
+  if(hint){
+    if(isCustom){hint.textContent='Elige manualmente el tipo de usuario y el concepto de recaudo por defecto.';}
+    else{var c=cvConvenioSel();hint.textContent='tipoUsuario = '+c.tu+' · concepto de recaudo por defecto = '+c.con+' ('+(CONCEPTO_NOMBRES[c.con]||c.con)+')';}
+  }
+  if(typeof cvUV==='function')cvUV();
+};
 window.cvLX=function(f){
   var rd=new FileReader();
   rd.onload=function(e){
@@ -1159,7 +1216,7 @@ function cvUV(){
   var sf=vR.filter(function(r){return!exDate(r.fecha);}).length;
   var un=function(v){return /^\d$/.test(String(v==null?'':v).trim());};
   var corr=vR.filter(function(r){return un(r.mod)||un(r.con)||un(r.grupo)||un(r.via)||un(r.tdx)||un(r.causa)||un(r.fin);}).length;
-  var tuSel=document.getElementById('cv-tusr');var tuTxt=(tuSel&&tuSel.selectedIndex>=0)?tuSel.options[tuSel.selectedIndex].text:'11 — Planes Voluntarios de Salud (medicina prepagada / pólizas / complementarios)';
+  var tuTxt=cvConvenioSel().label;
   var munBad={};vR.forEach(function(r){var m=String(r.mun==null?'':r.mun).trim().replace(/\.0$/,'');if(/^\d{1,4}$/.test(m))munBad[r.doc]=1;});var nMun=Object.keys(munBad).length;
   var csBad=vR.filter(function(r){var v=parseInt(r.cserv,10);return !v||v===500;}).length;
   var antic=vR.filter(function(r){return pad2(r.con)==='04';}).length;
@@ -1304,7 +1361,7 @@ function pad5(v){v=String(v==null?'':v).trim().replace(/\.0$/,'');return /^\d{1,
 var CSERV_CUPS={'234201':347,'893106':338,'242301':343,'242103':343,'237303':311,'231201':371,'231301':371};
 function csServ(cups,raw){var v=parseInt(raw,10);if(v&&v!==500)return v;return CSERV_CUPS[String(cups)]||334;}
 // Concepto de recaudo 04 (anticipos) solo aplica en la FEV, nunca en el RIPS soporte (Doc. Técnico 1, Res. 948/2026).
-function concRec(v){var c=pad2(v);return c==='04'?null:(c||'05');}
+function concRec(v,def){var c=pad2(v);return c==='04'?null:(c||def||'05');}
 window.cvGenerar=function(){
   if(!vX||!vR)return;
   var inp=document.getElementById('cv-numfact');
@@ -1312,7 +1369,7 @@ window.cvGenerar=function(){
   var pr=document.getElementById('cv-prest').value.trim()||'';
   var pf=document.getElementById('cv-prof').value.trim()||'00000000';
   var mn=document.getElementById('cv-mun').value.trim()||'68001';
-  var tu=document.getElementById('cv-tusr').value||'11';
+  var conv=cvConvenioSel();var tu=conv.tu||'12';var conDef=conv.con||'05';
   var pacs={};vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={td:rw.td,doc:rw.doc,nombre:rw.nombre,nac:rw.nac,sexo:rw.sexo,tu:rw.tu,mun:rw.mun,procs:[]};pacs[rw.doc].procs.push(rw);});
   var us=Object.values(pacs).map(function(p,idx){
     var cv=vC[p.doc]||{};var nac=(p.nac&&/\d{4}-\d{2}-\d{2}/.test(p.nac))?p.nac:(cv.nac||'1980-01-01');var sx=mapSexoCv(p.sexo)||cv.sx||'M';var cs=[],ps=[],ci2=1,pi=1;
@@ -1321,8 +1378,8 @@ window.cvGenerar=function(){
       var ft=exDate(rw.fecha);ft=ft?ft+' 00:00':(vX.st+' 00:00');
       if(vX.st&&ft.substring(0,10)<vX.st)ft=vX.st+' 00:00';if(vX.en&&ft.substring(0,10)>vX.en)ft=vX.en+' 00:00';
       var au=ca(rw.aut);var cups=cups6(rw.cups);var esCons=(rw.tipo&&rw.tipo.toLowerCase().indexOf('consulta')>-1)||ic(cups);
-      if(esCons){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',causaMotivoAtencion:pad2(rw.causa)||'26',codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:pad2(rw.tdx)||'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,conceptoRecaudo:concRec(rw.con),consecutivo:ci2++});}
-      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:pad2(rw.via)||'01',modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:concRec(rw.con),valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,consecutivo:pi++});}
+      if(esCons){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',causaMotivoAtencion:pad2(rw.causa)||'26',codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:pad2(rw.tdx)||'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,vrServicio:rw.valor,valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,conceptoRecaudo:concRec(rw.con,conDef),consecutivo:ci2++});}
+      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:pad2(rw.via)||'01',modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:pf,codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:concRec(rw.con,conDef),valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,consecutivo:pi++});}
     });
     return{tipoDocumentoIdentificacion:p.td||'CC',numDocumentoIdentificacion:p.doc,tipoUsuario:tu,fechaNacimiento:nac,codSexo:sx,codPaisResidencia:'170',codMunicipioResidencia:pad5(p.mun||mn),codZonaTerritorialResidencia:'01',incapacidad:'NO',codPaisOrigen:'170',consecutivo:idx+1,servicios:{consultas:cs.length?cs:null,procedimientos:ps.length?ps:null}};
   });
