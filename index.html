@@ -464,22 +464,30 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
               <input id="cv-prof" type="text" placeholder="Documento profesional" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Municipio pacientes</label>
               <input id="cv-mun" type="text" value="68001" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
-            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Convenio / Cobertura</label>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Cobertura o plan de beneficio (Doc. Técnico 1)</label>
               <select id="cv-convenio" onchange="cvConvenioChange()" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
-                <option value="prepagada" data-tu="11" data-con="03" selected>Medicina prepagada / pólizas / plan complementario (Colsanitas, Medisanitas...)</option>
-                <option value="particular" data-tu="12" data-con="05">Particular (pago directo del paciente)</option>
-                <option value="contrib-cot" data-tu="01" data-con="01">EPS Contributivo — cotizante</option>
-                <option value="contrib-ben" data-tu="02" data-con="01">EPS Contributivo — beneficiario</option>
-                <option value="contrib-adic" data-tu="03" data-con="01">EPS Contributivo — adicional</option>
-                <option value="subsidiado" data-tu="04" data-con="02">EPS-S Subsidiado</option>
-                <option value="no-afiliado" data-tu="05" data-con="05">No afiliado (PPNA / vinculados)</option>
-                <option value="especial-cot" data-tu="06" data-con="05">Régimen Especial/Excepción — cotizante (FF.MM, Policía, Magisterio, Ecopetrol, universidades)</option>
-                <option value="especial-ben" data-tu="07" data-con="05">Régimen Especial/Excepción — beneficiario</option>
-                <option value="especial-nocot" data-tu="13" data-con="05">Régimen Especial/Excepción — no cotizante (Ley 352/1997)</option>
-                <option value="ppl" data-tu="08" data-con="05">PPL — Fondo Nacional de Salud (INPEC)</option>
-                <option value="arl" data-tu="09" data-con="05">ARL — riesgos laborales</option>
-                <option value="soat" data-tu="10" data-con="05">SOAT — accidentes de tránsito</option>
-                <option value="personalizado" data-tu="" data-con="">Personalizado (elegir manualmente)</option>
+                <option value="upc-inactivo" disabled>1 · UPC (INACTIVO desde jul/2026 — usa 16 o 17)</option>
+                <option value="presupuesto-max" data-manual="1" data-hint="Aplica a Contributivo o Subsidiado según el caso: elige el régimen abajo.">2 · Presupuesto máximo</option>
+                <option value="prima-eps-soat" data-manual="1" data-hint="Víctima de accidente de tránsito sin SOAT vigente: confirma el tipo de usuario y el concepto de recaudo con tu EPS.">3 · Prima EPS, no aseg. SOAT</option>
+                <option value="cob-soat" data-tu="10" data-con="05">4 · Cobertura póliza SOAT</option>
+                <option value="cob-arl" data-tu="09" data-con="05">5 · Cobertura ARL</option>
+                <option value="cob-adres" data-manual="1" data-hint="Cobertura transversal a varios regímenes: elige el régimen del paciente abajo.">6 · Cobertura ADRES</option>
+                <option value="cob-salud-publica" data-manual="1" data-hint="Acciones de gestión en salud pública: elige el tipo de usuario abajo.">7 · Cobertura salud pública</option>
+                <option value="ent-territorial" data-tu="05" data-con="05">8 · Ent. territorial, rec. oferta</option>
+                <option value="urg-migrante" data-tu="05" data-con="05">9 · Urgencias población migrante</option>
+                <option value="plan-complementario" data-tu="11" data-con="03">10 · Plan complementario</option>
+                <option value="medicina-prepagada" data-tu="11" data-con="03" selected>11 · Medicina prepagada</option>
+                <option value="polizas-salud" data-tu="11" data-con="03">12 · Pólizas en salud</option>
+                <option value="especial-cot" data-tu="06" data-con="05">13 · Régimen Especial/Excepción — cotizante</option>
+                <option value="especial-ben" data-tu="07" data-con="05">13 · Régimen Especial/Excepción — beneficiario</option>
+                <option value="especial-nocot" data-tu="13" data-con="05">13 · Régimen Especial/Excepción — no cotizante (Ley 352/1997)</option>
+                <option value="ppl" data-tu="08" data-con="05">14 · Fondo Nal. Salud PPL</option>
+                <option value="particular" data-tu="12" data-con="05">15 · Particular</option>
+                <option value="contrib-cot" data-tu="01" data-con="01">16 · UPC Contributivo — cotizante</option>
+                <option value="contrib-ben" data-tu="02" data-con="01">16 · UPC Contributivo — beneficiario</option>
+                <option value="contrib-adic" data-tu="03" data-con="01">16 · UPC Contributivo — adicional</option>
+                <option value="subsidiado" data-tu="04" data-con="02">17 · UPC Subsidiado</option>
+                <option value="personalizado" data-manual="1">Personalizado (elegir manualmente)</option>
               </select>
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;" id="cv-convenio-hint"></div>
             </div>
@@ -1104,13 +1112,13 @@ document.addEventListener('DOMContentLoaded',function(){
   window.cvConvenioChange&&window.cvConvenioChange();
 });
 var CONCEPTO_NOMBRES={'01':'Cuota moderadora','02':'Copago','03':'Pagos compartidos (planes voluntarios)','05':'Otro / no aplica'};
-// Devuelve {tu, con} según el convenio elegido, o los campos manuales si el usuario eligió "Personalizado".
+// Devuelve {tu, con} según la cobertura elegida, o los campos manuales si requiere elegir régimen a mano.
 function cvConvenioSel(){
   var sel=document.getElementById('cv-convenio');
   var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
-  if(!opt||opt.value==='personalizado'){
+  if(!opt||opt.dataset.manual==='1'){
     var tuM=document.getElementById('cv-tusr-manual'),conM=document.getElementById('cv-con-manual');
-    return{tu:(tuM&&tuM.value)||'12',con:(conM&&conM.value)||'05',label:'Personalizado'};
+    return{tu:(tuM&&tuM.value)||'12',con:(conM&&conM.value)||'05',label:opt?opt.textContent+' (manual)':'Personalizado'};
   }
   return{tu:opt.dataset.tu,con:opt.dataset.con,label:opt.textContent};
 }
@@ -1118,11 +1126,11 @@ window.cvConvenioChange=function(){
   var sel=document.getElementById('cv-convenio');
   var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
   var manual=document.getElementById('cv-manual');
-  var isCustom=opt&&opt.value==='personalizado';
+  var isCustom=opt&&opt.dataset.manual==='1';
   if(manual)manual.style.display=isCustom?'grid':'none';
   var hint=document.getElementById('cv-convenio-hint');
   if(hint){
-    if(isCustom){hint.textContent='Elige manualmente el tipo de usuario y el concepto de recaudo por defecto.';}
+    if(isCustom){hint.textContent=(opt&&opt.dataset.hint)||'Esta cobertura no tiene un tipo de usuario único: elige régimen y concepto de recaudo abajo.';}
     else{var c=cvConvenioSel();hint.textContent='tipoUsuario = '+c.tu+' · concepto de recaudo por defecto = '+c.con+' ('+(CONCEPTO_NOMBRES[c.con]||c.con)+')';}
   }
   if(typeof cvUV==='function')cvUV();
