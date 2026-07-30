@@ -3,27 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DACP · Validador y Corrector RIPS</title>
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjMTYxNjE2Ii8+PHRleHQgeD0iNTAiIHk9IjczIiBmb250LXNpemU9IjYyIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiNDOEEwM0MiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkQ8L3RleHQ+PC9zdmc+">
+<title>Validador y Corrector RIPS</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjMjU2M0VCIi8+PHBhdGggZD0iTTI4IDIwYTYgNiAwIDAgMSA2LTZoMjJsMTYgMTZ2NDRhNiA2IDAgMCAxLTYgNkgzNGE2IDYgMCAwIDEtNi02VjIweiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik01NiAxNHYxMmE0IDQgMCAwIDAgNCA0aDEyeiIgZmlsbD0iI0RCRUFGRSIvPjxwYXRoIGQ9Ik0zNiA0NGgyNE0zNiA1NGgyOE0zNiA2NGgxNiIgc3Ryb2tlPSIjMjU2M0VCIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjY2IiBjeT0iNzAiIHI9IjE3IiBmaWxsPSIjMTZBMzRBIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMy41Ii8+PHBhdGggZD0iTTU4IDcwbDYgNiAxMS0xMyIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
 <style>
 :root{
-  --blue:#C8A03C;--blue-dark:#E2BC55;--blue-light:#2B2412;--blue-mid:#3A3015;
-  --white:#1B1B20;--gray-50:#100F13;--gray-100:#1E1D23;--gray-200:#2E2C34;
-  --gray-300:#433F49;--gray-500:#9E988C;--gray-700:#CFC8B6;--gray-900:#F2EBD7;
-  --green:#22C55E;--yellow:#F59E0B;--red:#E0533D;--purple:#8B5CF6;--orange:#F97316;--dark:#161616;--dark-2:#3b3115;
-  --shadow-sm:0 1px 3px rgba(200,160,60,.12),0 1px 2px rgba(0,0,0,.06);
-  --shadow:0 4px 16px rgba(200,160,60,.15),0 2px 8px rgba(0,0,0,.06);
-  --shadow-lg:0 10px 40px rgba(200,160,60,.18),0 4px 16px rgba(0,0,0,.08);
+  --blue:#2563EB;--blue-dark:#1D4ED8;--blue-light:#EFF6FF;--blue-mid:#DBEAFE;
+  --white:#FFFFFF;--gray-50:#F8FAFC;--gray-100:#F1F5F9;--gray-200:#E2E8F0;
+  --gray-300:#CBD5E1;--gray-500:#64748B;--gray-700:#334155;--gray-900:#0F172A;
+  --green:#22C55E;--yellow:#F59E0B;--red:#E0533D;--purple:#8B5CF6;--orange:#F97316;--dark:#1E3A8A;--dark-2:#1D4ED8;
+  --shadow-sm:0 1px 3px rgba(37,99,235,.12),0 1px 2px rgba(0,0,0,.06);
+  --shadow:0 4px 16px rgba(37,99,235,.15),0 2px 8px rgba(0,0,0,.06);
+  --shadow-lg:0 10px 40px rgba(37,99,235,.18),0 4px 16px rgba(0,0,0,.08);
   --radius:12px;--mono:'Courier New',monospace;
   --sans:'Nunito Sans',sans-serif;--display:'Nunito',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--sans);background:var(--gray-50);color:var(--gray-900);min-height:100vh;
-  background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(200,160,60,.12) 0%,transparent 70%);}
+  background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(37,99,235,.08) 0%,transparent 70%);}
 
 /* ── LOGIN ── */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -42,10 +42,10 @@ body{font-family:var(--sans);background:var(--gray-50);color:var(--gray-900);min
 .form-label{display:block;font-size:.8rem;font-weight:700;color:var(--gray-700);margin-bottom:6px;}
 .form-input{width:100%;padding:10px 14px;border:1.5px solid var(--gray-200);border-radius:8px;
   font-family:var(--sans);font-size:.85rem;color:var(--gray-900);outline:none;transition:border-color .2s;background:var(--white);}
-.form-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(200,160,60,.15);}
+.form-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.15);}
 .btn-login{width:100%;padding:12px;background:var(--blue);border:none;border-radius:10px;color:var(--white);
   font-family:var(--display);font-size:.9rem;font-weight:700;cursor:pointer;transition:all .2s;
-  box-shadow:0 4px 12px rgba(200,160,60,.35);margin-top:8px;}
+  box-shadow:0 4px 12px rgba(37,99,235,.35);margin-top:8px;}
 .btn-login:hover{background:var(--blue-dark);transform:translateY(-1px);}
 .btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none;}
 .auth-msg{padding:10px 14px;border-radius:8px;font-size:.78rem;margin-top:12px;text-align:center;}
@@ -68,7 +68,7 @@ header{display:flex;align-items:center;justify-content:space-between;background:
 .user-email{font-size:.75rem;font-weight:700;color:var(--gray-700);}
 .version-badge{display:inline-block;background:var(--blue-light);color:var(--blue-dark);
   font-family:var(--mono);font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:20px;
-  border:1px solid rgba(200,160,60,.3);}
+  border:1px solid rgba(37,99,235,.3);}
 .btn-logout{padding:6px 14px;background:var(--white);border:1.5px solid var(--gray-200);
   color:var(--gray-500);border-radius:7px;font-family:var(--display);font-size:.75rem;font-weight:700;
   cursor:pointer;transition:all .2s;}
@@ -76,13 +76,13 @@ header{display:flex;align-items:center;justify-content:space-between;background:
 .catalog-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
 .pill{font-size:.63rem;background:var(--gray-100);color:var(--gray-500);padding:2px 7px;
   border-radius:20px;border:1px solid var(--gray-200);font-weight:600;}
-.pill.active{background:var(--blue-light);color:var(--blue-dark);border-color:rgba(200,160,60,.3);}
+.pill.active{background:var(--blue-light);color:var(--blue-dark);border-color:rgba(37,99,235,.3);}
 .tabs{display:flex;gap:4px;background:var(--white);border-radius:var(--radius);padding:5px;
   margin-bottom:18px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);}
 .tab{flex:1;padding:9px;text-align:center;font-family:var(--display);font-size:.8rem;font-weight:700;
   color:var(--gray-500);cursor:pointer;border-radius:9px;transition:all .2s;border:none;background:transparent;}
 .tab:hover{color:var(--blue);background:var(--blue-light);}
-.tab.active{background:var(--blue);color:var(--white);box-shadow:0 2px 8px rgba(200,160,60,.4);}
+.tab.active{background:var(--blue);color:var(--white);box-shadow:0 2px 8px rgba(37,99,235,.4);}
 .panel{display:none;}.panel.active{display:block;}
 .card{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);
   padding:22px 26px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
@@ -108,7 +108,7 @@ code.ok{color:var(--green);background:#F0FDF4;}
 .btn-primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px 20px;
   background:var(--blue);border:none;border-radius:10px;color:var(--white);
   font-family:var(--display);font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;
-  box-shadow:0 4px 12px rgba(200,160,60,.35);margin-top:6px;}
+  box-shadow:0 4px 12px rgba(37,99,235,.35);margin-top:6px;}
 .btn-primary:hover{background:var(--blue-dark);transform:translateY(-1px);}
 .btn-row{display:flex;gap:8px;margin-top:12px;}
 .btn-secondary{display:flex;align-items:center;justify-content:center;gap:8px;
@@ -173,7 +173,7 @@ code.ok{color:var(--green);background:#F0FDF4;}
 .stab.active{background:var(--blue);color:var(--white);border-color:var(--blue);}
 .search-input{width:100%;padding:10px 14px;background:var(--white);border:1.5px solid var(--gray-200);
   border-radius:10px;color:var(--gray-900);font-size:.84rem;outline:none;transition:border-color .2s;margin-bottom:10px;}
-.search-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(200,160,60,.15);}
+.search-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.15);}
 .search-results{max-height:360px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);}
 .sr-item{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background .15s;}
 .sr-item:last-child{border-bottom:none;}.sr-item:hover{background:var(--blue-light);}
@@ -185,7 +185,7 @@ code.ok{color:var(--green);background:#F0FDF4;}
 .hidden{display:none!important;}
 .copied-toast{position:fixed;bottom:24px;right:24px;background:var(--blue);color:var(--white);
   font-family:var(--display);font-size:.79rem;font-weight:700;padding:10px 18px;border-radius:10px;
-  opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;box-shadow:0 4px 16px rgba(200,160,60,.4);}
+  opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;box-shadow:0 4px 16px rgba(37,99,235,.4);}
 .copied-toast.show{opacity:1;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--gray-100);}
@@ -203,7 +203,7 @@ body.dark .login-card{background:#1E2A35;border-color:#243040;}
 body.dark .form-input{background:#161F28;border-color:#2E3D50;color:#E8F2FA;}
 body.dark .auth-msg.error{background:#3A1A1A;border-color:#7B2020;}
 body.dark .auth-msg.success{background:#1A3A20;border-color:#207B30;}
-body.dark code{background:#1A3040;color:#C8A03C;}
+body.dark code{background:#1A3040;color:#60A5FA;}
 body.dark code.bad{background:#3A1A1A;color:#EF4444;}
 body.dark code.ok{background:#1A3A20;color:#22C55E;}
 body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
@@ -213,7 +213,7 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
   padding:10px;background:var(--white);border:1.5px solid var(--gray-200);border-radius:10px;
   color:var(--gray-700);font-family:var(--display);font-size:.85rem;font-weight:700;
   cursor:pointer;transition:all .2s;margin-top:8px;}
-.btn-google:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(200,160,60,.2);}
+.btn-google:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(37,99,235,.2);}
 .divider{display:flex;align-items:center;gap:8px;margin:12px 0;}
 .divider hr{flex:1;border:none;border-top:1px solid var(--gray-200);}
 .divider span{font-size:.72rem;color:var(--gray-400);white-space:nowrap;}
@@ -246,31 +246,30 @@ body.dark .warn-box{background:#2A2000;border-color:#6B4A00;}
 .coming-soon h3{font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--gray-700);margin-bottom:6px;}
 .coming-soon p{font-size:.82rem;line-height:1.6;}
 
-/* ── REDISEÑO DACP (dorado / oscuro) ── */
-.brand-logo{font-family:var(--display);font-weight:800;font-size:1.7rem;letter-spacing:.08em;color:var(--blue);text-shadow:0 1px 3px rgba(0,0,0,.5);line-height:1;}
-.brand-logo-lg{display:inline-block;font-size:2.2rem;letter-spacing:.1em;margin-bottom:8px;text-shadow:none;}
-header{background:linear-gradient(100deg,var(--dark) 0%,#4a3c12 55%,var(--blue) 140%)!important;border:1px solid rgba(0,0,0,.25)!important;}
-header .header-titles h1{color:#F4EACD!important;}
-header .header-titles h1 span{color:#E8C766!important;}
-header .header-titles p{color:#CDBF98!important;}
-header .user-email{color:#E7DCBE!important;}
-header .version-badge{background:rgba(255,255,255,.14)!important;color:#F0DFA0!important;border-color:rgba(240,223,160,.4)!important;}
-header .btn-logout{background:rgba(255,255,255,.10)!important;border-color:rgba(255,255,255,.28)!important;color:#F0E8D0!important;}
+/* ── REDISEÑO RIPS (blanco / azul) ── */
+.brand-logo{display:flex;align-items:center;line-height:1;}
+.brand-logo svg{display:block;}
+.brand-logo-lg{display:inline-flex;margin-bottom:8px;}
+header{background:linear-gradient(100deg,var(--dark) 0%,var(--dark-2) 55%,var(--blue) 140%)!important;border:1px solid rgba(0,0,0,.1)!important;}
+header .header-titles h1{color:#FFFFFF!important;}
+header .header-titles h1 span{color:#BFDBFE!important;}
+header .header-titles p{color:#CBDCF5!important;}
+header .user-email{color:#E3ECFB!important;}
+header .version-badge{background:rgba(255,255,255,.16)!important;color:#EAF2FF!important;border-color:rgba(255,255,255,.35)!important;}
+header .btn-logout{background:rgba(255,255,255,.10)!important;border-color:rgba(255,255,255,.28)!important;color:#EAF2FF!important;}
 header .btn-logout:hover{background:rgba(224,83,61,.35)!important;border-color:var(--red)!important;color:#fff!important;}
-header .pill{background:rgba(255,255,255,.12)!important;color:#D9CDA6!important;border-color:rgba(255,255,255,.2)!important;}
-header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!important;border-color:rgba(240,223,160,.45)!important;}
-.nav-item.active,.tab.active,.btn-primary,.btn-login{color:#23200F!important;}
+header .pill{background:rgba(255,255,255,.14)!important;color:#D6E4FA!important;border-color:rgba(255,255,255,.24)!important;}
+header .pill.active{background:rgba(255,255,255,.26)!important;color:#FFFFFF!important;border-color:rgba(255,255,255,.5)!important;}
+.nav-item.active,.tab.active,.btn-primary,.btn-login{color:#fff!important;}
 .panel.active{animation:dacpFade .28s ease both;}@keyframes dacpFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}.card{transition:box-shadow .2s ease,transform .2s ease;}.nav-item,.btn-primary,.btn-login,.upload-btn,.btn-secondary,.btn-logout{transition:all .2s ease;}.stat{transition:transform .15s ease;}.stat:hover{transform:translateY(-2px);}
 
-.hl-chip{font-family:var(--display);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:20px;border:1.5px solid var(--gray-200);background:#fff;color:var(--gray-700);cursor:pointer;transition:all .15s;}.hl-chip:hover{border-color:var(--blue);}.hl-chip.active{background:var(--blue);color:#23200F;border-color:var(--blue);}.hl-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.73rem;padding:8px 14px;border-bottom:1px solid var(--gray-100);}.hl-tag{background:var(--blue-light);color:var(--blue-dark);border-radius:4px;padding:0 6px;font-weight:700;font-size:.66rem;}.hl-file{font-family:var(--mono);font-weight:700;color:var(--blue-dark);font-size:.7rem;}.hl-mut{color:var(--gray-500);font-size:.69rem;}.hl-old{color:var(--red);text-decoration:line-through;}.hl-new{color:var(--green);font-weight:700;}.hl-arr{color:var(--gray-400);}.rule-item[title],.pill[title]{cursor:help;}
+.hl-chip{font-family:var(--display);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:20px;border:1.5px solid var(--gray-200);background:#fff;color:var(--gray-700);cursor:pointer;transition:all .15s;}.hl-chip:hover{border-color:var(--blue);}.hl-chip.active{background:var(--blue);color:#fff;border-color:var(--blue);}.hl-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.73rem;padding:8px 14px;border-bottom:1px solid var(--gray-100);}.hl-tag{background:var(--blue-light);color:var(--blue-dark);border-radius:4px;padding:0 6px;font-weight:700;font-size:.66rem;}.hl-file{font-family:var(--mono);font-weight:700;color:var(--blue-dark);font-size:.7rem;}.hl-mut{color:var(--gray-500);font-size:.69rem;}.hl-old{color:var(--red);text-decoration:line-through;}.hl-new{color:var(--green);font-weight:700;}.hl-arr{color:var(--gray-400);}.rule-item[title],.pill[title]{cursor:help;}
 
 /* ── TEMA OSCURO: superficies claras hardcodeadas ── */
-.warn-box{background:#2a2208!important;border-color:#5c4a12!important;color:#E6C97A!important;}
 .search-input,#hl-search,input[type=text],input[type=number],input[type=password],input[type=email],select,textarea{background:var(--white)!important;color:var(--gray-900)!important;border-color:var(--gray-200)!important;}
 .search-results{background:var(--white);}.sr-item:hover{background:var(--gray-100);}
 .hl-chip{background:var(--white)!important;}
-#cv-result,#cc-result{background:#13251a!important;border-color:#235c34!important;}
-.copied-toast{color:#23200F;}
+body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-color:#235c34!important;}
 </style>
 </head>
 <body>
@@ -281,7 +280,16 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
 <div class="wrap">
   <header>
     <div class="header-left">
-      <div class="brand-logo">DACP</div>
+      <div class="brand-logo" title="RIPS" aria-label="RIPS">
+        <svg width="38" height="38" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg" role="img">
+          <rect width="38" height="38" rx="9" fill="#ffffff" fill-opacity=".16"/>
+          <path d="M10 8.5A2.5 2.5 0 0 1 12.5 6h9L28 12.5V29.5A2.5 2.5 0 0 1 25.5 32h-13A2.5 2.5 0 0 1 10 29.5v-21z" fill="#ffffff"/>
+          <path d="M21.5 6v4.5A2 2 0 0 0 23.5 12.5H28z" fill="#DBEAFE"/>
+          <path d="M13.5 16.5h9M13.5 20h11M13.5 23.5h6.5" stroke="#2563EB" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="24.5" cy="26" r="6.4" fill="#16A34A" stroke="#ffffff" stroke-width="1.4"/>
+          <path d="M21.7 26.1l1.9 1.9 3.3-3.7" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
       <div class="header-titles">
         <h1><span>Validador y Corrector RIPS</span></h1>
         <p>Facturación Electrónica en Salud</p>
@@ -400,7 +408,7 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
       <p class="card-sub">Genera el JSON RIPS para facturación de cualquier convenio (medicina prepagada, pólizas, particular, contributivo, subsidiado, etc.). Carga el XML de la factura y el Excel de pacientes.</p>
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
-          <span id="cvn1" style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(200,160,60,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">1</span>
+          <span id="cvn1" style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">1</span>
           <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Cargar XML de la factura</span>
           <span id="cvs1" style="font-size:.72rem;color:var(--gray-400);">Pendiente</span>
         </div>
@@ -420,7 +428,7 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
       </div>
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
-          <span id="cvn2" style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(200,160,60,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">2</span>
+          <span id="cvn2" style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">2</span>
           <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Cargar Excel de pacientes</span>
           <span id="cvs2" style="font-size:.72rem;color:var(--gray-400);">Pendiente</span>
         </div>
@@ -438,12 +446,12 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
       </div>
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
-          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(200,160,60,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">3</span>
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">3</span>
           <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">CSV pacientes <em style="font-weight:400;font-size:.76rem;color:var(--gray-400);">— opcional</em></span>
           <span id="cvs3" style="font-size:.72rem;color:var(--gray-400);">Opcional</span>
         </div>
         <div style="padding:12px 16px;">
-          <div style="background:var(--blue-light);border:1px solid rgba(200,160,60,.2);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:10px;">ℹ️ Completa <strong>fecha de nacimiento</strong> y <strong>sexo</strong>. Sin este archivo se usa 1980-01-01 / M.</div>
+          <div style="background:var(--blue-light);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:10px;">ℹ️ Completa <strong>fecha de nacimiento</strong> y <strong>sexo</strong>. Sin este archivo se usa 1980-01-01 / M.</div>
           <div onclick="document.getElementById('cvi3').click()" style="border:2px dashed var(--gray-300);border-radius:8px;padding:18px;text-align:center;cursor:pointer;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-300)'">
             <input type="file" id="cvi3" accept=".csv,.txt" style="display:none">
             <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> para cargar CSV</div>
@@ -453,7 +461,7 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
       </div>
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
-          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(200,160,60,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">4</span>
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">4</span>
           <span style="font-family:var(--display);font-weight:700;font-size:.85rem;">Configuración del prestador</span>
         </div>
         <div style="padding:12px 16px;">
@@ -527,7 +535,7 @@ header .pill.active{background:rgba(232,199,102,.22)!important;color:#F0DFA0!imp
         <div style="font-size:.8rem;color:var(--gray-400);">⏳ Carga el XML y el Excel para ver las validaciones</div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button id="cv-btn" onclick="cvGenerar()" disabled style="padding:11px 22px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-family:var(--display);font-size:.85rem;font-weight:700;cursor:pointer;opacity:.4;box-shadow:0 4px 12px rgba(200,160,60,.35);">⚡ Generar JSON RIPS</button>
+        <button id="cv-btn" onclick="cvGenerar()" disabled style="padding:11px 22px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-family:var(--display);font-size:.85rem;font-weight:700;cursor:pointer;opacity:.4;box-shadow:0 4px 12px rgba(37,99,235,.35);">⚡ Generar JSON RIPS</button>
         <button onclick="cvLimpiar()" style="padding:11px 18px;background:var(--white);border:1.5px solid var(--gray-200);border-radius:10px;font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--gray-500);cursor:pointer;">🗑️ Limpiar</button>
       </div>
       <div id="cv-result" style="display:none;margin-top:14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:18px;">
@@ -1006,24 +1014,24 @@ function buildReporteHTML(){
   });
   var css='*{box-sizing:border-box;}body{font-family:"Nunito Sans",Arial,sans-serif;color:#1A2E3D;margin:0;background:#F8FAFC;}'
     +'.wrap{max-width:1000px;margin:0 auto;padding:24px;}'
-    +'header{background:linear-gradient(100deg,#161616,#4a3c12 55%,#C8A03C 140%);color:#F4EACD;padding:20px 24px;border-radius:12px;margin-bottom:18px;}'
+    +'header{background:linear-gradient(100deg,#1E3A8A,#1D4ED8 55%,#2563EB 140%);color:#FFFFFF;padding:20px 24px;border-radius:12px;margin-bottom:18px;}'
     +'header h1{margin:0;font-size:1.25rem;}header p{margin:5px 0 0;opacity:.92;font-size:.83rem;}'
     +'.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}'
     +'.kpi{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:12px 16px;flex:1;min-width:110px;}'
-    +'.kpi b{display:block;font-size:1.5rem;color:#96751B;}.kpi span{font-size:.72rem;color:#6B8599;}'
+    +'.kpi b{display:block;font-size:1.5rem;color:#1D4ED8;}.kpi span{font-size:.72rem;color:#6B8599;}'
     +'section{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:14px 18px;margin-bottom:14px;}'
-    +'section h2{font-size:.9rem;margin:0 0 10px;font-family:"Courier New",monospace;color:#96751B;}'
+    +'section h2{font-size:.9rem;margin:0 0 10px;font-family:"Courier New",monospace;color:#1D4ED8;}'
     +'table{width:100%;border-collapse:collapse;font-size:.8rem;margin:0 0 8px;}'
-    +'th{background:#FBF3DC;color:#96751B;text-align:left;padding:7px 9px;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;}'
+    +'th{background:#EFF6FF;color:#1D4ED8;text-align:left;padding:7px 9px;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;}'
     +'td{padding:7px 9px;border-top:1px solid #F0F4F8;vertical-align:top;}'
     +'code{font-family:"Courier New",monospace;background:#F0F4F8;padding:1px 5px;border-radius:4px;font-size:.78rem;}'
     +'.old{color:#EF4444;text-decoration:line-through;}.new{color:#16A34A;font-weight:700;}'
-    +'.tag{background:#FBF3DC;color:#96751B;border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700;}'
+    +'.tag{background:#EFF6FF;color:#1D4ED8;border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700;}'
     +'.pend th{background:#FFFBEB;color:#92400E;}.none{color:#6B8599;font-size:.8rem;margin:0;}'
     +'.excsec{border-color:#FED7AA;}.excsec h2{color:#EA580C;}.excsec th{background:#FFF7ED;color:#9A3412;}'
     +'@media print{body{background:#fff;}header,.kpi,th,.tag{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
   return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reporte de hallazgos RIPS</title><style>'+css+'</style></head><body><div class="wrap">'
-    +'<header><h1>Reporte de hallazgos · Corrección RIPS</h1><p>DACP · Validador y Corrector RIPS · Generado el '+esc(fecha)+'</p></header>'
+    +'<header><h1>Reporte de hallazgos · Corrección RIPS</h1><p>Validador y Corrector RIPS · Generado el '+esc(fecha)+'</p></header>'
     +'<div class="kpis">'
     +'<div class="kpi"><b>'+stats.total+'</b><span>Archivos procesados</span></div>'
     +'<div class="kpi"><b>'+nFiles+'</b><span>Con cambios</span></div>'
