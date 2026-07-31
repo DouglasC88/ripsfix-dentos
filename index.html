@@ -1386,7 +1386,9 @@ function pad5(v){v=String(v==null?'':v).trim().replace(/\.0$/,'');return /^\d{1,
 var CSERV_CUPS={'234201':347,'893106':338,'242301':343,'242103':343,'237303':311,'231201':371,'231301':371};
 function csServ(cups,raw){var v=parseInt(raw,10);if(v&&v!==500)return v;return CSERV_CUPS[String(cups)]||334;}
 // Concepto de recaudo 04 (anticipos) solo aplica en la FEV, nunca en el RIPS soporte (Doc. Técnico 1, Res. 948/2026).
-function concRec(v,def){var c=pad2(v);return c==='04'?null:(c||def||'05');}
+// RVC060: si el concepto es 01 (cuota moderadora) o 03 (pagos compartidos), el valor pago moderador debe ser >=1.
+// Si el Excel no trae concepto explícito y no hubo copago real, no se fuerza ese concepto (queda sin dato).
+function concRec(v,def,vpm){var c=pad2(v);if(c==='04')return null;if(c)return c;if((def==='01'||def==='03')&&!(vpm>0))return null;return def||'05';}
 window.cvGenerar=function(){
   if(!vX||!vR)return;
   var inp=document.getElementById('cv-numfact');
@@ -1404,8 +1406,8 @@ window.cvGenerar=function(){
       if(vX.st&&ft.substring(0,10)<vX.st)ft=vX.st+' 00:00';if(vX.en&&ft.substring(0,10)>vX.en)ft=vX.en+' 00:00';
       var au=ca(rw.aut);var cups=cups6(rw.cups);var esCons=String(rw.tipo||'').trim()?(rw.tipo.toLowerCase().indexOf('consulta')>-1):ic(cups);
       var docProf=(rw.prof&&/^\d{4,15}$/.test(rw.prof))?rw.prof:pf;
-      if(esCons){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',causaMotivoAtencion:pad2(rw.causa)||'26',codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:pad2(rw.tdx)||'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:docProf,vrServicio:rw.valor,valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,conceptoRecaudo:concRec(rw.con,conDef),consecutivo:ci2++});}
-      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:pad2(rw.via)||'01',modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:docProf,codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:concRec(rw.con,conDef),valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,consecutivo:pi++});}
+      if(esCons){cs.push({codPrestador:pr,fechaInicioAtencion:ft,numAutorizacion:au,codConsulta:cups,modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',causaMotivoAtencion:pad2(rw.causa)||'26',codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado1:null,codDiagnosticoRelacionado2:null,codDiagnosticoRelacionado3:null,tipoDiagnosticoPrincipal:pad2(rw.tdx)||'02',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:docProf,vrServicio:rw.valor,valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,conceptoRecaudo:concRec(rw.con,conDef,rw.vpm),consecutivo:ci2++});}
+      else{ps.push({codPrestador:pr,fechaInicioAtencion:ft,idMIPRES:null,numAutorizacion:au,codProcedimiento:cups,viaIngresoServicioSalud:pad2(rw.via)||'01',modalidadGrupoServicioTecSal:pad2(rw.mod)||'01',grupoServicios:pad2(rw.grupo)||'01',codServicio:csServ(cups,rw.cserv),finalidadTecnologiaSalud:pad2(rw.fin)||'15',tipoDocumentoIdentificacion:'CC',numDocumentoIdentificacion:docProf,codDiagnosticoPrincipal:dx,codDiagnosticoRelacionado:null,codComplicacion:null,vrServicio:rw.valor,conceptoRecaudo:concRec(rw.con,conDef,rw.vpm),valorPagoModerador:rw.vpm||0,numFEVPagoModerador:null,consecutivo:pi++});}
     });
     return{tipoDocumentoIdentificacion:p.td||'CC',numDocumentoIdentificacion:p.doc,tipoUsuario:tu,fechaNacimiento:nac,codSexo:sx,codPaisResidencia:'170',codMunicipioResidencia:pad5(p.mun||mn),codZonaTerritorialResidencia:'01',incapacidad:'NO',codPaisOrigen:'170',consecutivo:idx+1,servicios:{consultas:cs.length?cs:null,procedimientos:ps.length?ps:null}};
   });
