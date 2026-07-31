@@ -422,7 +422,7 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
           <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <label style="font-size:.78rem;font-weight:700;color:var(--gray-700);white-space:nowrap;">Número de factura:</label>
             <input id="cv-numfact" type="text" placeholder="Ej: FACT_19620 o DEN119598" style="flex:1;min-width:180px;padding:7px 10px;border:1.5px solid var(--blue);border-radius:8px;font-family:var(--mono);font-size:.82rem;outline:none;background:var(--white);color:var(--gray-900);">
-            <span style="font-size:.7rem;color:var(--gray-400);">Reemplaza el UUID del XML</span>
+            <span style="font-size:.7rem;color:var(--gray-400);">Se autocompleta desde el XML (ParentDocumentID); edítalo solo si es distinto</span>
           </div>
         </div>
       </div>
@@ -1150,7 +1150,7 @@ window.cvLX=function(f){
     try{
       var txt=e.target.result;
       function rx1(p,s){var m=s.match(p);return m?m[1].trim():'';}
-      var nF=rx1(/<cbc:ID>([^<]+)/,txt);
+      var nF=rx1(/<cbc:ParentDocumentID>([^<]+)/,txt)||rx1(/<cbc:ID>([^<]+)/,txt);
       var py=parseFloat(rx1(/PayableAmount[^>]*>([^<]+)/,txt))||0;
       var pbS=txt.indexOf('InvoicePeriod'),pbE=txt.indexOf('/InvoicePeriod');
       var pb=pbS>-1?txt.substring(pbS,pbE>-1?pbE:pbS+500):'';
