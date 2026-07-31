@@ -1160,10 +1160,13 @@ window.cvLX=function(f){
       var aId=[],aNm=[];
       while((m2=rId.exec(txt))!==null)aId.push(m2[1].trim());
       while((m2=rNm.exec(txt))!==null)aNm.push(m2[1].trim());
-      vX={nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null};
-      document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+cvI('Factura',nF,'mono')+cvI('Prestador',vX.sNm)+cvI('NIT Prestador',vX.nP,'mono')+cvI('Pagador',vX.cNm)+cvI('NIT Pagador',vX.nC,'mono')+cvI('Periodo',(st||'?')+' a '+(en||'?'),'mono')+cvI('Valor total',fm(py),'green')+'</div>';
+      var cp=rx1(/<Name>CODIGO_PRESTADOR<\/Name>\s*<Value[^>]*>([^<]+)/,txt);
+      vX={nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null};
+      document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+cvI('Factura',nF,'mono')+cvI('Prestador',vX.sNm)+cvI('NIT Prestador',vX.nP,'mono')+cvI('Código habilitación',cp||'no detectado','mono')+cvI('Pagador',vX.cNm)+cvI('NIT Pagador',vX.nC,'mono')+cvI('Periodo',(st||'?')+' a '+(en||'?'),'mono')+cvI('Valor total',fm(py),'green')+'</div>';
       var inp=document.getElementById('cv-numfact');
       if(inp&&!inp.value)inp.value=nF;
+      var prestInp=document.getElementById('cv-prest');
+      if(prestInp&&!prestInp.value.trim()&&cp)prestInp.value=cp;
       sok(1,'OK '+nF);cvUV();
     }catch(er){alert('Error XML: '+er.message);}
   };
@@ -1388,7 +1391,7 @@ window.cvGenerar=function(){
   if(!vX||!vR)return;
   var inp=document.getElementById('cv-numfact');
   if(inp&&inp.value.trim())vX.nF=inp.value.trim();
-  var pr=document.getElementById('cv-prest').value.trim()||'';
+  var pr=document.getElementById('cv-prest').value.trim()||(vX&&vX.cp)||'';
   var pf=document.getElementById('cv-prof').value.trim()||'00000000';
   var mn=document.getElementById('cv-mun').value.trim()||'68001';
   var conv=cvConvenioSel();var tu=conv.tu||'12';var conDef=conv.con||'05';
