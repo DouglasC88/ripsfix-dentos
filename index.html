@@ -531,6 +531,9 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
           </div>
         </div>
       </div>
+      <div style="text-align:center;margin-bottom:12px;">
+        <button onclick="cvRefrescar()" style="padding:9px 18px;background:var(--white);border:1.5px solid var(--blue);border-radius:8px;color:var(--blue);font-family:var(--display);font-size:.82rem;font-weight:700;cursor:pointer;">🔄 Actualizar vista previa y validaciones</button>
+      </div>
       <div id="cv-val" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;padding:14px;margin-bottom:12px;">
         <div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>
         <div style="font-size:.8rem;color:var(--gray-400);">⏳ Carga el XML y el Excel para ver las validaciones</div>
@@ -1183,15 +1186,18 @@ function renderCvMapeo(){var el=document.getElementById('cv-mapeo');if(!el)retur
 function exDate(v){if(v==null||v==='')return '';if(typeof v==='number'&&v>20000){var d=new Date(Math.round((v-25569)*86400000));return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);}var m=String(v).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);return '';}
 function mapSexoCv(s){s=String(s||'').trim().toUpperCase();if(s==='H')return 'M';if(s==='M')return 'M';if(s==='F')return 'F';if(s.indexOf('MASC')===0||s.indexOf('HOMB')===0)return 'M';if(s.indexOf('FEM')===0||s.indexOf('MUJ')===0)return 'F';return '';}
 function cvGet(f){var sel=document.getElementById('cvmap-'+f);if(sel)return parseInt(sel.value);return cvMap[f]==null?-1:cvMap[f];}
+window.cvRefrescar=function(){cvApplyMap();};
 function cvApplyMap(){if(!cvRows.length)return;vR=[];for(var j=cvHi+1;j<cvRows.length;j++){var r=cvRows[j];if(!r)continue;var g=function(f){var i=cvGet(f);return(i>=0&&i<r.length)?r[i]:'';};var fn=function(f){return String(g(f)).trim().replace(/\.0$/,'');};var doc=fn('doc'),cups=fn('cups');if(!doc&&!cups)continue;vR.push({doc:doc,td:fn('td')||'CC',nombre:[g('ape1'),g('ape2'),g('nom1'),g('nom2')].map(function(x){return String(x||'').trim();}).join(' ').replace(/\s+/g,' ').trim(),nac:exDate(g('nac')),sexo:String(g('sexo')).trim(),tu:fn('tu'),mun:fn('mun'),fecha:g('fecha'),prof:fn('prof'),aut:fn('aut2')||fn('aut'),cups:cups,dx:String(g('dx')).trim().toUpperCase(),causa:fn('causa'),tdx:fn('tdx'),cserv:fn('cserv'),fin:fn('fin'),mod:fn('mod'),via:fn('via'),grupo:fn('grupo'),valor:parseFloat(String(g('valor')).replace(/[^0-9.]/g,''))||0,con:fn('con'),vpm:parseFloat(String(g('vpm')).replace(/[^0-9.]/g,''))||0,tipo:String(g('tipo')).trim()});}var out=document.getElementById('cvxlout');renderCvPreview();if(!vR.length){if(out)out.innerHTML='<div style="font-size:.76rem;color:var(--red);margin-top:8px;">No se detectaron filas. Revisa el mapeo (Documento y CUPS).</div>';return;}var pacs={};vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={total:0,n:0};pacs[rw.doc].total+=rw.valor;pacs[rw.doc].n++;});var nPac=Object.keys(pacs).length,tot=vR.reduce(function(a,r){return a+r.valor;},0);if(out)out.innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+cvI('Pacientes',''+nPac,'mono')+cvI('Servicios',''+vR.length,'mono')+cvI('Total',fm(tot),'')+'</div>';cvUV();}
 function renderCvPreview(){
   var el=document.getElementById('cv-preview');if(!el)return;
   if(!vR||!vR.length){el.style.display='none';el.innerHTML='';return;}
-  var cols=[['doc','Documento'],['nombre','Nombre'],['nac','Nac.'],['fecha','Fecha atención'],['prof','Dr.'],['aut','Autorización'],['cups','CUPS'],['dx','Dx'],['valor','Valor'],['con','Concepto']];
+  var pf=(document.getElementById('cv-prof')||{}).value||'';
+  var conv=(typeof cvConvenioSel==='function')?cvConvenioSel():{con:'05'};
+  var cols=[['doc','Documento'],['nombre','Nombre'],['nac','Nac.'],['fecha','Fecha atención'],['prof','Dr. (final)'],['aut','Autorización'],['cups','CUPS'],['dx','Dx'],['valor','Valor'],['con','Concepto (final)']];
   var n=Math.min(5,vR.length);
   var h='<div style="border:1px solid var(--gray-200);border-radius:10px;margin-top:10px;padding:12px 14px;overflow-x:auto;">';
   h+='<div style="font-family:var(--display);font-weight:700;font-size:.82rem;margin-bottom:4px;">Vista previa (primeras '+n+' de '+vR.length+' filas)</div>';
-  h+='<div style="font-size:.72rem;color:var(--gray-500);margin-bottom:10px;">Así va a quedar leído cada campo con el mapeo actual. Una celda en rojo "(vacío)" significa que ese dato NO se está tomando.</div>';
+  h+='<div style="font-size:.72rem;color:var(--gray-500);margin-bottom:10px;">Así va a quedar CADA CAMPO ya resuelto (con respaldos y valores por defecto aplicados) — es lo mismo que sale en el JSON. Una celda en rojo "(vacío)" significa que ese dato NO se está tomando.</div>';
   h+='<table style="width:100%;border-collapse:collapse;font-size:.72rem;white-space:nowrap;"><thead><tr>';
   cols.forEach(function(c){h+='<th style="text-align:left;padding:4px 8px;border-bottom:1.5px solid var(--gray-200);color:var(--gray-500);font-weight:700;">'+esc(c[1])+'</th>';});
   h+='</tr></thead><tbody>';
@@ -1202,6 +1208,8 @@ function renderCvPreview(){
       var v=rw[c[0]];
       if(c[0]==='fecha')v=exDate(v);
       if(c[0]==='valor')v=v?fm(v):'';
+      if(c[0]==='prof')v=(rw.prof&&/^\d{4,15}$/.test(rw.prof))?rw.prof:pf;
+      if(c[0]==='con')v=(typeof concRec==='function')?concRec(rw.con,conv.con,rw.vpm):rw.con;
       var empty=(v==null||v==='');
       h+='<td style="padding:4px 8px;border-bottom:1px solid var(--gray-100);'+(empty?'color:var(--red);font-style:italic;':'')+'">'+(empty?'(vacío)':esc(String(v)))+'</td>';
     });
