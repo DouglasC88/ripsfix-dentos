@@ -1119,6 +1119,7 @@ document.addEventListener('DOMContentLoaded',function(){
   var i3=document.getElementById('cvi3');if(i3)i3.addEventListener('change',function(){if(this.files[0])cvLC(this.files[0]);});
   var tm=document.getElementById('cv-tusr-manual');if(tm)tm.addEventListener('change',function(){if(typeof cvUV==='function')cvUV();});
   var cm=document.getElementById('cv-con-manual');if(cm)cm.addEventListener('change',function(){if(typeof cvUV==='function')cvUV();});
+  ['cv-prest','cv-prof','cv-mun'].forEach(function(id){var e=document.getElementById(id);if(e)e.addEventListener('input',function(){if(typeof cvUV==='function')cvUV();});});
   window.cvConvenioChange&&window.cvConvenioChange();
 });
 var CONCEPTO_NOMBRES={'01':'Cuota moderadora','02':'Copago','03':'Pagos compartidos (planes voluntarios)','05':'Otro / no aplica'};
