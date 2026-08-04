@@ -1425,7 +1425,7 @@ function csServ(cups,raw){var v=parseInt(raw,10);if(v&&v!==500)return v;return C
 // RVC060: si el concepto es 01 (cuota moderadora) o 03 (pagos compartidos), el valor pago moderador debe ser >=1.
 // Si el Excel no trae concepto explícito y no hubo copago real, no se fuerza ese concepto (queda sin dato).
 // conceptoRecaudo es obligatorio (RVG01): nunca debe quedar null. RVC060 exige valorPagoModerador>=1 si el concepto es 01/03.
-function concRec(v,def,vpm){var c=pad2(v);if(c&&c!=='04')return c;if((def==='01'||def==='03')&&!(vpm>0))return'05';return def||'05';}
+function concRec(v,def,vpm){var c=pad2(v);if(c&&c!=='04'){if((c==='01'||c==='03')&&!(vpm>0))return'05';return c;}if((def==='01'||def==='03')&&!(vpm>0))return'05';return def||'05';}
 window.cvGenerar=function(){
   if(!vX||!vR)return;
   var inp=document.getElementById('cv-numfact');
