@@ -268,7 +268,7 @@ header .pill.active{background:rgba(255,255,255,.26)!important;color:#FFFFFF!imp
 /* ── TEMA OSCURO: superficies claras hardcodeadas ── */
 .search-input,#hl-search,input[type=text],input[type=number],input[type=password],input[type=email],select,textarea{background:var(--white)!important;color:var(--gray-900)!important;border-color:var(--gray-200)!important;}
 .search-results{background:var(--white);}.sr-item:hover{background:var(--gray-100);}
-.hl-chip{background:var(--white)!important;}
+.hl-chip:not(.active){background:var(--white)!important;}
 body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-color:#235c34!important;}
 </style>
 </head>
@@ -403,6 +403,11 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
 
   <!-- RIPS CONVENIOS -->
   <div class="panel" id="tab-convenios">
+    <div>
+      <span class="stab active" id="cvtab-gen" onclick="cvSwitchMode('gen')">⚡ Generar JSON</span>
+      <span class="stab" id="cvtab-rev" onclick="cvSwitchMode('rev')">🔎 Revisar y corregir JSON</span>
+    </div>
+    <div id="cv-mode-gen">
     <div class="card">
       <div class="card-title">🤝 RIPS Convenios</div>
       <p class="card-sub">Genera el JSON RIPS para facturación de cualquier convenio (medicina prepagada, pólizas, particular, contributivo, subsidiado, etc.). Carga el XML de la factura y el Excel de pacientes.</p>
@@ -550,6 +555,101 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
           <button onclick="cvCopiar()" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--gray-500);cursor:pointer;">📋 Copiar</button>
         </div>
       </div>
+    </div>
+    </div>
+
+    <!-- ── REVISAR Y CORREGIR JSON ── -->
+    <div id="cv-mode-rev" style="display:none;">
+    <div class="card">
+      <div class="card-title">🔎 Revisar y corregir JSON de convenios</div>
+      <p class="card-sub">Carga el JSON RIPS que ya exportaste (por ejemplo desde Dentos). Se valida campo por campo contra la Resolución 948/2026 (Documento Técnico 1), se corrige automáticamente lo corregible y obtienes un reporte de errores para lo que debe arreglarse en el origen.</p>
+
+      <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
+          <span id="rvn1" style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">1</span>
+          <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Cargar JSON RIPS</span>
+          <span id="rvs1" style="font-size:.72rem;color:var(--gray-400);">Pendiente</span>
+        </div>
+        <div style="padding:12px 16px;">
+          <div onclick="document.getElementById('rvi-json').click()" style="border:2px dashed var(--gray-300);border-radius:8px;padding:22px;text-align:center;cursor:pointer;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-300)'">
+            <input type="file" id="rvi-json" accept=".json" multiple style="display:none">
+            <div style="font-size:22px;margin-bottom:5px;">🧾</div>
+            <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> o arrastra uno o varios JSON</div>
+          </div>
+          <div id="rv-json-list"></div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
+          <span id="rvn2" style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">2</span>
+          <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Cargar XML de la factura <em style="font-weight:400;font-size:.76rem;color:var(--gray-400);">— opcional</em></span>
+          <span id="rvs2" style="font-size:.72rem;color:var(--gray-400);">Opcional</span>
+        </div>
+        <div style="padding:12px 16px;">
+          <div style="background:var(--blue-light);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:10px;">ℹ️ Con el XML se verifica además el <strong>número de factura</strong>, el <strong>NIT del prestador</strong>, el <strong>valor total</strong> y que las <strong>fechas de atención</strong> caigan dentro del período facturado. Se empareja con el JSON por nombre de archivo o por número de factura.</div>
+          <div onclick="document.getElementById('rvi-xml').click()" style="border:2px dashed var(--gray-300);border-radius:8px;padding:18px;text-align:center;cursor:pointer;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-300)'">
+            <input type="file" id="rvi-xml" accept=".xml" multiple style="display:none">
+            <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> para cargar los XML</div>
+          </div>
+          <div id="rv-xml-list"></div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">3</span>
+          <span style="font-family:var(--display);font-weight:700;font-size:.85rem;">Qué debe cumplir el archivo</span>
+        </div>
+        <div style="padding:12px 16px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Tipo de usuario esperado</label>
+              <select id="rv-tu" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+                <option value="">No verificar (dejar el del archivo)</option>
+                <option value="01">01 — Contributivo cotizante</option>
+                <option value="02">02 — Contributivo beneficiario</option>
+                <option value="03">03 — Contributivo adicional</option>
+                <option value="04">04 — Subsidiado</option>
+                <option value="05">05 — No afiliado (PPNA / vinculados)</option>
+                <option value="06">06 — Especial o Excepción cotizante</option>
+                <option value="07">07 — Especial o Excepción beneficiario</option>
+                <option value="13">13 — Especial/Excepción no cotizante (Ley 352/1997)</option>
+                <option value="08">08 — PPL a cargo del Fondo Nacional de Salud</option>
+                <option value="09">09 — Tomador/Amparado ARL</option>
+                <option value="10">10 — Tomador/Amparado SOAT</option>
+                <option value="11">11 — Planes Voluntarios de Salud (prepagada, pólizas, complementario)</option>
+                <option value="12">12 — Particular</option>
+              </select>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Si lo eliges, todos los usuarios quedan con ese tipo (es lo que exige el convenio).</div></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Concepto de recaudo por defecto</label>
+              <select id="rv-con" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+                <option value="05" selected>05 — Otro / no aplica</option>
+                <option value="02">02 — Copago</option>
+                <option value="01">01 — Cuota moderadora (solo Contributivo)</option>
+                <option value="03">03 — Pagos compartidos (planes voluntarios)</option>
+              </select>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Se usa cuando el concepto viene vacío o inválido.</div></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Código habilitación esperado</label>
+              <input id="rv-prest" type="text" placeholder="Se toma del XML si lo cargas" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">CC odontólogo (respaldo)</label>
+              <input id="rv-prof" type="text" placeholder="Solo si el JSON lo trae vacío" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Municipio pacientes (respaldo)</label>
+              <input id="rv-mun" type="text" value="68001" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
+          </div>
+          <label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:.8rem;color:var(--gray-700);cursor:pointer;">
+            <input type="checkbox" id="rv-fix" checked style="margin-top:2px;">
+            <span><strong>Aplicar correcciones automáticas</strong> y dejar el JSON listo para descargar.<br><span style="font-size:.72rem;color:var(--gray-400);">Si lo desactivas, solo se audita: todo se reporta como error o advertencia y no se modifica nada.</span></span>
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button id="rv-btn" onclick="rvAnalizar()" disabled style="padding:11px 22px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-family:var(--display);font-size:.85rem;font-weight:700;cursor:pointer;opacity:.4;box-shadow:0 4px 12px rgba(37,99,235,.35);">🔎 Analizar y corregir</button>
+        <button onclick="rvLimpiar()" style="padding:11px 18px;background:var(--white);border:1.5px solid var(--gray-200);border-radius:10px;font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--gray-500);cursor:pointer;">🗑️ Limpiar</button>
+      </div>
+
+      <div id="rv-result" style="display:none;margin-top:16px;"></div>
+    </div>
     </div>
   </div>
 
@@ -1149,24 +1249,27 @@ window.cvConvenioChange=function(){
   }
   if(typeof cvUV==='function')cvUV();
 };
+function cvXmlInfo(txt){
+  function rx1(p,s){var m=s.match(p);return m?m[1].trim():'';}
+  var nF=rx1(/<cbc:ParentDocumentID>([^<]+)/,txt)||rx1(/<cbc:ID>([^<]+)/,txt);
+  var py=parseFloat(rx1(/PayableAmount[^>]*>([^<]+)/,txt))||0;
+  var pbS=txt.indexOf('InvoicePeriod'),pbE=txt.indexOf('/InvoicePeriod');
+  var pb=pbS>-1?txt.substring(pbS,pbE>-1?pbE:pbS+500):'';
+  var st=rx1(/StartDate[^>]*>([^<]+)/,pb||txt);
+  var en=rx1(/EndDate[^>]*>([^<]+)/,pb||txt);
+  var rId=/CompanyID[^>]*>([0-9]{6,15})/g,rNm=/RegistrationName[^>]*>([^<]{3,80})/g,m2;
+  var aId=[],aNm=[];
+  while((m2=rId.exec(txt))!==null)aId.push(m2[1].trim());
+  while((m2=rNm.exec(txt))!==null)aNm.push(m2[1].trim());
+  var cp=rx1(/<Name>CODIGO_PRESTADOR<\/Name>\s*<Value[^>]*>([^<]+)/,txt);
+  return{nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null};
+}
 window.cvLX=function(f){
   var rd=new FileReader();
   rd.onload=function(e){
     try{
-      var txt=e.target.result;
-      function rx1(p,s){var m=s.match(p);return m?m[1].trim():'';}
-      var nF=rx1(/<cbc:ParentDocumentID>([^<]+)/,txt)||rx1(/<cbc:ID>([^<]+)/,txt);
-      var py=parseFloat(rx1(/PayableAmount[^>]*>([^<]+)/,txt))||0;
-      var pbS=txt.indexOf('InvoicePeriod'),pbE=txt.indexOf('/InvoicePeriod');
-      var pb=pbS>-1?txt.substring(pbS,pbE>-1?pbE:pbS+500):'';
-      var st=rx1(/StartDate[^>]*>([^<]+)/,pb||txt);
-      var en=rx1(/EndDate[^>]*>([^<]+)/,pb||txt);
-      var rId=/CompanyID[^>]*>([0-9]{6,15})/g,rNm=/RegistrationName[^>]*>([^<]{3,80})/g,m2;
-      var aId=[],aNm=[];
-      while((m2=rId.exec(txt))!==null)aId.push(m2[1].trim());
-      while((m2=rNm.exec(txt))!==null)aNm.push(m2[1].trim());
-      var cp=rx1(/<Name>CODIGO_PRESTADOR<\/Name>\s*<Value[^>]*>([^<]+)/,txt);
-      vX={nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null};
+      vX=cvXmlInfo(e.target.result);
+      var nF=vX.nF,st=vX.st,en=vX.en,py=vX.py,cp=vX.cp;
       document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+cvI('Factura',nF,'mono')+cvI('Prestador',vX.sNm)+cvI('NIT Prestador',vX.nP,'mono')+cvI('Código habilitación',cp||'no detectado','mono')+cvI('Pagador',vX.cNm)+cvI('NIT Pagador',vX.nC,'mono')+cvI('Periodo',(st||'?')+' a '+(en||'?'),'mono')+cvI('Valor total',fm(py),'green')+'</div>';
       var inp=document.getElementById('cv-numfact');
       if(inp&&!inp.value)inp.value=nF;
@@ -1465,6 +1568,588 @@ window.cvLimpiar=function(){
   var btn=document.getElementById('cv-btn');if(btn){btn.disabled=true;btn.style.opacity='.4';}
   var res=document.getElementById('cv-result');if(res)res.style.display='none';
 };
+
+// ═══════════════════════════════════════════════════════════════
+// REVISOR / CORRECTOR DE JSON RIPS DE CONVENIOS
+// Audita un JSON ya generado (p. ej. exportado desde Dentos) contra la
+// Res. 948/2026 (Doc. Técnico 1), corrige lo corregible y reporta el resto.
+// ═══════════════════════════════════════════════════════════════
+var rvJ=[],rvX=[],rvRes=[];
+var RV_TDOC=['CC','CE','CD','PA','RC','TI','CN','SC','PE','PT','DE','AS','MS','NV','NI','NIT'];
+var RV_TU=['01','02','03','04','05','06','07','08','09','10','11','12','13'];
+var RV_CON=['01','02','03','05'];
+var RV_BLOQUES=[
+  {k:'consultas',lbl:'Consulta',cod:'codConsulta'},
+  {k:'procedimientos',lbl:'Procedimiento',cod:'codProcedimiento'},
+  {k:'urgencias',lbl:'Urgencia',cod:null},
+  {k:'hospitalizacion',lbl:'Hospitalización',cod:null},
+  {k:'otrosServicios',lbl:'Otro servicio',cod:'codTecnologiaSalud'},
+  {k:'medicamentos',lbl:'Medicamento',cod:'codTecnologiaSalud'}
+];
+
+window.cvSwitchMode=function(m){
+  var gen=m!=='rev';
+  document.getElementById('cv-mode-gen').style.display=gen?'':'none';
+  document.getElementById('cv-mode-rev').style.display=gen?'none':'';
+  document.getElementById('cvtab-gen').classList.toggle('active',gen);
+  document.getElementById('cvtab-rev').classList.toggle('active',!gen);
+};
+
+function rvDia(v){var m=String(v==null?'':v).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);return m?(m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2)):'';}
+function rvFhm(v){var d=rvDia(v);if(!d)return '';var t=String(v).match(/(\d{1,2}):(\d{2})/);return d+' '+(t?(('0'+t[1]).slice(-2)+':'+t[2]):'00:00');}
+function rvNum(v){
+  if(typeof v==='number')return isFinite(v)?v:null;
+  var s=String(v==null?'':v).trim().replace(/[$\s]/g,'');
+  if(!s)return null;
+  if(/^-?\d+(\.\d+)?$/.test(s))return parseFloat(s);
+  if(/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s))return parseFloat(s.replace(/\./g,'').replace(',','.'));
+  if(/^-?\d+(,\d+)?$/.test(s))return parseFloat(s.replace(',','.'));
+  return null;
+}
+
+// Audita (y opcionalmente corrige) un JSON. Devuelve {json, h:[hallazgos], tot, nServ}.
+function rvAudit(json,xml,cfg){
+  var H=[],fix=cfg.fix,hoy=new Date().toISOString().slice(0,10),totServ=0,nServ=0;
+  function add(sev,tipo,loc,campo,msg,antes,despues){H.push({sev:sev,tipo:tipo,loc:loc,campo:campo,msg:msg,antes:antes,despues:despues});}
+  function put(obj,campo,nuevo,tipo,loc,msg,antesTxt){
+    var antes=(antesTxt===undefined)?obj[campo]:antesTxt;
+    if(fix)obj[campo]=nuevo;
+    add(fix?'corregido':'corregible',tipo,loc,campo,msg,antes,nuevo);
+  }
+  function fixTo(obj,campo,nuevo,tipo,loc,msg){
+    var a=obj[campo]==null?null:String(obj[campo]),b=nuevo==null?null:String(nuevo);
+    if(a===b)return;
+    put(obj,campo,nuevo,tipo,loc,msg);
+  }
+  // Igual que fixTo pero sensible al tipo: el validador rechaza los números entre comillas.
+  function fixNum(obj,campo,nuevo,tipo,loc,msg){
+    if(obj[campo]===nuevo)return;
+    put(obj,campo,nuevo,tipo,loc,msg);
+  }
+
+  var L0='Encabezado';
+  var nioS=String(json.numDocumentoIdObligado==null?'':json.numDocumentoIdObligado).trim();
+  if(!nioS)add('error','Obligatorio',L0,'numDocumentoIdObligado','Falta el NIT del prestador obligado a facturar.',json.numDocumentoIdObligado,null);
+  else{
+    var soloDig=nioS.indexOf('-')>-1?nioS.split('-')[0].replace(/\D/g,''):nioS.replace(/\D/g,'');
+    if(soloDig!==nioS)fixTo(json,'numDocumentoIdObligado',soloDig,'Formato',L0,'El NIT no debe llevar puntos, guiones ni dígito de verificación.');
+    if(xml&&xml.nP&&soloDig&&soloDig!==xml.nP)add('advertencia','Cruce con XML',L0,'numDocumentoIdObligado','El NIT del JSON no coincide con el del prestador en la factura.',soloDig,xml.nP);
+  }
+  var nf=String(json.numFactura==null?'':json.numFactura).trim();
+  if(!nf){
+    if(xml&&xml.nF)put(json,'numFactura',xml.nF,'Obligatorio',L0,'Falta el número de factura; se toma del XML.');
+    else add('error','Obligatorio',L0,'numFactura','Falta el número de factura.',json.numFactura,null);
+  }else{
+    fixTo(json,'numFactura',nf,'Formato',L0,'El número de factura traía espacios sobrantes.');
+    if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nf))add('error','Formato',L0,'numFactura','El número de factura parece un UUID (CUFE) y no el consecutivo real de la factura.',nf,(xml&&xml.nF)||null);
+    else if(xml&&xml.nF&&nf!==xml.nF)add('advertencia','Cruce con XML',L0,'numFactura','El número de factura del JSON no coincide con el del XML.',nf,xml.nF);
+  }
+  if(!('tipoNota' in json))put(json,'tipoNota',null,'Obligatorio',L0,'Falta el campo tipoNota; debe existir aunque vaya en null.','(no existe)');
+  else if(json.tipoNota!=null&&String(json.tipoNota).trim()==='')fixTo(json,'tipoNota',null,'Formato',L0,'tipoNota va en null cuando la factura no es nota crédito ni débito.');
+  if(!('numNota' in json))put(json,'numNota',null,'Obligatorio',L0,'Falta el campo numNota; debe existir aunque vaya en null.','(no existe)');
+  else if(json.numNota!=null&&String(json.numNota).trim()==='')fixTo(json,'numNota',null,'Formato',L0,'numNota va en null cuando la factura no es nota crédito ni débito.');
+  if((json.tipoNota==null||String(json.tipoNota).trim()==='')&&json.numNota!=null&&String(json.numNota).trim()!=='')add('advertencia','Coherencia',L0,'numNota','Hay número de nota pero no tipo de nota.',json.numNota,null);
+
+  if(!Array.isArray(json.usuarios)||!json.usuarios.length){
+    add('error','Estructura',L0,'usuarios','El JSON no trae ningún usuario.',null,null);
+    return{json:json,h:H,tot:0,nServ:0};
+  }
+
+  var vistosUsr={},vistosServ={};
+  json.usuarios.forEach(function(u,ui){
+    var nd=String(u.numDocumentoIdentificacion==null?'':u.numDocumentoIdentificacion).trim().replace(/[\s.]/g,'');
+    var L='Usuario '+(ui+1)+(nd?' · '+nd:'');
+    var svc=u.servicios;
+    if(!svc||typeof svc!=='object'||Array.isArray(svc)){add('error','Estructura',L,'servicios','El usuario no trae el objeto servicios.',null,null);svc={};}
+    var items=[];
+    RV_BLOQUES.forEach(function(b){
+      var arr=svc[b.k];
+      if(arr==null)return;
+      if(!Array.isArray(arr)){add('error','Estructura',L,b.k,'El bloque '+b.k+' debe ser una lista o null.',typeof arr,null);return;}
+      if(!arr.length){put(svc,b.k,null,'Formato',L,'El bloque '+b.k+' está vacío: debe ir en null, no como lista vacía.','[]');return;}
+      arr.forEach(function(s,i){items.push({b:b,s:s,i:i});});
+    });
+    if(!items.length)add('error','Estructura',L,'servicios','El usuario no tiene ningún servicio registrado.',null,null);
+    var refDate=items.map(function(it){return rvDia(it.s.fechaInicioAtencion||it.s.fechaDispensAdmon);}).filter(Boolean).sort()[0]||null;
+
+    var td=String(u.tipoDocumentoIdentificacion==null?'':u.tipoDocumentoIdentificacion).trim().toUpperCase();
+    if(!td)add('error','Obligatorio',L,'tipoDocumentoIdentificacion','Falta el tipo de documento del usuario.',u.tipoDocumentoIdentificacion,null);
+    else{
+      fixTo(u,'tipoDocumentoIdentificacion',td,'Formato',L,'El tipo de documento va en mayúsculas y sin espacios.');
+      if(RV_TDOC.indexOf(td)<0)add('error','Tabla de referencia',L,'tipoDocumentoIdentificacion','"'+td+'" no está en la tabla de tipos de documento del Documento Técnico 1.',td,null);
+    }
+    if(!nd)add('error','Obligatorio',L,'numDocumentoIdentificacion','Falta el número de documento del usuario.',u.numDocumentoIdentificacion,null);
+    else{
+      fixTo(u,'numDocumentoIdentificacion',nd,'Formato',L,'El número de documento no debe llevar puntos ni espacios.');
+      var kU=td+'|'+nd;
+      if(vistosUsr[kU])add('advertencia','Duplicado',L,'numDocumentoIdentificacion','Este paciente aparece más de una vez: el validador espera un solo registro por paciente con todos sus servicios.',nd,null);
+      else vistosUsr[kU]=1;
+    }
+    var fn=rvDia(u.fechaNacimiento);
+    if(!fn)add('error','Formato',L,'fechaNacimiento','La fecha de nacimiento falta o no tiene el formato AAAA-MM-DD.',u.fechaNacimiento,null);
+    else{
+      fixTo(u,'fechaNacimiento',fn,'Formato',L,'La fecha de nacimiento va en formato AAAA-MM-DD, sin hora.');
+      if(fn>hoy)add('error','Coherencia',L,'fechaNacimiento','La fecha de nacimiento es futura.',fn,null);
+      else if(refDate&&fn>refDate)add('error','Coherencia',L,'fechaNacimiento','La fecha de nacimiento es posterior a la fecha de atención ('+refDate+').',fn,null);
+    }
+    var sx=mapSexoCv(u.codSexo);
+    if(!sx)add('error','Obligatorio',L,'codSexo','El sexo falta o no se puede interpretar como M o F.',u.codSexo,null);
+    else fixTo(u,'codSexo',sx,'Formato',L,'El sexo se reporta como M o F.');
+    var tu=pad2(u.tipoUsuario);
+    if(cfg.tu&&tu!==cfg.tu)put(u,'tipoUsuario',cfg.tu,'Tipo usuario',L,'El convenio exige tipo de usuario '+cfg.tu+'.');
+    else if(!tu)add('error','Obligatorio',L,'tipoUsuario','Falta el tipo de usuario.',u.tipoUsuario,null);
+    else{
+      fixTo(u,'tipoUsuario',tu,'Formato',L,'El tipo de usuario va a dos dígitos ("1" → "01").');
+      if(RV_TU.indexOf(tu)<0)add('error','Tabla de referencia',L,'tipoUsuario','"'+tu+'" no es un tipo de usuario válido (01 a 13).',tu,null);
+    }
+    ['codPaisResidencia','codPaisOrigen'].forEach(function(f){
+      var v=String(u[f]==null?'':u[f]).trim().replace(/\.0$/,'');
+      if(!v){put(u,f,'170','Obligatorio',L,'Falta '+f+'; se asume Colombia (170).');return;}
+      if(/^\d{1,3}$/.test(v)){fixTo(u,f,('000'+v).slice(-3),'Formato',L,'El código de país va a tres dígitos.');return;}
+      add('error','Tabla de referencia',L,f,'El código de país no es válido (tres dígitos, Colombia = 170).',u[f],null);
+    });
+    var mu=pad5(u.codMunicipioResidencia);
+    if(!mu){
+      if(cfg.mun)put(u,'codMunicipioResidencia',pad5(cfg.mun),'Obligatorio',L,'Falta el municipio de residencia; se usó el municipio por defecto.');
+      else add('error','Obligatorio',L,'codMunicipioResidencia','Falta el código DANE del municipio de residencia.',u.codMunicipioResidencia,null);
+    }
+    else if(!/^\d{5}$/.test(mu))add('error','Formato',L,'codMunicipioResidencia','El código DANE del municipio debe tener 5 dígitos.',u.codMunicipioResidencia,null);
+    else fixTo(u,'codMunicipioResidencia',mu,'Formato',L,'El municipio va a 5 dígitos: el Excel pierde el cero inicial ("5045" → "05045").');
+    var zn=pad2(u.codZonaTerritorialResidencia);
+    if(!zn)put(u,'codZonaTerritorialResidencia','01','Obligatorio',L,'Falta la zona territorial de residencia; se asumió 01 (urbana).');
+    else if(zn!=='01'&&zn!=='02')add('error','Tabla de referencia',L,'codZonaTerritorialResidencia','Solo admite 01 (urbana) o 02 (rural).',u.codZonaTerritorialResidencia,null);
+    else fixTo(u,'codZonaTerritorialResidencia',zn,'Formato',L,'La zona territorial va a dos dígitos.');
+    var inc=String(u.incapacidad==null?'':u.incapacidad).trim().toUpperCase();
+    if(inc==='SÍ'||inc==='S'||inc==='TRUE'||inc==='1')inc='SI';
+    else if(inc==='N'||inc==='FALSE'||inc==='0')inc='NO';
+    if(inc!=='SI'&&inc!=='NO')put(u,'incapacidad','NO','Obligatorio',L,'El campo incapacidad debe ser "SI" o "NO".');
+    else fixTo(u,'incapacidad',inc,'Formato',L,'El campo incapacidad va como "SI" o "NO" en mayúsculas.');
+    if(u.consecutivo!==ui+1)put(u,'consecutivo',ui+1,'Consecutivo',L,'El consecutivo del usuario debe ser secuencial desde 1.');
+    var tdFix=correctDoc(String(u.tipoDocumentoIdentificacion||'').toUpperCase(),calcAge(rvDia(u.fechaNacimiento),refDate));
+    if(tdFix)put(u,'tipoDocumentoIdentificacion',tdFix,'Documento',L,'Por la edad del paciente en la fecha de atención, el tipo de documento debe ser '+tdFix+'.');
+
+    items.forEach(function(it){
+      var b=it.b,s=it.s,SL=L+' › '+b.lbl+' '+(it.i+1);
+      var cp=String(s.codPrestador==null?'':s.codPrestador).trim().replace(/\.0$/,'');
+      if(!cp){
+        if(cfg.prest)put(s,'codPrestador',cfg.prest,'Obligatorio',SL,'Falta el código de habilitación del prestador.');
+        else add('error','Obligatorio',SL,'codPrestador','Falta el código de habilitación del prestador.',s.codPrestador,null);
+      }else{
+        fixTo(s,'codPrestador',cp,'Formato',SL,'El código de habilitación se normalizó.');
+        if(!/^\d{10,12}$/.test(cp))add('advertencia','Formato',SL,'codPrestador','El código de habilitación suele tener 10 a 12 dígitos.',cp,null);
+        else if(cfg.prest&&cp!==cfg.prest)add('advertencia','Coherencia',SL,'codPrestador','No coincide con el código de habilitación esperado ('+cfg.prest+').',cp,cfg.prest);
+      }
+      var campoF=(b.k==='medicamentos')?'fechaDispensAdmon':'fechaInicioAtencion';
+      var fi=rvFhm(s[campoF]);
+      if(!fi)add('error','Formato',SL,campoF,'La fecha falta o no tiene el formato AAAA-MM-DD HH:MM.',s[campoF],null);
+      else{
+        var dia=fi.slice(0,10);
+        if(xml&&xml.st&&xml.en&&(dia<xml.st||dia>xml.en)){
+          dia=(dia<xml.st)?xml.st:xml.en;
+          put(s,campoF,dia+' 00:00','Período',SL,'La fecha de atención cae fuera del período facturado ('+xml.st+' a '+xml.en+').');
+        }
+        else fixTo(s,campoF,fi,'Formato',SL,'La fecha va en formato AAAA-MM-DD HH:MM.');
+        if(dia>hoy)add('error','Coherencia',SL,campoF,'La fecha de atención es futura.',dia,null);
+        if(dia<FECHA_CORTE_MSPS)add('advertencia','Período',SL,campoF,'La atención es anterior al '+FECHA_CORTE_MSPS+': el Ministerio no recibe RIPS con esa fecha.',dia,null);
+      }
+      if(s.fechaFinAtencion!=null&&String(s.fechaFinAtencion).trim()!==''){
+        var ff=rvFhm(s.fechaFinAtencion);
+        if(!ff)add('error','Formato',SL,'fechaFinAtencion','La fecha fin no tiene el formato AAAA-MM-DD HH:MM.',s.fechaFinAtencion,null);
+        else{
+          fixTo(s,'fechaFinAtencion',ff,'Formato',SL,'La fecha fin va en formato AAAA-MM-DD HH:MM.');
+          if(fi&&ff<fi)add('error','Coherencia',SL,'fechaFinAtencion','La fecha fin es anterior a la fecha de inicio.',ff,null);
+        }
+      }
+      var codFinal=null;
+      if(b.cod){
+        var cd=String(s[b.cod]==null?'':s[b.cod]).trim().replace(/\s+/g,'').replace(/\.0$/,'');
+        if(!cd)add('error','Obligatorio',SL,b.cod,'Falta el código del servicio.',s[b.cod],null);
+        else if(b.k==='consultas'||b.k==='procedimientos'){
+          var c6=cd;
+          if(/^\d+$/.test(cd))c6=cd.length>6?cups6(cd):('000000'+cd).slice(-6);
+          if(c6!==cd)put(s,b.cod,c6,'CUPS',SL,cd.length>6?('El código '+cd+' no es un CUPS de 6 dígitos; se convirtió a su equivalente oficial '+c6+'.'):'El código CUPS va a 6 dígitos.');
+          codFinal=c6;
+          if(!CUPS_DATA[c6])add('error','CUPS',SL,b.cod,'El código '+c6+' no existe en el catálogo CUPS oficial.',c6,null);
+        }else{
+          fixTo(s,b.cod,cd,'Formato',SL,'El código se normalizó.');
+          codFinal=cd;
+        }
+      }
+      if(b.k!=='medicamentos'&&b.k!=='otrosServicios'){
+        var dxRaw=String(s.codDiagnosticoPrincipal==null?'':s.codDiagnosticoPrincipal).trim().toUpperCase().replace(/\./g,'');
+        if(!dxRaw||!CIE10_DATA[dxRaw]){
+          var sug=codFinal?ck(codFinal):'K088';
+          if(!CIE10_DATA[sug])sug='K088';
+          put(s,'codDiagnosticoPrincipal',sug,'CIE-10',SL,dxRaw?('El diagnóstico "'+dxRaw+'" no existe en el CIE-10; se asignó '+sug+' según el procedimiento.'):('Falta el diagnóstico principal; se asignó '+sug+' según el procedimiento.'));
+        }else fixTo(s,'codDiagnosticoPrincipal',dxRaw,'Formato',SL,'El diagnóstico va en mayúsculas y sin puntos.');
+      }
+      ['codDiagnosticoRelacionado','codDiagnosticoRelacionado1','codDiagnosticoRelacionado2','codDiagnosticoRelacionado3','codComplicacion'].forEach(function(cf){
+        if(!(cf in s)||s[cf]==null)return;
+        var t=String(s[cf]).trim().toUpperCase().replace(/\./g,'');
+        if(!t){fixTo(s,cf,null,'Formato',SL,cf+' va en null cuando no aplica, no como texto vacío.');return;}
+        if(!CIE10_DATA[t])add('advertencia','CIE-10',SL,cf,'El código "'+t+'" no existe en el CIE-10.',s[cf],null);
+        else fixTo(s,cf,t,'Formato',SL,'El diagnóstico va en mayúsculas y sin puntos.');
+      });
+      var dosDig=[];
+      if(b.k==='consultas')dosDig=[['modalidadGrupoServicioTecSal','01'],['grupoServicios','01'],['finalidadTecnologiaSalud','15'],['causaMotivoAtencion','26'],['tipoDiagnosticoPrincipal','02']];
+      else if(b.k==='procedimientos')dosDig=[['viaIngresoServicioSalud','01'],['modalidadGrupoServicioTecSal','01'],['grupoServicios','01'],['finalidadTecnologiaSalud','15']];
+      else if(b.k==='urgencias'||b.k==='hospitalizacion')dosDig=[['causaMotivoAtencion','26']];
+      dosDig.forEach(function(p){
+        var f=p[0],v=pad2(s[f]);
+        if(!v){put(s,f,p[1],'Obligatorio',SL,'Falta '+f+'; se asignó '+p[1]+', el valor habitual en odontología.');return;}
+        if(!/^\d{2}$/.test(v)){add('error','Formato',SL,f,'El campo '+f+' debe ser un código de dos dígitos.',s[f],null);return;}
+        fixTo(s,f,v,'Formato',SL,'Los códigos van a dos dígitos ("1" → "01").');
+      });
+      if(b.k==='consultas'&&['01','02','03'].indexOf(pad2(s.tipoDiagnosticoPrincipal))<0)add('error','Tabla de referencia',SL,'tipoDiagnosticoPrincipal','Solo admite 01 (impresión diagnóstica), 02 (confirmado nuevo) o 03 (confirmado repetido).',s.tipoDiagnosticoPrincipal,null);
+      if((b.k==='consultas'||b.k==='procedimientos')&&['01','02','03','04','05'].indexOf(pad2(s.grupoServicios))<0)add('error','Tabla de referencia',SL,'grupoServicios','El grupo de servicios debe estar entre 01 y 05 (odontología va en 01, consulta externa).',s.grupoServicios,null);
+      if(b.k==='procedimientos'&&['01','02','03','04','05'].indexOf(pad2(s.viaIngresoServicioSalud))<0)add('error','Tabla de referencia',SL,'viaIngresoServicioSalud','La vía de ingreso debe estar entre 01 y 05.',s.viaIngresoServicioSalud,null);
+      if(b.k==='consultas'||b.k==='procedimientos'){
+        var csv=parseInt(s.codServicio,10);
+        if(!csv||csv===500){
+          var csNuevo=csServ(codFinal,s.codServicio);
+          put(s,'codServicio',csNuevo,'Cod. servicio',SL,(csv===500?'El código de servicio 500 no existe en la tabla del REPS':'Falta el código de servicio')+'; se asignó '+csNuevo+' según el CUPS.');
+        }else fixNum(s,'codServicio',csv,'Formato',SL,'El código de servicio va como número entero, sin comillas.');
+        var ptd=String(s.tipoDocumentoIdentificacion==null?'':s.tipoDocumentoIdentificacion).trim().toUpperCase();
+        if(!ptd)put(s,'tipoDocumentoIdentificacion','CC','Obligatorio',SL,'Falta el tipo de documento del profesional que atendió.');
+        else{
+          fixTo(s,'tipoDocumentoIdentificacion',ptd,'Formato',SL,'El tipo de documento del profesional va en mayúsculas.');
+          if(RV_TDOC.indexOf(ptd)<0)add('error','Tabla de referencia',SL,'tipoDocumentoIdentificacion','"'+ptd+'" no está en la tabla de tipos de documento.',ptd,null);
+        }
+        var pnd=String(s.numDocumentoIdentificacion==null?'':s.numDocumentoIdentificacion).trim().replace(/[\s.]/g,'');
+        if(!pnd||/^0+$/.test(pnd)){
+          if(cfg.prof)put(s,'numDocumentoIdentificacion',cfg.prof,'Obligatorio',SL,'Falta el documento del profesional; se usó el CC de respaldo.');
+          else add('error','Obligatorio',SL,'numDocumentoIdentificacion','Falta el documento del profesional que atendió.',s.numDocumentoIdentificacion,null);
+        }else fixTo(s,'numDocumentoIdentificacion',pnd,'Formato',SL,'El documento del profesional no debe llevar puntos ni espacios.');
+      }
+      if('numAutorizacion' in s&&s.numAutorizacion!=null){
+        var aus=String(s.numAutorizacion).trim().replace(/\.0$/,'');
+        if(!aus||aus==='0')fixTo(s,'numAutorizacion',null,'Formato',SL,'numAutorizacion va en null cuando no hay autorización, no como texto vacío o cero.');
+        else fixTo(s,'numAutorizacion',aus,'Formato',SL,'El número de autorización se normalizó.');
+      }
+      if(b.k!=='urgencias'&&b.k!=='hospitalizacion'){
+        var vr=rvNum(s.vrServicio);
+        if(vr==null)add('error','Obligatorio',SL,'vrServicio','El valor del servicio falta o no es numérico.',s.vrServicio,null);
+        else if(vr<=0)add('error','Valor',SL,'vrServicio','El valor del servicio está en cero y el validador lo rechaza: debe ser mayor que cero.',s.vrServicio,null);
+        else{fixNum(s,'vrServicio',vr,'Formato',SL,'El valor va como número, sin separadores ni comillas.');totServ+=vr;nServ++;}
+        var vpm=rvNum(s.valorPagoModerador);
+        if(vpm==null)put(s,'valorPagoModerador',0,'Obligatorio',SL,'Falta el valor de pago moderador; va en 0 cuando el paciente no pagó cuota.');
+        else if(vpm<0)add('error','Valor',SL,'valorPagoModerador','El valor de pago moderador no puede ser negativo.',s.valorPagoModerador,null);
+        else fixNum(s,'valorPagoModerador',vpm,'Formato',SL,'El valor de pago moderador va como número, sin comillas.');
+        var vpmF=rvNum(s.valorPagoModerador)||0;
+        var cr=pad2(s.conceptoRecaudo),crNuevo=concRec(cr,cfg.con,vpmF);
+        if(cr==='04')put(s,'conceptoRecaudo',crNuevo,'Concepto recaudo',SL,'El concepto 04 (anticipos) solo aplica en la factura electrónica, nunca en el RIPS; se cambió a '+crNuevo+'.');
+        else if(!cr)put(s,'conceptoRecaudo',crNuevo,'Obligatorio',SL,'Falta el concepto de recaudo, que es obligatorio; se asignó '+crNuevo+'.');
+        else if(RV_CON.indexOf(cr)<0)put(s,'conceptoRecaudo',crNuevo,'Tabla de referencia',SL,'El concepto de recaudo "'+cr+'" no existe; se asignó '+crNuevo+'.');
+        else if((cr==='01'||cr==='03')&&!(vpmF>0))put(s,'conceptoRecaudo','05','Concepto recaudo',SL,'El concepto '+cr+' exige un pago moderador mayor o igual a 1 y aquí es 0; se cambió a 05.');
+        else fixTo(s,'conceptoRecaudo',cr,'Formato',SL,'El concepto de recaudo va a dos dígitos.');
+        if(vpmF>0){
+          if(s.numFEVPagoModerador==null||String(s.numFEVPagoModerador).trim()==='')add('error','Coherencia',SL,'numFEVPagoModerador','Hay pago moderador ('+fm(vpmF)+') pero falta el número de factura que lo soporta.',s.numFEVPagoModerador,null);
+        }
+        else if(s.numFEVPagoModerador!=null)fixTo(s,'numFEVPagoModerador',null,'Coherencia',SL,'No hay pago moderador, así que numFEVPagoModerador debe ir en null (ni texto vacío ni número de factura).');
+        else if(!('numFEVPagoModerador' in s))put(s,'numFEVPagoModerador',null,'Obligatorio',SL,'Falta el campo numFEVPagoModerador; debe existir aunque vaya en null.','(no existe)');
+      }
+      if(b.k==='medicamentos'){
+        ['cantidadMedicamento','vrUnitMedicamento'].forEach(function(f){
+          if(!(f in s))return;
+          var n=rvNum(s[f]);
+          if(n==null){add('error','Formato',SL,f,'El campo '+f+' debe ser numérico.',s[f],null);return;}
+          fixNum(s,f,n,'Formato',SL,'El campo '+f+' va como número, sin comillas.');
+        });
+      }
+      if(codFinal&&nd){
+        var kS=nd+'|'+codFinal+'|'+rvDia(s[campoF]);
+        if(vistosServ[kS])add('advertencia','Duplicado',SL,b.cod,'Este servicio (mismo paciente, mismo código y misma fecha) ya aparece en el archivo.',codFinal,null);
+        else vistosServ[kS]=1;
+      }
+    });
+
+    RV_BLOQUES.forEach(function(b){
+      var arr=svc[b.k];
+      if(!Array.isArray(arr))return;
+      arr.forEach(function(s,i){
+        if(s.consecutivo!==i+1)put(s,'consecutivo',i+1,'Consecutivo',L+' › '+b.lbl+' '+(i+1),'El consecutivo del servicio debe ser secuencial desde 1 dentro de su bloque.');
+      });
+    });
+  });
+
+  if(xml&&xml.py>0&&nServ){
+    var dif=Math.round((totServ-xml.py)*100)/100;
+    if(Math.abs(dif)>=1)add('advertencia','Cruce con XML',L0,'vrServicio','La suma de los servicios ('+fm(totServ)+') no coincide con el valor de la factura ('+fm(xml.py)+'). Diferencia: '+fm(dif)+'.',totServ,xml.py);
+  }
+  return{json:json,h:H,tot:totServ,nServ:nServ};
+}
+
+function rvsok(n,msg,ok){
+  var e=document.getElementById('rvn'+n);
+  if(e){e.style.background=ok?'var(--green)':'';e.style.borderColor=ok?'var(--green)':'';e.style.color=ok?'#fff':'';}
+  var s=document.getElementById('rvs'+n);
+  if(s){s.style.color=ok?'var(--green)':'';s.style.fontWeight=ok?'700':'';s.textContent=msg;}
+}
+function rvRenderFiles(){
+  rvJ.sort(function(a,b){return a.name<b.name?-1:1;});
+  var el=document.getElementById('rv-json-list');
+  var ok=rvJ.filter(function(f){return f.json;}).length;
+  if(el){
+    var h='';
+    if(rvJ.length){
+      h='<div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;">';
+      rvJ.forEach(function(f){
+        var nUsr=f.json&&Array.isArray(f.json.usuarios)?f.json.usuarios.length:0;
+        h+='<div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:7px 12px;font-size:.78rem;">'
+          +'<span>'+(f.json?'🧾':'⛔')+'</span><span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--gray-700);">'+esc(f.name)+'</span>'
+          +'<span style="color:'+(f.json?'var(--gray-500)':'var(--red)')+';font-size:.72rem;">'+esc(f.json?('Factura '+(f.json.numFactura||'?')+' · '+nUsr+' usuario(s)'):f.error)+'</span></div>';
+      });
+      h+='</div>';
+    }
+    el.innerHTML=h;
+  }
+  rvsok(1,ok?(ok+' archivo(s) listo(s)'):'Pendiente',!!ok);
+  var btn=document.getElementById('rv-btn');
+  if(btn){btn.disabled=!ok;btn.style.opacity=ok?'1':'.4';}
+}
+function rvRenderXml(){
+  rvX.sort(function(a,b){return a.name<b.name?-1:1;});
+  var el=document.getElementById('rv-xml-list');
+  if(el){
+    var h='';
+    if(rvX.length){
+      h='<div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;">';
+      rvX.forEach(function(x){
+        h+='<div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:7px 12px;font-size:.78rem;">'
+          +'<span>📄</span><span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--gray-700);">'+esc(x.name)+'</span>'
+          +'<span style="color:var(--gray-500);font-size:.72rem;">Factura '+esc(x.info.nF||'?')+' · '+esc((x.info.st||'?')+' a '+(x.info.en||'?'))+' · '+fm(x.info.py)+'</span></div>';
+      });
+      h+='</div>';
+    }
+    el.innerHTML=h;
+  }
+  rvsok(2,rvX.length?(rvX.length+' XML cargado(s)'):'Opcional',!!rvX.length);
+  var pi=document.getElementById('rv-prest');
+  if(pi&&!pi.value.trim()&&rvX.length&&rvX[0].info.cp)pi.value=rvX[0].info.cp;
+}
+function rvMatchXml(item){
+  if(!rvX.length)return null;
+  var base=item.name.replace(/\.json$/i,'').toLowerCase();
+  var nf=String((item.json&&item.json.numFactura)||'').trim().toLowerCase();
+  var byName=null,byFact=null;
+  rvX.forEach(function(x){
+    if(x.name.replace(/\.xml$/i,'').toLowerCase()===base)byName=x.info;
+    if(nf&&String(x.info.nF||'').trim().toLowerCase()===nf)byFact=x.info;
+  });
+  return byName||byFact||(rvX.length===1?rvX[0].info:null);
+}
+
+window.rvAnalizar=function(){
+  var validos=rvJ.filter(function(f){return f.json;});
+  if(!validos.length){alert('Carga al menos un JSON válido.');return;}
+  var g=function(id){var e=document.getElementById(id);return e?String(e.value||'').trim():'';};
+  var base={
+    fix:!!(document.getElementById('rv-fix')||{}).checked,
+    tu:g('rv-tu'),con:g('rv-con')||'05',prest:g('rv-prest'),prof:g('rv-prof'),mun:g('rv-mun')
+  };
+  rvRes=validos.map(function(f){
+    var xml=rvMatchXml(f);
+    var cfg={fix:base.fix,tu:base.tu,con:base.con,prof:base.prof,mun:base.mun,prest:base.prest||(xml&&xml.cp)||''};
+    var r=rvAudit(JSON.parse(JSON.stringify(f.json)),xml,cfg);
+    return{name:f.name,json:r.json,h:r.h,tot:r.tot,nServ:r.nServ,xml:xml,fix:base.fix};
+  });
+  rvRender();
+};
+
+function rvCuenta(h,sev){return h.filter(function(x){return x.sev===sev;}).length;}
+function rvBadge(sev){
+  if(sev==='error')return'<span class="hl-tag" style="background:#FEE2E2;color:#B91C1C;">Error</span>';
+  if(sev==='advertencia')return'<span class="hl-tag" style="background:#FEF3C7;color:#92400E;">Advertencia</span>';
+  if(sev==='corregible')return'<span class="hl-tag" style="background:#E0E7FF;color:#3730A3;">Corregible</span>';
+  return'<span class="hl-tag" style="background:#DCFCE7;color:#15803D;">Corregido</span>';
+}
+function rvRender(){
+  var el=document.getElementById('rv-result');if(!el)return;
+  var todos=[];
+  rvRes.forEach(function(r){r.h.forEach(function(x){todos.push({f:r.name,x:x});});});
+  var modoAud=!!(rvRes.length&&!rvRes[0].fix);
+  var sevAuto=modoAud?'corregible':'corregido';
+  var nErr=todos.filter(function(t){return t.x.sev==='error';}).length;
+  var nAdv=todos.filter(function(t){return t.x.sev==='advertencia';}).length;
+  var nAuto=todos.filter(function(t){return t.x.sev===sevAuto;}).length;
+  var h='<div style="background:'+(nErr?'#FFFBEB':'#F0FDF4')+';border:1px solid '+(nErr?'#FDE68A':'#BBF7D0')+';border-radius:10px;padding:16px;">'
+    +'<div style="font-size:.95rem;font-weight:700;color:'+(nErr?'#92400E':'var(--green)')+';margin-bottom:2px;">'
+    +(nErr?('⚠️ '+nErr+' error(es) que debes corregir en el origen'):'✅ Sin errores que corregir a mano')+'</div>'
+    +'<div style="font-size:.75rem;color:var(--gray-500);margin-bottom:14px;">'+rvRes.length+' archivo(s) analizado(s) · '
+    +(modoAud?('modo auditoría: no se modificó nada, '+nAuto+' hallazgo(s) los puede corregir la app sola'):(nAuto+' corrección(es) aplicada(s)'))
+    +' · '+nAdv+' advertencia(s)</div>'
+    +'<div class="stat-grid" style="margin-bottom:12px;">'
+    +'<div class="stat"><div class="stat-icon">📄</div><div class="stat-num blue">'+rvRes.length+'</div><div class="stat-label">Archivos</div></div>'
+    +'<div class="stat"><div class="stat-icon">⛔</div><div class="stat-num red">'+nErr+'</div><div class="stat-label">Errores</div></div>'
+    +'<div class="stat"><div class="stat-icon">⚠️</div><div class="stat-num yellow">'+nAdv+'</div><div class="stat-label">Advertencias</div></div>'
+    +'<div class="stat"><div class="stat-icon">🔧</div><div class="stat-num '+(modoAud?'purple':'green')+'">'+nAuto+'</div><div class="stat-label">'+(modoAud?'Corregibles':'Corregidos')+'</div></div>'
+    +'</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+    +'<button onclick="rvAbrirReporte()" style="padding:9px 16px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.78rem;font-weight:700;cursor:pointer;">📄 Ver reporte de errores</button>'
+    +'<button onclick="rvDescargarReporte()" style="padding:9px 16px;background:var(--white);border:1.5px solid var(--blue);border-radius:8px;color:var(--blue-dark);font-family:var(--display);font-size:.78rem;font-weight:700;cursor:pointer;">⬇️ Descargar reporte HTML</button>'
+    +(modoAud?'':'<button onclick="rvDescargarTodos()" style="padding:9px 16px;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.78rem;font-weight:700;cursor:pointer;">⬇️ Descargar JSON corregido(s)</button>')
+    +'</div>';
+  h+='<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">';
+  rvRes.forEach(function(r,i){
+    var e=rvCuenta(r.h,'error'),a=rvCuenta(r.h,'advertencia'),c=rvCuenta(r.h,sevAuto);
+    h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--white);border:1px solid var(--gray-200);border-radius:8px;padding:8px 12px;font-size:.78rem;">'
+      +'<span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--blue-dark);min-width:140px;">'+esc(r.name)+'</span>'
+      +'<span style="font-size:.72rem;color:var(--gray-500);">'+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s) · '+fm(r.tot)+(r.xml?'':' · sin XML')+'</span>'
+      +'<span style="font-size:.72rem;color:'+(e?'var(--red)':'var(--green)')+';font-weight:700;">'+(e?e+' error(es)':'sin errores')+'</span>'
+      +'<span style="font-size:.72rem;color:var(--gray-400);">'+a+' adv · '+c+(modoAud?' corregible(s)':' corregido(s)')+'</span>'
+      +(modoAud?'':'<button onclick="rvDescargar('+i+')" style="padding:5px 11px;background:var(--white);border:1.5px solid var(--green);border-radius:7px;color:var(--green);font-family:var(--display);font-size:.72rem;font-weight:700;cursor:pointer;">⬇️ JSON</button>')
+      +'</div>';
+  });
+  h+='</div>';
+  if(!todos.length){
+    h+='<div style="padding:14px;text-align:center;color:var(--gray-500);font-size:.82rem;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);">✅ El JSON cumple todas las validaciones que revisa la aplicación.</div></div>';
+    el.style.display='block';el.innerHTML=h;el.scrollIntoView({behavior:'smooth',block:'start'});return;
+  }
+  var tipos={};todos.forEach(function(t){tipos[t.x.tipo]=(tipos[t.x.tipo]||0)+1;});
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">'
+    +'<button class="hl-chip active" data-s="" data-c="" onclick="rvFiltrar(this)">Todos ('+todos.length+')</button>'
+    +'<button class="hl-chip" data-s="error" data-c="" onclick="rvFiltrar(this)">Errores ('+nErr+')</button>'
+    +'<button class="hl-chip" data-s="advertencia" data-c="" onclick="rvFiltrar(this)">Advertencias ('+nAdv+')</button>'
+    +'<button class="hl-chip" data-s="'+sevAuto+'" data-c="" onclick="rvFiltrar(this)">'+(modoAud?'Corregibles':'Corregidos')+' ('+nAuto+')</button>';
+  Object.keys(tipos).forEach(function(t){h+='<button class="hl-chip" data-s="" data-c="'+esc(t)+'" onclick="rvFiltrar(this)">'+esc(t)+' ('+tipos[t]+')</button>';});
+  h+='<input id="rv-search" oninput="rvFiltrar()" placeholder="🔎 Buscar paciente, campo, valor..." style="flex:1;min-width:160px;margin-left:auto;padding:7px 11px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.78rem;outline:none;"></div>';
+  h+='<div id="rv-list" style="max-height:420px;overflow:auto;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);">';
+  todos.forEach(function(t){
+    var x=t.x;
+    var muestraDest=x.sev==='corregido'||x.sev==='corregible'||(x.despues!=null&&String(x.despues)!=='');
+    var flechas='<span class="hl-old">'+esc(vDisp(x.antes))+'</span>'+(muestraDest?('<span class="hl-arr">→</span><span class="hl-new">'+esc(x.despues==null?'null':vDisp(x.despues))+'</span>'):'');
+    h+='<div class="hl-row" data-s="'+x.sev+'" data-c="'+esc(x.tipo)+'" data-f="'+esc((t.f+' '+x.sev+' '+x.tipo+' '+x.loc+' '+x.campo+' '+x.msg+' '+vDisp(x.antes)+' '+vDisp(x.despues)).toLowerCase())+'">'
+      +rvBadge(x.sev)+'<span class="hl-tag">'+esc(x.tipo)+'</span>'
+      +(rvRes.length>1?'<span class="hl-file">'+esc(t.f)+'</span>':'')
+      +'<span class="hl-mut">'+esc(x.loc)+'</span><code>'+esc(x.campo)+'</code>'+flechas
+      +'<span style="flex-basis:100%;font-size:.71rem;color:var(--gray-500);">'+esc(x.msg)+'</span></div>';
+  });
+  h+='</div></div>';
+  el.style.display='block';el.innerHTML=h;el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+window.rvFiltrar=function(btn){
+  if(btn){var cs=document.querySelectorAll('#rv-result .hl-chip');for(var k=0;k<cs.length;k++)cs[k].classList.remove('active');btn.classList.add('active');}
+  var act=document.querySelector('#rv-result .hl-chip.active');
+  var sev=act?act.getAttribute('data-s'):'',tipo=act?act.getAttribute('data-c'):'';
+  var q=String(((document.getElementById('rv-search')||{}).value)||'').trim().toLowerCase();
+  var rows=document.querySelectorAll('#rv-list .hl-row');
+  for(var i=0;i<rows.length;i++){
+    var okS=!sev||rows[i].getAttribute('data-s')===sev;
+    var okC=!tipo||rows[i].getAttribute('data-c')===tipo;
+    var okQ=!q||rows[i].getAttribute('data-f').indexOf(q)>=0;
+    rows[i].style.display=(okS&&okC&&okQ)?'':'none';
+  }
+};
+function rvBaja(nombre,texto,mime){
+  var b=new Blob([texto],{type:mime});
+  var url=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=url;a.download=nombre;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},3000);
+}
+window.rvDescargar=function(i){
+  var r=rvRes[i];if(!r)return;
+  rvBaja(r.name.replace(/\.json$/i,'')+'_corregido.json',JSON.stringify(r.json,null,2),'application/json');
+};
+window.rvDescargarTodos=function(){rvRes.forEach(function(r,i){setTimeout(function(){rvDescargar(i);},i*350);});};
+function rvReporteHTML(){
+  var fecha=new Date().toLocaleString('es-CO');
+  var modoAud=!!(rvRes.length&&!rvRes[0].fix);
+  var sevAuto=modoAud?'corregible':'corregido';
+  var nErr=0,nAdv=0,nAuto=0;
+  rvRes.forEach(function(r){nErr+=rvCuenta(r.h,'error');nAdv+=rvCuenta(r.h,'advertencia');nAuto+=rvCuenta(r.h,sevAuto);});
+  var body='';
+  rvRes.forEach(function(r){
+    body+='<section><h2>🧾 '+esc(r.name)+'</h2>';
+    body+='<p class="meta">Factura <b>'+esc(r.json.numFactura||'?')+'</b> · '+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s) · total '+esc(fm(r.tot))+(r.xml?(' · XML '+esc(r.xml.nF||'?')+' ('+esc(fm(r.xml.py))+')'):' · sin XML de referencia')+'</p>';
+    if(!r.h.length)body+='<p class="none">Sin hallazgos: cumple todas las validaciones revisadas.</p>';
+    else{
+      body+='<table><thead><tr><th>Severidad</th><th>Tipo</th><th>Ubicación</th><th>Campo</th><th>Antes</th><th>Después</th><th>Detalle</th></tr></thead><tbody>';
+      ['error','advertencia','corregible','corregido'].forEach(function(sev){
+        r.h.filter(function(x){return x.sev===sev;}).forEach(function(x){
+          body+='<tr><td><span class="sev '+sev+'">'+(sev==='error'?'Error':sev==='advertencia'?'Advertencia':sev==='corregible'?'Corregible':'Corregido')+'</span></td>'
+            +'<td>'+esc(x.tipo)+'</td><td>'+esc(x.loc)+'</td><td><code>'+esc(x.campo)+'</code></td>'
+            +'<td class="old">'+esc(vDisp(x.antes))+'</td><td class="new">'+esc(x.despues==null?((sev==='corregido'||sev==='corregible')?'null':'—'):vDisp(x.despues))+'</td>'
+            +'<td class="det">'+esc(x.msg)+'</td></tr>';
+        });
+      });
+      body+='</tbody></table>';
+    }
+    body+='</section>';
+  });
+  var css='*{box-sizing:border-box;}body{font-family:"Nunito Sans",Arial,sans-serif;color:#1A2E3D;margin:0;background:#F8FAFC;}'
+    +'.wrap{max-width:1180px;margin:0 auto;padding:24px;}'
+    +'header{background:linear-gradient(100deg,#1E3A8A,#1D4ED8 55%,#2563EB 140%);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:18px;}'
+    +'header h1{margin:0;font-size:1.25rem;}header p{margin:5px 0 0;opacity:.92;font-size:.83rem;}'
+    +'.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}'
+    +'.kpi{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:12px 16px;flex:1;min-width:120px;}'
+    +'.kpi b{display:block;font-size:1.5rem;color:#1D4ED8;}.kpi span{font-size:.72rem;color:#6B8599;}'
+    +'section{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:14px 18px;margin-bottom:14px;}'
+    +'section h2{font-size:.9rem;margin:0 0 4px;font-family:"Courier New",monospace;color:#1D4ED8;}'
+    +'.meta{font-size:.76rem;color:#6B8599;margin:0 0 10px;}'
+    +'table{width:100%;border-collapse:collapse;font-size:.78rem;}'
+    +'th{background:#EFF6FF;color:#1D4ED8;text-align:left;padding:7px 9px;font-size:.67rem;text-transform:uppercase;letter-spacing:.04em;}'
+    +'td{padding:7px 9px;border-top:1px solid #F0F4F8;vertical-align:top;}'
+    +'code{font-family:"Courier New",monospace;background:#F0F4F8;padding:1px 5px;border-radius:4px;font-size:.76rem;}'
+    +'.old{color:#B91C1C;}.new{color:#15803D;font-weight:700;}.det{color:#42596B;}'
+    +'.sev{border-radius:5px;padding:1px 7px;font-size:.67rem;font-weight:700;white-space:nowrap;}'
+    +'.sev.error{background:#FEE2E2;color:#B91C1C;}.sev.advertencia{background:#FEF3C7;color:#92400E;}'
+    +'.sev.corregido{background:#DCFCE7;color:#15803D;}.sev.corregible{background:#E0E7FF;color:#3730A3;}'
+    +'.none{color:#6B8599;font-size:.8rem;margin:0;}'
+    +'@media print{body{background:#fff;}header,.kpi,th,.sev{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
+  return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reporte de errores RIPS Convenios</title><style>'+css+'</style></head><body><div class="wrap">'
+    +'<header><h1>Reporte de errores · RIPS Convenios</h1><p>Validado contra la Resolución 948/2026 (Documento Técnico 1) · Generado el '+esc(fecha)+(modoAud?' · modo auditoría (sin correcciones aplicadas)':'')+'</p></header>'
+    +'<div class="kpis">'
+    +'<div class="kpi"><b>'+rvRes.length+'</b><span>Archivos analizados</span></div>'
+    +'<div class="kpi"><b style="color:#B91C1C">'+nErr+'</b><span>Errores por corregir</span></div>'
+    +'<div class="kpi"><b style="color:#B45309">'+nAdv+'</b><span>Advertencias</span></div>'
+    +'<div class="kpi"><b style="color:'+(modoAud?'#3730A3':'#15803D')+'">'+nAuto+'</b><span>'+(modoAud?'Corregibles automáticamente':'Corregidos automáticamente')+'</span></div>'
+    +'</div>'+body+'</div></body></html>';
+}
+window.rvAbrirReporte=function(){
+  var url=URL.createObjectURL(new Blob([rvReporteHTML()],{type:'text/html;charset=utf-8'}));
+  window.open(url,'_blank');
+  setTimeout(function(){URL.revokeObjectURL(url);},60000);
+};
+window.rvDescargarReporte=function(){rvBaja('reporte_errores_rips_convenios_'+new Date().toISOString().slice(0,10)+'.html',rvReporteHTML(),'text/html;charset=utf-8');};
+window.rvLimpiar=function(){
+  rvJ=[];rvX=[];rvRes=[];
+  ['rv-json-list','rv-xml-list'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
+  ['rvi-json','rvi-xml'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+  rvsok(1,'Pendiente',false);rvsok(2,'Opcional',false);
+  var btn=document.getElementById('rv-btn');if(btn){btn.disabled=true;btn.style.opacity='.4';}
+  var res=document.getElementById('rv-result');if(res){res.style.display='none';res.innerHTML='';}
+};
+document.addEventListener('DOMContentLoaded',function(){
+  var ij=document.getElementById('rvi-json');
+  if(ij)ij.addEventListener('change',function(){
+    var files=this.files;if(!files||!files.length)return;
+    rvJ=[];var pend=files.length;
+    Array.prototype.forEach.call(files,function(f){
+      var rd=new FileReader();
+      rd.onload=function(e){
+        try{rvJ.push({name:f.name,json:JSON.parse(e.target.result)});}
+        catch(er){rvJ.push({name:f.name,error:'JSON inválido: '+er.message});}
+        if(--pend===0)rvRenderFiles();
+      };
+      rd.onerror=function(){rvJ.push({name:f.name,error:'No se pudo leer el archivo'});if(--pend===0)rvRenderFiles();};
+      rd.readAsText(f);
+    });
+  });
+  var ix=document.getElementById('rvi-xml');
+  if(ix)ix.addEventListener('change',function(){
+    var files=this.files;if(!files||!files.length)return;
+    rvX=[];var pend=files.length;
+    Array.prototype.forEach.call(files,function(f){
+      var rd=new FileReader();
+      rd.onload=function(e){
+        try{rvX.push({name:f.name,info:cvXmlInfo(e.target.result)});}catch(er){}
+        if(--pend===0)rvRenderXml();
+      };
+      rd.onerror=function(){if(--pend===0)rvRenderXml();};
+      rd.readAsText(f);
+    });
+  });
+});
 })();
 // === FIN RIPS CONVENIOS ===
 </script>
