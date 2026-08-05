@@ -472,8 +472,9 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
         </div>
         <div style="padding:12px 16px;">
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;">
-            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Código habilitación</label>
-              <input id="cv-prest" type="text" placeholder="Ej: 6800104868" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Código habilitación con sede</label>
+              <input id="cv-prest" type="text" placeholder="Ej: 680010486801" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">12 dígitos: los 10 del prestador más los 2 de la sede. Del XML solo se pueden tomar los 10 primeros.</div></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">CC odontólogo (respaldo)</label>
               <input id="cv-prof" type="text" placeholder="Solo si el Excel no trae el Dr." style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Si el Excel trae una columna con el documento del Dr. que atendió, se usa esa por servicio; este campo solo aplica cuando falta.</div></div>
@@ -610,6 +611,15 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
               <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Tipo usuario (elige el régimen)</label>
                 <select id="rv-tusr-manual" onchange="rvConvenioChange()" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></select></div>
             </div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Modalidad de pago del contrato</label>
+              <select id="rv-modpago" onchange="rvModPagoChange()" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+                <option value="" selected>Detectar del XML de la factura</option>
+                <option value="02">02 — Pago por evento</option>
+                <option value="01">01 — Pago por capitación (cápita)</option>
+                <option value="03">03 — Pago global prospectivo (PGP)</option>
+                <option value="04">04 — Pago por conjunto integral de atenciones</option>
+              </select>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;" id="rv-modpago-hint">Solo el pago por evento lleva valor en cada servicio; en las demás <code>vrServicio</code> debe ir en cero (RVC034).</div></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Concepto de recaudo por defecto</label>
               <select id="rv-con" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
                 <option value="05" selected>05 — Otro / no aplica</option>
@@ -618,8 +628,9 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
                 <option value="03">03 — Pagos compartidos (planes voluntarios)</option>
               </select>
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Se ajusta al convenio que elijas; solo se usa cuando el concepto viene vacío o inválido.</div></div>
-            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Código habilitación esperado</label>
-              <input id="rv-prest" type="text" placeholder="Se toma del XML si lo cargas" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Código habilitación con sede (12 dígitos)</label>
+              <input id="rv-prest" type="text" placeholder="Ej: 206210148901" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">El XML de la factura lleva 10 dígitos; el RIPS exige 12 (los 10 del prestador + 2 de la sede). Si pones los 12 aquí, se completan los que vengan con 10.</div></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">CC odontólogo (respaldo)</label>
               <input id="rv-prof" type="text" placeholder="Solo si el JSON lo trae vacío" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Municipio pacientes (respaldo)</label>
@@ -1238,8 +1249,18 @@ window.cvConvenioChange=function(){
   }
   if(typeof cvUV==='function')cvUV();
 };
+// Lee un campo adicional del sector salud de la FEV: <Name>X</Name><Value schemeID="cod">nombre</Value>
+function cvXmlCampo(txt,nombre){
+  var m=txt.match(new RegExp('<Name>\\s*'+nombre+'\\s*<\\/Name>\\s*<Value([^>]*)>([^<]*)','i'));
+  if(!m)return{cod:'',nom:''};
+  var sm=m[1].match(/schemeID\s*=\s*"([^"]*)"/i),val=String(m[2]||'').trim();
+  var cod=sm?sm[1].trim():'';
+  if(!cod&&/^\d{1,2}$/.test(val))cod=val;
+  return{cod:cod,nom:val};
+}
 function cvXmlInfo(txt){
   function rx1(p,s){var m=s.match(p);return m?m[1].trim():'';}
+  var mp=cvXmlCampo(txt,'MODALIDAD_PAGO'),cob=cvXmlCampo(txt,'COBERTURA_PLAN_BENEFICIOS');
   var nF=rx1(/<cbc:ParentDocumentID>([^<]+)/,txt)||rx1(/<cbc:ID>([^<]+)/,txt);
   var py=parseFloat(rx1(/PayableAmount[^>]*>([^<]+)/,txt))||0;
   var pbS=txt.indexOf('InvoicePeriod'),pbE=txt.indexOf('/InvoicePeriod');
@@ -1251,15 +1272,21 @@ function cvXmlInfo(txt){
   while((m2=rId.exec(txt))!==null)aId.push(m2[1].trim());
   while((m2=rNm.exec(txt))!==null)aNm.push(m2[1].trim());
   var cp=rx1(/<Name>CODIGO_PRESTADOR<\/Name>\s*<Value[^>]*>([^<]+)/,txt);
-  return{nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null};
+  return{nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null,
+    mp:mp.cod,mpNom:mp.nom,cob:cob.cod,cobNom:cob.nom};
 }
+// Modalidades de pago de la FEV en salud. Solo el pago por evento lleva valor en cada
+// servicio del RIPS: en las demás, vrServicio debe ir en cero (RVC034).
+var MODALIDAD_PAGO={'01':'Pago por capitación','02':'Pago por evento','03':'Pago global prospectivo','04':'Pago por conjunto integral de atenciones'};
 window.cvLX=function(f){
   var rd=new FileReader();
   rd.onload=function(e){
     try{
       vX=cvXmlInfo(e.target.result);
       var nF=vX.nF,st=vX.st,en=vX.en,py=vX.py,cp=vX.cp;
-      document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+cvI('Factura',nF,'mono')+cvI('Prestador',vX.sNm)+cvI('NIT Prestador',vX.nP,'mono')+cvI('Código habilitación',cp||'no detectado','mono')+cvI('Pagador',vX.cNm)+cvI('NIT Pagador',vX.nC,'mono')+cvI('Periodo',(st||'?')+' a '+(en||'?'),'mono')+cvI('Valor total',fm(py),'green')+'</div>';
+      document.getElementById('cvxmlout').innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'+cvI('Factura',nF,'mono')+cvI('Prestador',vX.sNm)+cvI('NIT Prestador',vX.nP,'mono')+cvI('Código habilitación',cp||'no detectado','mono')+cvI('Pagador',vX.cNm)+cvI('NIT Pagador',vX.nC,'mono')+cvI('Periodo',(st||'?')+' a '+(en||'?'),'mono')+cvI('Valor total',fm(py),'green')
+        +cvI('Modalidad de pago',vX.mp?(vX.mp+' · '+(MODALIDAD_PAGO[pad2(vX.mp)]||vX.mpNom||'')):'no declarada')
+        +cvI('Cobertura declarada',vX.cob?(vX.cob+(vX.cobNom?' · '+vX.cobNom:'')):'no declarada')+'</div>';
       var inp=document.getElementById('cv-numfact');
       if(inp&&!inp.value)inp.value=nF;
       var prestInp=document.getElementById('cv-prest');
@@ -1373,8 +1400,10 @@ function cvUV(){
   var profOk=vR.filter(function(r){return r.prof&&/^\d{4,15}$/.test(r.prof);}).length;
   var profBackup=vR.length-profOk;
   var pfSet=(document.getElementById('cv-prof')||{}).value;
+  // El XML de la factura lleva 10 dígitos, pero el RIPS exige 12 (los 10 del prestador + 2 de la sede).
+  var prestVal=String((document.getElementById('cv-prest')||{}).value||'').replace(/\D/g,''),prestOk=/^\d{12}$/.test(prestVal);
   function vi(ok,t,d){return'<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-100);font-size:.8rem;"><span style="color:'+(ok?'var(--green)':'var(--yellow)')+'">'+(ok?'OK':'AV')+'</span><span>'+t+'<div style="font-size:.7rem;color:var(--gray-400);font-family:var(--mono);margin-top:1px;">'+d+'</div></span></div>';}
-  document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(true,'Diagnóstico (CIE-10)',sinDx?(sinDx+' sin CIE-10 propio → se asigna K088 automáticamente'):'Todos con diagnóstico del Excel')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas')+vi(true,'Tipo de usuario','Todos = '+tuTxt+' (definido para el convenio, no se toma del Excel)')+vi(true,'Municipio (DANE 5 díg.)',nMun?(nMun+' usuario(s) con código de 4 díg. → corregido a 5 ("5045"→"05045")'):'Todos con 5 dígitos')+vi(true,'Código de servicio',csBad?(csBad+' servicio(s) con código 500/inválido → asignado por CUPS (odontología general = 334)'):'Todos con código válido del Excel')+vi(true,'Códigos a 2 dígitos',corr?(corr+' servicios con código de 1 dígito → corregidos automáticamente ("1"→"01")'):'Formato correcto (modalidad, grupo, concepto, etc.)')+vi(antic===0,'Concepto de recaudo 04 (anticipos)',antic?(antic+' servicio(s) traían concepto 04 → se omite en el RIPS (solo aplica en la FEV, Doc. Técnico 1)'):'Ninguno (correcto para RIPS soporte)')+vi(profOk===vR.length,'Documento del Dr. que atendió',profOk===vR.length?(profOk+' servicio(s) con Dr. propio del Excel'):(profOk+' con Dr. del Excel · '+profBackup+(pfSet?' usan el CC de respaldo ('+pfSet+')':' SIN Dr. asignado — completa el campo de respaldo o la columna en el Excel')));
+  document.getElementById('cv-val').innerHTML='<div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Validaciones</div>'+vi(df<1,'Suma vs XML',fm(tot)+' vs '+fm(vX.py))+vi(true,'Diagnóstico (CIE-10)',sinDx?(sinDx+' sin CIE-10 propio → se asigna K088 automáticamente'):'Todos con diagnóstico del Excel')+vi(sf===0,'Fechas',sf?sf+' sin fecha':'Todas validas')+vi(true,'Tipo de usuario','Todos = '+tuTxt+' (definido para el convenio, no se toma del Excel)')+vi(true,'Municipio (DANE 5 díg.)',nMun?(nMun+' usuario(s) con código de 4 díg. → corregido a 5 ("5045"→"05045")'):'Todos con 5 dígitos')+vi(true,'Código de servicio',csBad?(csBad+' servicio(s) con código 500/inválido → asignado por CUPS (odontología general = 334)'):'Todos con código válido del Excel')+vi(true,'Códigos a 2 dígitos',corr?(corr+' servicios con código de 1 dígito → corregidos automáticamente ("1"→"01")'):'Formato correcto (modalidad, grupo, concepto, etc.)')+vi(antic===0,'Concepto de recaudo 04 (anticipos)',antic?(antic+' servicio(s) traían concepto 04 → se omite en el RIPS (solo aplica en la FEV, Doc. Técnico 1)'):'Ninguno (correcto para RIPS soporte)')+vi(prestOk,'Código de habilitación (12 dígitos)',prestOk?('OK '+prestVal):(prestVal?(prestVal.length+' dígitos: el RIPS exige 12 (los 10 del prestador + 2 de la sede). El XML de la factura solo trae 10, completa los de tu sede.'):'Sin código: se tomaría el del XML, que trae solo 10 dígitos.'))+vi(profOk===vR.length,'Documento del Dr. que atendió',profOk===vR.length?(profOk+' servicio(s) con Dr. propio del Excel'):(profOk+' con Dr. del Excel · '+profBackup+(pfSet?' usan el CC de respaldo ('+pfSet+')':' SIN Dr. asignado — completa el campo de respaldo o la columna en el Excel')));
   var btn=document.getElementById('cv-btn');if(btn){btn.disabled=false;btn.style.opacity='1';}
 }
 // Tabla de equivalencias exactas CUPS 7->6 digitos
@@ -1589,18 +1618,35 @@ window.cvSwitchMode=function(m){
 function rvInitConvenio(){
   var cvSel=document.getElementById('cv-convenio'),rvSel=document.getElementById('rv-convenio');
   if(cvSel&&rvSel&&!rvSel.options.length){
-    rvSel.innerHTML='<option value="">Sin convenio — dejar el tipo de usuario que trae el archivo</option>'+cvSel.innerHTML;
-    rvSel.value='';
+    rvSel.innerHTML='<option value="auto">Detectar del XML de la factura (recomendado)</option>'
+      +'<option value="">Sin convenio — dejar el tipo de usuario que trae el archivo</option>'+cvSel.innerHTML;
+    rvSel.value='auto';
   }
   var cvTu=document.getElementById('cv-tusr-manual'),rvTu=document.getElementById('rv-tusr-manual');
   if(cvTu&&rvTu&&!rvTu.options.length)rvTu.innerHTML=cvTu.innerHTML;
   window.rvConvenioChange();
 }
-// Devuelve {tu, con, label} del convenio elegido. tu vacío = no verificar el tipo de usuario.
+// Mapa código de cobertura del Doc. Técnico 1 -> tipoUsuario, leído del propio selector.
+// Los códigos que admiten varios regímenes (13, 16...) quedan marcados como ambiguos.
+function rvCobTabla(){
+  var sel=document.getElementById('rv-convenio'),M={},i,o,m,n;
+  if(!sel)return M;
+  for(i=0;i<sel.options.length;i++){
+    o=sel.options[i];
+    if(!o.value||o.value==='auto'||o.disabled||o.dataset.manual==='1'||!o.dataset.tu)continue;
+    m=o.textContent.match(/^\s*(\d{1,2})\s*·/);if(!m)continue;
+    n=('0'+m[1]).slice(-2);
+    if(M[n])M[n].amb=true;
+    else M[n]={tu:o.dataset.tu,con:o.dataset.con||'05',label:o.textContent.trim(),amb:false};
+  }
+  return M;
+}
+// Devuelve {tu, con, label, auto} del convenio elegido. tu vacío = no verificar el tipo de usuario.
 function rvConvenioSel(){
   var sel=document.getElementById('rv-convenio');
   var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
   var con=String(((document.getElementById('rv-con')||{}).value)||'05');
+  if(opt&&opt.value==='auto')return{tu:'',con:con,label:'',auto:true};
   if(!opt||!opt.value)return{tu:'',con:con,label:'Sin convenio (se deja el tipo de usuario del archivo)'};
   if(opt.dataset.manual==='1'){
     var tuM=document.getElementById('rv-tusr-manual');
@@ -1608,6 +1654,27 @@ function rvConvenioSel(){
   }
   return{tu:opt.dataset.tu||'',con:con,label:opt.textContent.trim()};
 }
+// Resuelve el convenio de un archivo concreto cuando está en modo "detectar del XML".
+function rvResolverConvenio(base,xml){
+  if(!base.auto)return{tu:base.tu,con:base.con,conv:base.label,aviso:''};
+  var cod=xml&&xml.cob?pad2(xml.cob):'';
+  if(!cod)return{tu:'',con:base.con,conv:'no declarada en el XML',
+    aviso:'El XML no declara COBERTURA_PLAN_BENEFICIOS, así que no se puede deducir el tipo de usuario: elige el convenio a mano si necesitas revisarlo.'};
+  var e=rvCobTabla()[cod];
+  if(!e)return{tu:'',con:base.con,conv:'cobertura '+cod+' del XML (desconocida)',
+    aviso:'El XML declara la cobertura '+cod+', que no está en la tabla del Documento Técnico 1.'};
+  if(e.amb)return{tu:'',con:e.con,conv:'cobertura '+cod+' del XML ('+(xml.cobNom||'')+')',
+    aviso:'La cobertura '+cod+' admite varios regímenes, así que no se puede deducir un solo tipo de usuario: elígelo a mano.'};
+  return{tu:e.tu,con:e.con,conv:'detectado del XML · '+e.label,aviso:''};
+}
+window.rvModPagoChange=function(){
+  var hint=document.getElementById('rv-modpago-hint');
+  var v=String(((document.getElementById('rv-modpago')||{}).value)||'');
+  if(!hint)return;
+  if(!v)hint.innerHTML='Se lee MODALIDAD_PAGO del XML. Si el XML no lo trae, se asume pago por evento.';
+  else if(v==='02')hint.innerHTML='Pago por evento: cada servicio debe llevar su <code>vrServicio</code> mayor que cero.';
+  else hint.innerHTML=esc(MODALIDAD_PAGO[v]||v)+': <code>vrServicio</code> debe ir en cero en todos los servicios (RVC034); el valor se cobra en la FEV, no en el RIPS.';
+};
 window.rvConvenioChange=function(){
   var sel=document.getElementById('rv-convenio');
   var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
@@ -1638,6 +1705,7 @@ function rvNum(v){
 // Audita (y opcionalmente corrige) un JSON. Devuelve {json, h:[hallazgos], tot, nServ}.
 function rvAudit(json,xml,cfg){
   var H=[],fix=cfg.fix,hoy=new Date().toISOString().slice(0,10),totServ=0,nServ=0;
+  var mod=cfg.mp||'02',esEvento=mod==='02',modNom=MODALIDAD_PAGO[mod]||('modalidad '+mod);
   function add(sev,tipo,loc,campo,msg,antes,despues){H.push({sev:sev,tipo:tipo,loc:loc,campo:campo,msg:msg,antes:antes,despues:despues});}
   function put(obj,campo,nuevo,tipo,loc,msg,antesTxt){
     var antes=(antesTxt===undefined)?obj[campo]:antesTxt;
@@ -1656,6 +1724,8 @@ function rvAudit(json,xml,cfg){
   }
 
   var L0='Encabezado';
+  if(cfg.avisoConv)add('advertencia','Convenio',L0,'tipoUsuario',cfg.avisoConv,(xml&&xml.cob)||'(sin dato)',null);
+  if(cfg.avisoMod)add('advertencia','Modalidad de pago',L0,'vrServicio',cfg.avisoMod,(xml&&xml.mp)||'(sin dato)',null);
   var nioS=String(json.numDocumentoIdObligado==null?'':json.numDocumentoIdObligado).trim();
   if(!nioS)add('error','Obligatorio',L0,'numDocumentoIdObligado','Falta el NIT del prestador obligado a facturar.',json.numDocumentoIdObligado,null);
   else{
@@ -1760,12 +1830,18 @@ function rvAudit(json,xml,cfg){
       var b=it.b,s=it.s,SL=L+' › '+b.lbl+' '+(it.i+1);
       var cp=String(s.codPrestador==null?'':s.codPrestador).trim().replace(/\.0$/,'');
       if(!cp){
-        if(cfg.prest)put(s,'codPrestador',cfg.prest,'Obligatorio',SL,'Falta el código de habilitación del prestador.');
+        if(cfg.prest12)put(s,'codPrestador',cfg.prest12,'Obligatorio',SL,'Falta el código de habilitación del prestador.');
         else add('error','Obligatorio',SL,'codPrestador','Falta el código de habilitación del prestador.',s.codPrestador,null);
       }else{
         fixTo(s,'codPrestador',cp,'Formato',SL,'El código de habilitación se normalizó.');
-        if(!/^\d{10,12}$/.test(cp))add('advertencia','Formato',SL,'codPrestador','El código de habilitación suele tener 10 a 12 dígitos.',cp,null);
-        else if(cfg.prest&&cp!==cfg.prest)add('advertencia','Coherencia',SL,'codPrestador','No coincide con el código de habilitación esperado ('+cfg.prest+').',cp,cfg.prest);
+        if(/^\d{10}$/.test(cp)){
+          // El XML de la factura lleva 10 dígitos, pero el RIPS exige los 12 con la sede.
+          if(cfg.sede)put(s,'codPrestador',cp+cfg.sede,'Cod. prestador',SL,'El RIPS exige el código de habilitación de 12 dígitos: se completó con los dos dígitos de sede ('+cfg.sede+'). El XML de la factura sí lleva solo 10.');
+          else add('error','Cod. prestador',SL,'codPrestador','El RIPS exige el código de habilitación de 12 dígitos (los 10 del prestador más los 2 de la sede); el XML de la factura lleva solo 10. Escribe arriba tu código de 12 dígitos para completarlo.',cp,null);
+        }
+        else if(!/^\d{12}$/.test(cp))add('error','Cod. prestador',SL,'codPrestador','El código de habilitación del RIPS debe tener 12 dígitos numéricos (10 del prestador + 2 de la sede).',cp,null);
+        var cpF=String(s.codPrestador==null?'':s.codPrestador);
+        if(cfg.prest10&&cpF.slice(0,10)!==cfg.prest10)add('advertencia','Coherencia',SL,'codPrestador','Los primeros 10 dígitos no corresponden al prestador de la factura ('+cfg.prest10+').',cpF,null);
       }
       var campoF=(b.k==='medicamentos')?'fechaDispensAdmon':'fechaInicioAtencion';
       var fi=rvFhm(s[campoF]);
@@ -1855,10 +1931,14 @@ function rvAudit(json,xml,cfg){
         else fixTo(s,'numAutorizacion',aus,'Formato',SL,'El número de autorización se normalizó.');
       }
       if(b.k!=='urgencias'&&b.k!=='hospitalizacion'){
+        nServ++;
         var vr=rvNum(s.vrServicio);
         if(vr==null)add('error','Obligatorio',SL,'vrServicio','El valor del servicio falta o no es numérico.',s.vrServicio,null);
-        else if(vr<=0)add('error','Valor',SL,'vrServicio','El valor del servicio está en cero y el validador lo rechaza: debe ser mayor que cero.',s.vrServicio,null);
-        else{fixNum(s,'vrServicio',vr,'Formato',SL,'El valor va como número, sin separadores ni comillas.');totServ+=vr;nServ++;}
+        else if(esEvento){
+          if(vr<=0)add('error','Valor',SL,'vrServicio','En pago por evento el valor del servicio no puede ir en cero: el validador lo rechaza (RVC034).',s.vrServicio,null);
+          else{fixNum(s,'vrServicio',vr,'Formato',SL,'El valor va como número, sin separadores ni comillas.');totServ+=vr;}
+        }
+        else if(vr!==0)put(s,'vrServicio',0,'Valor',SL,'En '+modNom.toLowerCase()+' el valor del servicio debe ir en cero (RVC034): el valor se cobra en la factura electrónica, no en cada servicio del RIPS.');
         var vpm=rvNum(s.valorPagoModerador);
         if(vpm==null)put(s,'valorPagoModerador',0,'Obligatorio',SL,'Falta el valor de pago moderador; va en 0 cuando el paciente no pagó cuota.');
         else if(vpm<0)add('error','Valor',SL,'valorPagoModerador','El valor de pago moderador no puede ser negativo.',s.valorPagoModerador,null);
@@ -1904,7 +1984,7 @@ function rvAudit(json,xml,cfg){
     });
   });
 
-  if(xml&&xml.py>0&&nServ){
+  if(esEvento&&xml&&xml.py>0&&nServ){
     var dif=Math.round((totServ-xml.py)*100)/100;
     if(Math.abs(dif)>=1)add('advertencia','Cruce con XML',L0,'vrServicio','La suma de los servicios ('+fm(totServ)+') no coincide con el valor de la factura ('+fm(xml.py)+'). Diferencia: '+fm(dif)+'.',totServ,xml.py);
   }
@@ -1949,15 +2029,18 @@ function rvRenderXml(){
       rvX.forEach(function(x){
         h+='<div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:7px 12px;font-size:.78rem;">'
           +'<span>📄</span><span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--gray-700);">'+esc(x.name)+'</span>'
-          +'<span style="color:var(--gray-500);font-size:.72rem;">Factura '+esc(x.info.nF||'?')+' · '+esc((x.info.st||'?')+' a '+(x.info.en||'?'))+' · '+fm(x.info.py)+'</span></div>';
+          +'<span style="color:var(--gray-500);font-size:.72rem;">Factura '+esc(x.info.nF||'?')+' · '+esc((x.info.st||'?')+' a '+(x.info.en||'?'))+' · '+fm(x.info.py)
+          +' · prestador '+esc(x.info.cp||'?')+' · pago '+esc(x.info.mp?(x.info.mp+' '+(MODALIDAD_PAGO[pad2(x.info.mp)]||'')):'no declarado')
+          +' · cobertura '+esc(x.info.cob||'no declarada')+'</span></div>';
       });
       h+='</div>';
     }
     el.innerHTML=h;
   }
   rvsok(2,rvX.length?(rvX.length+' XML cargado(s)'):'Opcional',!!rvX.length);
+  // No se autocompleta el código: el XML trae 10 dígitos y el RIPS exige los 12 con la sede.
   var pi=document.getElementById('rv-prest');
-  if(pi&&!pi.value.trim()&&rvX.length&&rvX[0].info.cp)pi.value=rvX[0].info.cp;
+  if(pi&&!pi.value.trim()&&rvX.length&&rvX[0].info.cp)pi.placeholder='Ej: '+rvX[0].info.cp+'01  (los 10 del XML + tu sede)';
 }
 function rvMatchXml(item){
   if(!rvX.length)return null;
@@ -1975,20 +2058,28 @@ window.rvAnalizar=function(){
   var validos=rvJ.filter(function(f){return f.json;});
   if(!validos.length){alert('Carga al menos un JSON válido.');return;}
   var g=function(id){var e=document.getElementById(id);return e?String(e.value||'').trim():'';};
-  var conv=rvConvenioSel();
+  var base=rvConvenioSel();
+  base.fix=!!(document.getElementById('rv-fix')||{}).checked;
   var selConv=document.getElementById('rv-convenio');
-  if(selConv&&selConv.value&&!conv.tu){alert('El convenio elegido no tiene un tipo de usuario único: elige el régimen del paciente en el campo de abajo.');return;}
-  var base={
-    fix:!!(document.getElementById('rv-fix')||{}).checked,
-    tu:conv.tu,con:conv.con||'05',conv:conv.label,prest:g('rv-prest'),prof:g('rv-prof'),mun:g('rv-mun')
-  };
+  if(selConv&&selConv.value&&selConv.value!=='auto'&&!base.tu){alert('El convenio elegido no tiene un tipo de usuario único: elige el régimen del paciente en el campo de abajo.');return;}
+  var prestRaw=g('rv-prest').replace(/\D/g,''),modSel=g('rv-modpago');
+  var prof=g('rv-prof'),mun=g('rv-mun');
+  var prest12=/^\d{12}$/.test(prestRaw)?prestRaw:'';
   rvRes=validos.map(function(f){
     var xml=rvMatchXml(f);
-    var cfg={fix:base.fix,tu:base.tu,con:base.con,conv:base.conv,prof:base.prof,mun:base.mun,prest:base.prest||(xml&&xml.cp)||''};
+    var xcp=(xml&&xml.cp)?String(xml.cp).replace(/\D/g,''):'';
+    var cv=rvResolverConvenio(base,xml);
+    var mp=modSel||((xml&&xml.mp)?pad2(xml.mp):'');
+    var avisoMod=mp?'':((xml?'El XML no declara MODALIDAD_PAGO':'No cargaste el XML')+': se asume pago por evento y se exige valor mayor que cero en cada servicio. Si el contrato es por cápita, PGP o conjunto integral, elígelo arriba — en esas modalidades el valor debe ir en cero.');
+    var cfg={fix:base.fix,tu:cv.tu,con:cv.con||'05',conv:cv.conv,avisoConv:cv.aviso,
+      mp:mp||'02',avisoMod:avisoMod,prof:prof,mun:mun,
+      prest12:prest12,sede:prest12?prest12.slice(10):'',
+      prest10:prest12?prest12.slice(0,10):(/^\d{10}$/.test(prestRaw)?prestRaw:xcp.slice(0,10))};
     var r=rvAudit(JSON.parse(JSON.stringify(f.json)),xml,cfg);
-    return{name:f.name,json:r.json,h:r.h,tot:r.tot,nServ:r.nServ,xml:xml,fix:base.fix};
+    return{name:f.name,json:r.json,h:r.h,tot:r.tot,nServ:r.nServ,xml:xml,fix:base.fix,
+      conv:cv.conv,tu:cv.tu,mp:cfg.mp,mpNom:MODALIDAD_PAGO[cfg.mp]||cfg.mp};
   });
-  rvConv=base;
+  rvConv={auto:!!base.auto,modSel:modSel,fix:base.fix,label:base.label};
   rvRender();
 };
 
@@ -2014,8 +2105,8 @@ function rvRender(){
     +'<div style="font-size:.75rem;color:var(--gray-500);margin-bottom:4px;">'+rvRes.length+' archivo(s) analizado(s) · '
     +(modoAud?('modo auditoría: no se modificó nada, '+nAuto+' hallazgo(s) los puede corregir la app sola'):(nAuto+' corrección(es) aplicada(s)'))
     +' · '+nAdv+' advertencia(s)</div>'
-    +'<div style="font-size:.75rem;color:var(--gray-500);margin-bottom:14px;">🤝 Convenio: <strong>'+esc((rvConv&&rvConv.conv)||'sin convenio')+'</strong>'
-    +((rvConv&&rvConv.tu)?(' · tipoUsuario '+esc(rvConv.tu)+' · concepto por defecto '+esc(rvConv.con)):'')+'</div>'
+    +'<div style="font-size:.75rem;color:var(--gray-500);margin-bottom:14px;">🤝 Convenio: <strong>'+esc(rvRes.length===1?rvRes[0].conv:((rvConv&&rvConv.auto)?'detectado del XML de cada factura':((rvConv&&rvConv.label)||'sin convenio')))+'</strong>'
+    +' · 💳 Modalidad de pago: <strong>'+esc(rvRes.length===1?(rvRes[0].mp+' · '+rvRes[0].mpNom):((rvConv&&rvConv.modSel)?(rvConv.modSel+' · '+(MODALIDAD_PAGO[rvConv.modSel]||'')):'según el XML de cada factura'))+'</strong></div>'
     +'<div class="stat-grid" style="margin-bottom:12px;">'
     +'<div class="stat"><div class="stat-icon">📄</div><div class="stat-num blue">'+rvRes.length+'</div><div class="stat-label">Archivos</div></div>'
     +'<div class="stat"><div class="stat-icon">⛔</div><div class="stat-num red">'+nErr+'</div><div class="stat-label">Errores</div></div>'
@@ -2032,7 +2123,8 @@ function rvRender(){
     var e=rvCuenta(r.h,'error'),a=rvCuenta(r.h,'advertencia'),c=rvCuenta(r.h,sevAuto);
     h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--white);border:1px solid var(--gray-200);border-radius:8px;padding:8px 12px;font-size:.78rem;">'
       +'<span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--blue-dark);min-width:140px;">'+esc(r.name)+'</span>'
-      +'<span style="font-size:.72rem;color:var(--gray-500);">'+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s) · '+fm(r.tot)+(r.xml?'':' · sin XML')+'</span>'
+      +'<span style="font-size:.72rem;color:var(--gray-500);">'+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s) · '+(r.mp==='02'?fm(r.tot):('pago '+r.mp))+(r.xml?'':' · sin XML')+'</span>'
+      +'<span style="font-size:.7rem;color:var(--gray-400);flex-basis:100%;">'+esc(r.conv)+(r.tu?(' → tipoUsuario '+esc(r.tu)):'')+' · '+esc(r.mpNom)+'</span>'
       +'<span style="font-size:.72rem;color:'+(e?'var(--red)':'var(--green)')+';font-weight:700;">'+(e?e+' error(es)':'sin errores')+'</span>'
       +'<span style="font-size:.72rem;color:var(--gray-400);">'+a+' adv · '+c+(modoAud?' corregible(s)':' corregido(s)')+'</span>'
       +(modoAud?'':'<button onclick="rvDescargar('+i+')" style="padding:5px 11px;background:var(--white);border:1.5px solid var(--green);border-radius:7px;color:var(--green);font-family:var(--display);font-size:.72rem;font-weight:700;cursor:pointer;">⬇️ JSON</button>')
@@ -2098,7 +2190,7 @@ function rvReporteHTML(){
   var body='';
   rvRes.forEach(function(r){
     body+='<section><h2>🧾 '+esc(r.name)+'</h2>';
-    body+='<p class="meta">Factura <b>'+esc(r.json.numFactura||'?')+'</b> · '+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s) · total '+esc(fm(r.tot))+(r.xml?(' · XML '+esc(r.xml.nF||'?')+' ('+esc(fm(r.xml.py))+')'):' · sin XML de referencia')+'</p>';
+    body+='<p class="meta">Factura <b>'+esc(r.json.numFactura||'?')+'</b> · '+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s)'+(r.mp==='02'?(' · total '+esc(fm(r.tot))):'')+(r.xml?(' · XML '+esc(r.xml.nF||'?')+' ('+esc(fm(r.xml.py))+')'):' · sin XML de referencia')+'<br>Convenio: <b>'+esc(r.conv)+'</b>'+(r.tu?(' · tipoUsuario '+esc(r.tu)):'')+' · Modalidad de pago: <b>'+esc(r.mp+' · '+r.mpNom)+'</b></p>';
     if(!r.h.length)body+='<p class="none">Sin hallazgos: cumple todas las validaciones revisadas.</p>';
     else{
       body+='<table><thead><tr><th>Severidad</th><th>Tipo</th><th>Ubicación</th><th>Campo</th><th>Antes</th><th>Después</th><th>Detalle</th></tr></thead><tbody>';
@@ -2136,7 +2228,7 @@ function rvReporteHTML(){
     +'@media print{body{background:#fff;}header,.kpi,th,.sev{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
   return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reporte de errores RIPS Convenios</title><style>'+css+'</style></head><body><div class="wrap">'
     +'<header><h1>Reporte de errores · RIPS Convenios</h1><p>Validado contra la Resolución 948/2026 (Documento Técnico 1) · Generado el '+esc(fecha)+(modoAud?' · modo auditoría (sin correcciones aplicadas)':'')+'</p>'
-    +'<p>Convenio: <b>'+esc((rvConv&&rvConv.conv)||'sin convenio')+'</b>'+((rvConv&&rvConv.tu)?(' · tipoUsuario exigido '+esc(rvConv.tu)+' · concepto de recaudo por defecto '+esc(rvConv.con)):'')+'</p></header>'
+    +'<p>Convenio: <b>'+esc((rvConv&&rvConv.auto)?'detectado del XML de cada factura':((rvConv&&rvConv.label)||'sin convenio'))+'</b> · Modalidad de pago: <b>'+esc((rvConv&&rvConv.modSel)?(rvConv.modSel+' · '+(MODALIDAD_PAGO[rvConv.modSel]||'')):'según el XML de cada factura')+'</b></p></header>'
     +'<div class="kpis">'
     +'<div class="kpi"><b>'+rvRes.length+'</b><span>Archivos analizados</span></div>'
     +'<div class="kpi"><b style="color:#B91C1C">'+nErr+'</b><span>Errores por corregir</span></div>'
@@ -2159,7 +2251,7 @@ window.rvLimpiar=function(){
   var res=document.getElementById('rv-result');if(res){res.style.display='none';res.innerHTML='';}
 };
 document.addEventListener('DOMContentLoaded',function(){
-  rvInitConvenio();
+  rvInitConvenio();window.rvModPagoChange();
   var ij=document.getElementById('rvi-json');
   if(ij)ij.addEventListener('change',function(){
     var files=this.files;if(!files||!files.length)return;
