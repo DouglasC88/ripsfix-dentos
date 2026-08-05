@@ -599,28 +599,17 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
           <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">3</span>
-          <span style="font-family:var(--display);font-weight:700;font-size:.85rem;">Qué debe cumplir el archivo</span>
+          <span style="font-family:var(--display);font-weight:700;font-size:.85rem;">Convenio y datos del prestador</span>
         </div>
         <div style="padding:12px 16px;">
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">
-            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Tipo de usuario esperado</label>
-              <select id="rv-tu" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
-                <option value="">No verificar (dejar el del archivo)</option>
-                <option value="01">01 — Contributivo cotizante</option>
-                <option value="02">02 — Contributivo beneficiario</option>
-                <option value="03">03 — Contributivo adicional</option>
-                <option value="04">04 — Subsidiado</option>
-                <option value="05">05 — No afiliado (PPNA / vinculados)</option>
-                <option value="06">06 — Especial o Excepción cotizante</option>
-                <option value="07">07 — Especial o Excepción beneficiario</option>
-                <option value="13">13 — Especial/Excepción no cotizante (Ley 352/1997)</option>
-                <option value="08">08 — PPL a cargo del Fondo Nacional de Salud</option>
-                <option value="09">09 — Tomador/Amparado ARL</option>
-                <option value="10">10 — Tomador/Amparado SOAT</option>
-                <option value="11">11 — Planes Voluntarios de Salud (prepagada, pólizas, complementario)</option>
-                <option value="12">12 — Particular</option>
-              </select>
-              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Si lo eliges, todos los usuarios quedan con ese tipo (es lo que exige el convenio).</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;">
+            <div style="grid-column:1/-1;"><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Convenio · cobertura o plan de beneficio (Doc. Técnico 1)</label>
+              <select id="rv-convenio" onchange="rvConvenioChange()" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></select>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;" id="rv-convenio-hint"></div></div>
+            <div id="rv-manual" style="display:none;grid-column:1/-1;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;">
+              <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Tipo usuario (elige el régimen)</label>
+                <select id="rv-tusr-manual" onchange="rvConvenioChange()" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></select></div>
+            </div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Concepto de recaudo por defecto</label>
               <select id="rv-con" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
                 <option value="05" selected>05 — Otro / no aplica</option>
@@ -628,7 +617,7 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
                 <option value="01">01 — Cuota moderadora (solo Contributivo)</option>
                 <option value="03">03 — Pagos compartidos (planes voluntarios)</option>
               </select>
-              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Se usa cuando el concepto viene vacío o inválido.</div></div>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Se ajusta al convenio que elijas; solo se usa cuando el concepto viene vacío o inválido.</div></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Código habilitación esperado</label>
               <input id="rv-prest" type="text" placeholder="Se toma del XML si lo cargas" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);"></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">CC odontólogo (respaldo)</label>
@@ -1574,7 +1563,7 @@ window.cvLimpiar=function(){
 // Audita un JSON ya generado (p. ej. exportado desde Dentos) contra la
 // Res. 948/2026 (Doc. Técnico 1), corrige lo corregible y reporta el resto.
 // ═══════════════════════════════════════════════════════════════
-var rvJ=[],rvX=[],rvRes=[];
+var rvJ=[],rvX=[],rvRes=[],rvConv=null;
 var RV_TDOC=['CC','CE','CD','PA','RC','TI','CN','SC','PE','PT','DE','AS','MS','NV','NI','NIT'];
 var RV_TU=['01','02','03','04','05','06','07','08','09','10','11','12','13'];
 var RV_CON=['01','02','03','05'];
@@ -1593,6 +1582,45 @@ window.cvSwitchMode=function(m){
   document.getElementById('cv-mode-rev').style.display=gen?'none':'';
   document.getElementById('cvtab-gen').classList.toggle('active',gen);
   document.getElementById('cvtab-rev').classList.toggle('active',!gen);
+};
+
+// El revisor usa la MISMA tabla de convenios del generador: clona sus opciones
+// para que no existan dos listas de coberturas que puedan quedar desalineadas.
+function rvInitConvenio(){
+  var cvSel=document.getElementById('cv-convenio'),rvSel=document.getElementById('rv-convenio');
+  if(cvSel&&rvSel&&!rvSel.options.length){
+    rvSel.innerHTML='<option value="">Sin convenio — dejar el tipo de usuario que trae el archivo</option>'+cvSel.innerHTML;
+    rvSel.value='';
+  }
+  var cvTu=document.getElementById('cv-tusr-manual'),rvTu=document.getElementById('rv-tusr-manual');
+  if(cvTu&&rvTu&&!rvTu.options.length)rvTu.innerHTML=cvTu.innerHTML;
+  window.rvConvenioChange();
+}
+// Devuelve {tu, con, label} del convenio elegido. tu vacío = no verificar el tipo de usuario.
+function rvConvenioSel(){
+  var sel=document.getElementById('rv-convenio');
+  var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
+  var con=String(((document.getElementById('rv-con')||{}).value)||'05');
+  if(!opt||!opt.value)return{tu:'',con:con,label:'Sin convenio (se deja el tipo de usuario del archivo)'};
+  if(opt.dataset.manual==='1'){
+    var tuM=document.getElementById('rv-tusr-manual');
+    return{tu:(tuM&&tuM.value)||'',con:con,label:opt.textContent.trim()+' — régimen elegido a mano'};
+  }
+  return{tu:opt.dataset.tu||'',con:con,label:opt.textContent.trim()};
+}
+window.rvConvenioChange=function(){
+  var sel=document.getElementById('rv-convenio');
+  var opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
+  var esManual=!!(opt&&opt.value&&opt.dataset.manual==='1');
+  var manual=document.getElementById('rv-manual');
+  if(manual)manual.style.display=esManual?'grid':'none';
+  if(opt&&opt.value&&opt.dataset.con){var c=document.getElementById('rv-con');if(c)c.value=opt.dataset.con;}
+  var hint=document.getElementById('rv-convenio-hint');
+  if(hint){
+    var s=rvConvenioSel();
+    if(!s.tu)hint.textContent=esManual?((opt.dataset.hint||'')+' Elige el régimen abajo.'):'No se revisa el tipo de usuario: queda el que venga en el JSON.';
+    else hint.textContent='Se exige tipoUsuario = '+s.tu+' en todos los pacientes · concepto de recaudo por defecto = '+s.con+' ('+(CONCEPTO_NOMBRES[s.con]||s.con)+')';
+  }
 };
 
 function rvDia(v){var m=String(v==null?'':v).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);return m?(m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2)):'';}
@@ -1696,7 +1724,7 @@ function rvAudit(json,xml,cfg){
     if(!sx)add('error','Obligatorio',L,'codSexo','El sexo falta o no se puede interpretar como M o F.',u.codSexo,null);
     else fixTo(u,'codSexo',sx,'Formato',L,'El sexo se reporta como M o F.');
     var tu=pad2(u.tipoUsuario);
-    if(cfg.tu&&tu!==cfg.tu)put(u,'tipoUsuario',cfg.tu,'Tipo usuario',L,'El convenio exige tipo de usuario '+cfg.tu+'.');
+    if(cfg.tu&&tu!==cfg.tu)put(u,'tipoUsuario',cfg.tu,'Tipo usuario',L,'El convenio “'+(cfg.conv||'seleccionado')+'” exige tipo de usuario '+cfg.tu+'.');
     else if(!tu)add('error','Obligatorio',L,'tipoUsuario','Falta el tipo de usuario.',u.tipoUsuario,null);
     else{
       fixTo(u,'tipoUsuario',tu,'Formato',L,'El tipo de usuario va a dos dígitos ("1" → "01").');
@@ -1842,6 +1870,10 @@ function rvAudit(json,xml,cfg){
         else if(RV_CON.indexOf(cr)<0)put(s,'conceptoRecaudo',crNuevo,'Tabla de referencia',SL,'El concepto de recaudo "'+cr+'" no existe; se asignó '+crNuevo+'.');
         else if((cr==='01'||cr==='03')&&!(vpmF>0))put(s,'conceptoRecaudo','05','Concepto recaudo',SL,'El concepto '+cr+' exige un pago moderador mayor o igual a 1 y aquí es 0; se cambió a 05.');
         else fixTo(s,'conceptoRecaudo',cr,'Formato',SL,'El concepto de recaudo va a dos dígitos.');
+        // El concepto de recaudo tiene que ser coherente con el régimen del paciente.
+        var crF=pad2(s.conceptoRecaudo),tuF=pad2(u.tipoUsuario);
+        if(crF==='01'&&['01','02','03'].indexOf(tuF)<0)add('advertencia','Concepto recaudo',SL,'conceptoRecaudo','La cuota moderadora (01) solo aplica al régimen contributivo y este paciente es tipo '+tuF+'.',crF,null);
+        if(crF==='03'&&tuF!=='11')add('advertencia','Concepto recaudo',SL,'conceptoRecaudo','Los pagos compartidos (03) solo aplican a planes voluntarios de salud (tipo 11) y este paciente es tipo '+tuF+'.',crF,null);
         if(vpmF>0){
           if(s.numFEVPagoModerador==null||String(s.numFEVPagoModerador).trim()==='')add('error','Coherencia',SL,'numFEVPagoModerador','Hay pago moderador ('+fm(vpmF)+') pero falta el número de factura que lo soporta.',s.numFEVPagoModerador,null);
         }
@@ -1943,16 +1975,20 @@ window.rvAnalizar=function(){
   var validos=rvJ.filter(function(f){return f.json;});
   if(!validos.length){alert('Carga al menos un JSON válido.');return;}
   var g=function(id){var e=document.getElementById(id);return e?String(e.value||'').trim():'';};
+  var conv=rvConvenioSel();
+  var selConv=document.getElementById('rv-convenio');
+  if(selConv&&selConv.value&&!conv.tu){alert('El convenio elegido no tiene un tipo de usuario único: elige el régimen del paciente en el campo de abajo.');return;}
   var base={
     fix:!!(document.getElementById('rv-fix')||{}).checked,
-    tu:g('rv-tu'),con:g('rv-con')||'05',prest:g('rv-prest'),prof:g('rv-prof'),mun:g('rv-mun')
+    tu:conv.tu,con:conv.con||'05',conv:conv.label,prest:g('rv-prest'),prof:g('rv-prof'),mun:g('rv-mun')
   };
   rvRes=validos.map(function(f){
     var xml=rvMatchXml(f);
-    var cfg={fix:base.fix,tu:base.tu,con:base.con,prof:base.prof,mun:base.mun,prest:base.prest||(xml&&xml.cp)||''};
+    var cfg={fix:base.fix,tu:base.tu,con:base.con,conv:base.conv,prof:base.prof,mun:base.mun,prest:base.prest||(xml&&xml.cp)||''};
     var r=rvAudit(JSON.parse(JSON.stringify(f.json)),xml,cfg);
     return{name:f.name,json:r.json,h:r.h,tot:r.tot,nServ:r.nServ,xml:xml,fix:base.fix};
   });
+  rvConv=base;
   rvRender();
 };
 
@@ -1975,9 +2011,11 @@ function rvRender(){
   var h='<div style="background:'+(nErr?'#FFFBEB':'#F0FDF4')+';border:1px solid '+(nErr?'#FDE68A':'#BBF7D0')+';border-radius:10px;padding:16px;">'
     +'<div style="font-size:.95rem;font-weight:700;color:'+(nErr?'#92400E':'var(--green)')+';margin-bottom:2px;">'
     +(nErr?('⚠️ '+nErr+' error(es) que debes corregir en el origen'):'✅ Sin errores que corregir a mano')+'</div>'
-    +'<div style="font-size:.75rem;color:var(--gray-500);margin-bottom:14px;">'+rvRes.length+' archivo(s) analizado(s) · '
+    +'<div style="font-size:.75rem;color:var(--gray-500);margin-bottom:4px;">'+rvRes.length+' archivo(s) analizado(s) · '
     +(modoAud?('modo auditoría: no se modificó nada, '+nAuto+' hallazgo(s) los puede corregir la app sola'):(nAuto+' corrección(es) aplicada(s)'))
     +' · '+nAdv+' advertencia(s)</div>'
+    +'<div style="font-size:.75rem;color:var(--gray-500);margin-bottom:14px;">🤝 Convenio: <strong>'+esc((rvConv&&rvConv.conv)||'sin convenio')+'</strong>'
+    +((rvConv&&rvConv.tu)?(' · tipoUsuario '+esc(rvConv.tu)+' · concepto por defecto '+esc(rvConv.con)):'')+'</div>'
     +'<div class="stat-grid" style="margin-bottom:12px;">'
     +'<div class="stat"><div class="stat-icon">📄</div><div class="stat-num blue">'+rvRes.length+'</div><div class="stat-label">Archivos</div></div>'
     +'<div class="stat"><div class="stat-icon">⛔</div><div class="stat-num red">'+nErr+'</div><div class="stat-label">Errores</div></div>'
@@ -2097,7 +2135,8 @@ function rvReporteHTML(){
     +'.none{color:#6B8599;font-size:.8rem;margin:0;}'
     +'@media print{body{background:#fff;}header,.kpi,th,.sev{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
   return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reporte de errores RIPS Convenios</title><style>'+css+'</style></head><body><div class="wrap">'
-    +'<header><h1>Reporte de errores · RIPS Convenios</h1><p>Validado contra la Resolución 948/2026 (Documento Técnico 1) · Generado el '+esc(fecha)+(modoAud?' · modo auditoría (sin correcciones aplicadas)':'')+'</p></header>'
+    +'<header><h1>Reporte de errores · RIPS Convenios</h1><p>Validado contra la Resolución 948/2026 (Documento Técnico 1) · Generado el '+esc(fecha)+(modoAud?' · modo auditoría (sin correcciones aplicadas)':'')+'</p>'
+    +'<p>Convenio: <b>'+esc((rvConv&&rvConv.conv)||'sin convenio')+'</b>'+((rvConv&&rvConv.tu)?(' · tipoUsuario exigido '+esc(rvConv.tu)+' · concepto de recaudo por defecto '+esc(rvConv.con)):'')+'</p></header>'
     +'<div class="kpis">'
     +'<div class="kpi"><b>'+rvRes.length+'</b><span>Archivos analizados</span></div>'
     +'<div class="kpi"><b style="color:#B91C1C">'+nErr+'</b><span>Errores por corregir</span></div>'
@@ -2120,6 +2159,7 @@ window.rvLimpiar=function(){
   var res=document.getElementById('rv-result');if(res){res.style.display='none';res.innerHTML='';}
 };
 document.addEventListener('DOMContentLoaded',function(){
+  rvInitConvenio();
   var ij=document.getElementById('rvi-json');
   if(ij)ij.addEventListener('change',function(){
     var files=this.files;if(!files||!files.length)return;
