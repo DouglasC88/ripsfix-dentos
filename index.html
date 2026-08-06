@@ -628,6 +628,9 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
                 <option value="03">03 — Pagos compartidos (planes voluntarios)</option>
               </select>
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Se ajusta al convenio que elijas; solo se usa cuando el concepto viene vacío o inválido.</div></div>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Nº de factura que va en el RIPS</label>
+              <input id="rv-numfact" type="text" placeholder="Solo en cápita: la factura del período anterior" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">En capitación el RIPS se adjunta a la factura del período siguiente, así que aquí va el número de la <strong>factura anterior</strong>, distinto al del XML. En las demás modalidades déjalo vacío: debe coincidir con el XML.</div></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Código habilitación con sede (12 dígitos)</label>
               <input id="rv-prest" type="text" placeholder="Ej: 206210148901" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">El XML de la factura lleva 10 dígitos; el RIPS exige 12 (los 10 del prestador + 2 de la sede). Si pones los 12 aquí, se completan los que vengan con 10.</div></div>
@@ -1683,7 +1686,8 @@ window.rvModPagoChange=function(){
   if(!hint)return;
   if(!v)hint.innerHTML='Se lee MODALIDAD_PAGO del XML. Si el XML no lo trae, se asume pago por evento.';
   else if(v===MODALIDAD_EVENTO)hint.innerHTML='Pago por evento: cada servicio debe llevar su <code>vrServicio</code> mayor que cero.';
-  else hint.innerHTML=esc(MODALIDAD_PAGO[v]||v)+': <code>vrServicio</code> debe ir en cero en todos los servicios (RVC034); el valor se cobra en la FEV, no en el RIPS.';
+  else hint.innerHTML=esc(MODALIDAD_PAGO[v]||v)+': <code>vrServicio</code> debe ir en cero en todos los servicios (RVC034); el valor se cobra en la FEV, no en el RIPS.'
+    +(v==='03'?' Además el <code>numFactura</code> del RIPS debe ser el de la <strong>factura del período anterior</strong>, distinto al del XML.':'');
 };
 window.rvConvenioChange=function(){
   var sel=document.getElementById('rv-convenio');
@@ -1725,6 +1729,7 @@ function rvAudit(json,xml,cfg){
   var H=[],fix=cfg.fix,hoy=new Date().toISOString().slice(0,10),totServ=0,nServ=0;
   var mod=cfg.mp||MODALIDAD_EVENTO,modNom=cfg.mpNom||MODALIDAD_PAGO[mod]||('modalidad '+mod);
   var esEvento=esPagoPorEvento(mod,modNom);
+  var esCapita=/capitaci/i.test(modNom||'')||mod==='03';
   // En pago por evento, si hay servicios en cero se reparte el total de la factura entre todos
   // (lo mismo que hace RIPS Particulares). Se decide antes de validar para no reportar dos veces.
   var servTodos=[],repartir=false;
@@ -1766,13 +1771,20 @@ function rvAudit(json,xml,cfg){
   }
   var nf=String(json.numFactura==null?'':json.numFactura).trim();
   if(!nf){
-    if(xml&&xml.nF)put(json,'numFactura',xml.nF,'Obligatorio',L0,'Falta el número de factura; se toma del XML.');
+    if(cfg.numFactRips)put(json,'numFactura',cfg.numFactRips,'Obligatorio',L0,'Falta el número de factura; se usó el que indicaste para el RIPS.');
+    else if(!esCapita&&xml&&xml.nF)put(json,'numFactura',xml.nF,'Obligatorio',L0,'Falta el número de factura; se toma del XML.');
     else add('error','Obligatorio',L0,'numFactura','Falta el número de factura.',json.numFactura,null);
   }else{
     fixTo(json,'numFactura',nf,'Formato',L0,'El número de factura traía espacios sobrantes.');
     if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nf))add('error','Formato',L0,'numFactura','El número de factura parece un UUID (CUFE) y no el número real de la factura.',nf,(xml&&xml.nF)||null);
-    // RVG06: el número del RIPS debe ser idéntico al de la factura, con prefijo incluido.
-    // Si falta el prefijo, el Ministerio no encuentra la factura en su base y rechaza el RIPS.
+    else if(cfg.numFactRips&&nf!==cfg.numFactRips)put(json,'numFactura',cfg.numFactRips,'Cruce con XML',L0,'Se reemplazó por el número de factura que indicaste arriba para el RIPS.');
+    else if(esCapita){
+      // En capitación el RIPS acompaña a la factura del período siguiente: su numFactura es el de
+      // la factura anterior y no puede repetir el de la FEV que lo transporta (RVG06).
+      if(xml&&xml.nF&&nf===xml.nF)add('error','Cruce con XML',L0,'numFactura','En capitación por períodos el número de factura del RIPS debe ser DISTINTO al de la factura que lo transporta ("'+xml.nF+'"): tiene que ser el de la factura del período anterior, ya validada. Con este valor el validador rechaza el paquete (RVG06). Escríbelo en el campo "Nº de factura que va en el RIPS".',nf,null);
+      else add('advertencia','Cruce con XML',L0,'numFactura','En capitación este número debe corresponder a una factura de un período anterior ya validada por el Ministerio. No se puede comprobar desde aquí: verifica que "'+nf+'" sea esa factura.',nf,null);
+    }
+    // Fuera de capitación el número del RIPS es el de su propia factura, prefijo incluido (RVG06).
     else if(xml&&xml.nF&&nf!==xml.nF)put(json,'numFactura',xml.nF,'Cruce con XML',L0,
       'El número de factura del RIPS debe ser idéntico al de la factura electrónica ("'+xml.nF+'"). Con "'+nf+'" el Ministerio no la encuentra en su base de datos y rechaza el RIPS (RVG06)'+(xml.nF.indexOf(nf)>-1?': le falta el prefijo de la numeración.':'.'));
   }
@@ -2127,7 +2139,7 @@ window.rvAnalizar=function(){
   var selConv=document.getElementById('rv-convenio');
   if(selConv&&selConv.value&&selConv.value!=='auto'&&!base.tu){alert('El convenio elegido no tiene un tipo de usuario único: elige el régimen del paciente en el campo de abajo.');return;}
   var prestRaw=g('rv-prest').replace(/\D/g,''),modSel=g('rv-modpago');
-  var prof=g('rv-prof'),mun=g('rv-mun');
+  var prof=g('rv-prof'),mun=g('rv-mun'),numFactRips=g('rv-numfact');
   var prest12=/^\d{12}$/.test(prestRaw)?prestRaw:'';
   rvRes=validos.map(function(f){
     var xml=rvMatchXml(f);
@@ -2137,7 +2149,7 @@ window.rvAnalizar=function(){
     var mpNom=modSel?(MODALIDAD_PAGO[modSel]||''):((xml&&xml.mpNom)||MODALIDAD_PAGO[mp]||'');
     var avisoMod=mp?'':((xml?'El XML no declara MODALIDAD_PAGO':'No cargaste el XML')+': se asume pago por evento y se exige valor mayor que cero en cada servicio. Si el contrato es por cápita, PGP o conjunto integral, elígelo arriba — en esas modalidades el valor debe ir en cero.');
     var cfg={fix:base.fix,tu:cv.tu,con:cv.con||'05',conv:cv.conv,avisoConv:cv.aviso,
-      mp:mp||MODALIDAD_EVENTO,mpNom:mpNom,avisoMod:avisoMod,prof:prof,mun:mun,
+      mp:mp||MODALIDAD_EVENTO,mpNom:mpNom,avisoMod:avisoMod,prof:prof,mun:mun,numFactRips:numFactRips,
       prest12:prest12,sede:prest12?prest12.slice(10):'',
       prest10:prest12?prest12.slice(0,10):(/^\d{10}$/.test(prestRaw)?prestRaw:xcp.slice(0,10))};
     var r=rvAudit(JSON.parse(JSON.stringify(f.json)),xml,cfg);
