@@ -614,10 +614,10 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Modalidad de pago del contrato</label>
               <select id="rv-modpago" onchange="rvModPagoChange()" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
                 <option value="" selected>Detectar del XML de la factura</option>
-                <option value="02">02 — Pago por evento</option>
-                <option value="01">01 — Pago por capitación (cápita)</option>
-                <option value="03">03 — Pago global prospectivo (PGP)</option>
-                <option value="04">04 — Pago por conjunto integral de atenciones</option>
+                <option value="04">04 — Pago por evento</option>
+                <option value="03">03 — Pago por capitación (cápita)</option>
+                <option value="02">02 — Pago global prospectivo (PGP)</option>
+                <option value="01">01 — Pago individual por caso, paquete o canasta</option>
               </select>
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;" id="rv-modpago-hint">Solo el pago por evento lleva valor en cada servicio; en las demás <code>vrServicio</code> debe ir en cero (RVC034).</div></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Concepto de recaudo por defecto</label>
@@ -1284,9 +1284,18 @@ function cvXmlInfo(txt){
   return{nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null,
     mp:mp.cod,mpNom:mp.nom,cob:cob.cod,cobNom:cob.nom};
 }
-// Modalidades de pago de la FEV en salud. Solo el pago por evento lleva valor en cada
-// servicio del RIPS: en las demás, vrServicio debe ir en cero (RVC034).
-var MODALIDAD_PAGO={'01':'Pago por capitación','02':'Pago por evento','03':'Pago global prospectivo','04':'Pago por conjunto integral de atenciones'};
+// Modalidades de pago de la FEV en salud (tabla salud_modalidad_pago.gc de SISPRO).
+// Solo el pago por evento lleva valor en cada servicio del RIPS: en las demás,
+// vrServicio debe ir en cero (RVC034).
+var MODALIDAD_PAGO={'01':'Pago individual por caso, conjunto integral de atenciones, paquete o canasta','02':'Pago global prospectivo','03':'Pago por capitación','04':'Pago por evento'};
+var MODALIDAD_EVENTO='04';
+// El nombre que viene en el XML manda sobre el código: si el emisor usa otra codificación,
+// "Pago por evento" sigue reconociéndose.
+function esPagoPorEvento(cod,nom){
+  if(nom&&/evento/i.test(nom))return true;
+  if(nom&&/capitaci|global prospectivo|paquete|canasta|conjunto integral|caso/i.test(nom))return false;
+  return String(cod||MODALIDAD_EVENTO)===MODALIDAD_EVENTO;
+}
 window.cvLX=function(f){
   var rd=new FileReader();
   rd.onload=function(e){
@@ -1673,7 +1682,7 @@ window.rvModPagoChange=function(){
   var v=String(((document.getElementById('rv-modpago')||{}).value)||'');
   if(!hint)return;
   if(!v)hint.innerHTML='Se lee MODALIDAD_PAGO del XML. Si el XML no lo trae, se asume pago por evento.';
-  else if(v==='02')hint.innerHTML='Pago por evento: cada servicio debe llevar su <code>vrServicio</code> mayor que cero.';
+  else if(v===MODALIDAD_EVENTO)hint.innerHTML='Pago por evento: cada servicio debe llevar su <code>vrServicio</code> mayor que cero.';
   else hint.innerHTML=esc(MODALIDAD_PAGO[v]||v)+': <code>vrServicio</code> debe ir en cero en todos los servicios (RVC034); el valor se cobra en la FEV, no en el RIPS.';
 };
 window.rvConvenioChange=function(){
@@ -1714,7 +1723,8 @@ function rvNum(v){
 // Audita (y opcionalmente corrige) un JSON. Devuelve {json, h:[hallazgos], tot, nServ}.
 function rvAudit(json,xml,cfg){
   var H=[],fix=cfg.fix,hoy=new Date().toISOString().slice(0,10),totServ=0,nServ=0;
-  var mod=cfg.mp||'02',esEvento=mod==='02',modNom=MODALIDAD_PAGO[mod]||('modalidad '+mod);
+  var mod=cfg.mp||MODALIDAD_EVENTO,modNom=cfg.mpNom||MODALIDAD_PAGO[mod]||('modalidad '+mod);
+  var esEvento=esPagoPorEvento(mod,modNom);
   // En pago por evento, si hay servicios en cero se reparte el total de la factura entre todos
   // (lo mismo que hace RIPS Particulares). Se decide antes de validar para no reportar dos veces.
   var servTodos=[],repartir=false;
@@ -1760,8 +1770,11 @@ function rvAudit(json,xml,cfg){
     else add('error','Obligatorio',L0,'numFactura','Falta el número de factura.',json.numFactura,null);
   }else{
     fixTo(json,'numFactura',nf,'Formato',L0,'El número de factura traía espacios sobrantes.');
-    if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nf))add('error','Formato',L0,'numFactura','El número de factura parece un UUID (CUFE) y no el consecutivo real de la factura.',nf,(xml&&xml.nF)||null);
-    else if(xml&&xml.nF&&nf!==xml.nF)add('advertencia','Cruce con XML',L0,'numFactura','El número de factura del JSON no coincide con el del XML.',nf,xml.nF);
+    if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(nf))add('error','Formato',L0,'numFactura','El número de factura parece un UUID (CUFE) y no el número real de la factura.',nf,(xml&&xml.nF)||null);
+    // RVG06: el número del RIPS debe ser idéntico al de la factura, con prefijo incluido.
+    // Si falta el prefijo, el Ministerio no encuentra la factura en su base y rechaza el RIPS.
+    else if(xml&&xml.nF&&nf!==xml.nF)put(json,'numFactura',xml.nF,'Cruce con XML',L0,
+      'El número de factura del RIPS debe ser idéntico al de la factura electrónica ("'+xml.nF+'"). Con "'+nf+'" el Ministerio no la encuentra en su base de datos y rechaza el RIPS (RVG06)'+(xml.nF.indexOf(nf)>-1?': le falta el prefijo de la numeración.':'.'));
   }
   if(!('tipoNota' in json))put(json,'tipoNota',null,'Obligatorio',L0,'Falta el campo tipoNota; debe existir aunque vaya en null.','(no existe)');
   else if(json.tipoNota!=null&&String(json.tipoNota).trim()==='')fixTo(json,'tipoNota',null,'Formato',L0,'tipoNota va en null cuando la factura no es nota crédito ni débito.');
@@ -2121,14 +2134,16 @@ window.rvAnalizar=function(){
     var xcp=(xml&&xml.cp)?String(xml.cp).replace(/\D/g,''):'';
     var cv=rvResolverConvenio(base,xml);
     var mp=modSel||((xml&&xml.mp)?pad2(xml.mp):'');
+    var mpNom=modSel?(MODALIDAD_PAGO[modSel]||''):((xml&&xml.mpNom)||MODALIDAD_PAGO[mp]||'');
     var avisoMod=mp?'':((xml?'El XML no declara MODALIDAD_PAGO':'No cargaste el XML')+': se asume pago por evento y se exige valor mayor que cero en cada servicio. Si el contrato es por cápita, PGP o conjunto integral, elígelo arriba — en esas modalidades el valor debe ir en cero.');
     var cfg={fix:base.fix,tu:cv.tu,con:cv.con||'05',conv:cv.conv,avisoConv:cv.aviso,
-      mp:mp||'02',avisoMod:avisoMod,prof:prof,mun:mun,
+      mp:mp||MODALIDAD_EVENTO,mpNom:mpNom,avisoMod:avisoMod,prof:prof,mun:mun,
       prest12:prest12,sede:prest12?prest12.slice(10):'',
       prest10:prest12?prest12.slice(0,10):(/^\d{10}$/.test(prestRaw)?prestRaw:xcp.slice(0,10))};
     var r=rvAudit(JSON.parse(JSON.stringify(f.json)),xml,cfg);
     return{name:f.name,json:r.json,h:r.h,tot:r.tot,nServ:r.nServ,xml:xml,fix:base.fix,
-      conv:cv.conv,tu:cv.tu,mp:cfg.mp,mpNom:MODALIDAD_PAGO[cfg.mp]||cfg.mp};
+      conv:cv.conv,tu:cv.tu,mp:cfg.mp,mpNom:mpNom||MODALIDAD_PAGO[cfg.mp]||cfg.mp,
+      esEvento:esPagoPorEvento(cfg.mp,mpNom)};
   });
   rvConv={auto:!!base.auto,modSel:modSel,fix:base.fix,label:base.label};
   rvRender();
@@ -2174,7 +2189,7 @@ function rvRender(){
     var e=rvCuenta(r.h,'error'),a=rvCuenta(r.h,'advertencia'),c=rvCuenta(r.h,sevAuto);
     h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--white);border:1px solid var(--gray-200);border-radius:8px;padding:8px 12px;font-size:.78rem;">'
       +'<span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--blue-dark);min-width:140px;">'+esc(r.name)+'</span>'
-      +'<span style="font-size:.72rem;color:var(--gray-500);">'+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s) · '+(r.mp==='02'?fm(r.tot):('pago '+r.mp))+(r.xml?'':' · sin XML')+'</span>'
+      +'<span style="font-size:.72rem;color:var(--gray-500);">'+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s) · '+(r.esEvento?fm(r.tot):('pago '+r.mp))+(r.xml?'':' · sin XML')+'</span>'
       +'<span style="font-size:.7rem;color:var(--gray-400);flex-basis:100%;">'+esc(r.conv)+(r.tu?(' → tipoUsuario '+esc(r.tu)):'')+' · '+esc(r.mpNom)+'</span>'
       +'<span style="font-size:.72rem;color:'+(e?'var(--red)':'var(--green)')+';font-weight:700;">'+(e?e+' error(es)':'sin errores')+'</span>'
       +'<span style="font-size:.72rem;color:var(--gray-400);">'+a+' adv · '+c+(modoAud?' corregible(s)':' corregido(s)')+'</span>'
@@ -2241,7 +2256,7 @@ function rvReporteHTML(){
   var body='';
   rvRes.forEach(function(r){
     body+='<section><h2>🧾 '+esc(r.name)+'</h2>';
-    body+='<p class="meta">Factura <b>'+esc(r.json.numFactura||'?')+'</b> · '+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s)'+(r.mp==='02'?(' · total '+esc(fm(r.tot))):'')+(r.xml?(' · XML '+esc(r.xml.nF||'?')+' ('+esc(fm(r.xml.py))+')'):' · sin XML de referencia')+'<br>Convenio: <b>'+esc(r.conv)+'</b>'+(r.tu?(' · tipoUsuario '+esc(r.tu)):'')+' · Modalidad de pago: <b>'+esc(r.mp+' · '+r.mpNom)+'</b></p>';
+    body+='<p class="meta">Factura <b>'+esc(r.json.numFactura||'?')+'</b> · '+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s)'+(r.esEvento?(' · total '+esc(fm(r.tot))):'')+(r.xml?(' · XML '+esc(r.xml.nF||'?')+' ('+esc(fm(r.xml.py))+')'):' · sin XML de referencia')+'<br>Convenio: <b>'+esc(r.conv)+'</b>'+(r.tu?(' · tipoUsuario '+esc(r.tu)):'')+' · Modalidad de pago: <b>'+esc(r.mp+' · '+r.mpNom)+'</b></p>';
     if(!r.h.length)body+='<p class="none">Sin hallazgos: cumple todas las validaciones revisadas.</p>';
     else{
       body+='<table><thead><tr><th>Severidad</th><th>Tipo</th><th>Ubicación</th><th>Campo</th><th>Antes</th><th>Después</th><th>Detalle</th></tr></thead><tbody>';
