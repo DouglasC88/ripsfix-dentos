@@ -499,10 +499,10 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
                 <option value="especial-nocot" data-tu="13" data-con="05">13 · Régimen Especial/Excepción — no cotizante (Ley 352/1997)</option>
                 <option value="ppl" data-tu="08" data-con="05">14 · Fondo Nal. Salud PPL</option>
                 <option value="particular" data-tu="12" data-con="05">15 · Particular</option>
-                <option value="contrib-cot" data-tu="01" data-con="01">16 · UPC Contributivo — cotizante</option>
-                <option value="contrib-ben" data-tu="02" data-con="01">16 · UPC Contributivo — beneficiario</option>
-                <option value="contrib-adic" data-tu="03" data-con="01">16 · UPC Contributivo — adicional</option>
-                <option value="subsidiado" data-tu="04" data-con="02">17 · UPC Subsidiado</option>
+                <option value="contrib-cot" data-tu="01" data-con="02">16 · UPC Contributivo — cotizante</option>
+                <option value="contrib-ben" data-tu="02" data-con="02">16 · UPC Contributivo — beneficiario</option>
+                <option value="contrib-adic" data-tu="03" data-con="02">16 · UPC Contributivo — adicional</option>
+                <option value="subsidiado" data-tu="04" data-con="01">17 · UPC Subsidiado</option>
                 <option value="personalizado" data-manual="1">Personalizado (elegir manualmente)</option>
               </select>
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;" id="cv-convenio-hint"></div>
@@ -527,10 +527,10 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
               </select></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Concepto recaudo por defecto (manual)</label>
               <select id="cv-con-manual" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
-                <option value="01">01 — Cuota moderadora (solo Contributivo)</option>
-                <option value="02">02 — Copago</option>
+                <option value="01">01 — Copago</option>
+                <option value="02">02 — Cuota moderadora (solo Contributivo)</option>
                 <option value="03">03 — Pagos compartidos (planes voluntarios)</option>
-                <option value="05" selected>05 — Otro / no aplica</option>
+                <option value="05" selected>05 — No aplica</option>
               </select>
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">El concepto 04 (anticipos) nunca se usa aquí: solo aplica en la FEV.</div>
             </div>
@@ -620,14 +620,17 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
                 <option value="01">01 — Pago individual por caso, paquete o canasta</option>
               </select>
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;" id="rv-modpago-hint">Solo el pago por evento lleva valor en cada servicio; en las demás <code>vrServicio</code> debe ir en cero (RVC034).</div></div>
-            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Concepto de recaudo por defecto</label>
+            <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Tipo Recaudo Cobertura Dian (del contrato en DentOS)</label>
               <select id="rv-con" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
-                <option value="05" selected>05 — Otro / no aplica</option>
-                <option value="02">02 — Copago</option>
-                <option value="01">01 — Cuota moderadora (solo Contributivo)</option>
+                <option value="05" selected>05 — No aplica</option>
+                <option value="01">01 — Copago</option>
+                <option value="02">02 — Cuota moderadora (solo Contributivo)</option>
                 <option value="03">03 — Pagos compartidos (planes voluntarios)</option>
               </select>
-              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Se ajusta al convenio que elijas; solo se usa cuando el concepto viene vacío o inválido.</div></div>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">Es el campo <strong>Tipo Recaudo Cobertura Dian</strong> del contrato del convenio en DentOS (ej.: “FAMISANAR EPS CONTRIBUTIVO → CUOTA MODERADORA” = 02). Se ajusta al convenio que elijas y solo se usa cuando el concepto viene vacío o inválido.</div>
+              <label style="display:flex;align-items:flex-start;gap:6px;margin-top:6px;font-size:.7rem;color:var(--gray-600);cursor:pointer;">
+                <input type="checkbox" id="rv-con-forzar" style="margin-top:2px;">
+                <span>Exigirlo en <strong>todos</strong> los servicios (sobrescribe el concepto que traiga el archivo). Márcalo solo si estás seguro de que el contrato de este convenio recauda un único concepto.</span></label></div>
             <div><label style="display:block;font-size:.75rem;font-weight:700;color:var(--gray-700);margin-bottom:4px;">Nº de factura que va en el RIPS</label>
               <input id="rv-numfact" type="text" placeholder="Solo en cápita: la factura del período anterior" style="width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-family:var(--mono);font-size:.8rem;outline:none;background:var(--white);color:var(--gray-900);">
               <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">En capitación va el número de una <strong>factura de cápita anterior del mismo convenio que ya esté validada ante el Ministerio</strong> (con CUV): tiene que ser distinta a la del XML y estar en su base de datos. En las demás modalidades déjalo vacío, porque debe coincidir con el XML.</div></div>
@@ -1237,7 +1240,13 @@ document.addEventListener('DOMContentLoaded',function(){
   ['cv-prest','cv-prof','cv-mun'].forEach(function(id){var e=document.getElementById(id);if(e)e.addEventListener('input',function(){if(typeof cvUV==='function')cvUV();});});
   window.cvConvenioChange&&window.cvConvenioChange();
 });
-var CONCEPTO_NOMBRES={'01':'Cuota moderadora','02':'Copago','03':'Pagos compartidos (planes voluntarios)','05':'Otro / no aplica'};
+// Tabla conceptoRecaudo del Documento Técnico 1 (Res. 948/2026). Es la MISMA tabla que usa la FEV
+// en <cac:PrepaidPayment><cbc:ID schemeID="XX">, y por eso el cruce RVG09 puede comparar código a código.
+// El 04 (anticipos) solo existe en la FEV: nunca debe aparecer en el RIPS soporte.
+var CONCEPTO_NOMBRES={'01':'Copago','02':'Cuota moderadora','03':'Pagos compartidos (planes voluntarios)','04':'Anticipos (solo en la FEV)','05':'No aplica'};
+function conNom(c){c=pad2(c);return CONCEPTO_NOMBRES[c]||'concepto desconocido';}
+// Etiqueta "0X (Nombre)" para los mensajes de hallazgos.
+function conEtq(c){c=pad2(c);return c+' ('+conNom(c)+')';}
 // Devuelve {tu, con} según la cobertura elegida, o los campos manuales si requiere elegir régimen a mano.
 function cvConvenioSel(){
   var sel=document.getElementById('cv-convenio');
@@ -1270,8 +1279,32 @@ function cvXmlCampo(txt,nombre){
   if(!cod&&/^\d{1,2}$/.test(val))cod=val;
   return{cod:cod,nom:val};
 }
+// Lee los pagos anticipados de la FEV, que es donde la factura declara lo que recaudó el prestador:
+//   <cac:PrepaidPayment><cbc:ID schemeID="02">1</cbc:ID><cbc:PaidAmount currencyID="COP">209500.00</cbc:PaidAmount></cac:PrepaidPayment>
+// El schemeID es el concepto de recaudo (misma tabla que conceptoRecaudo del RIPS) y puede haber
+// varios bloques con distinto schemeID en una misma factura. Devuelve {pp:[{cod,val,id}], ppTot:{cod:total}}.
+// Se deduplican bloques idénticos porque los AttachedDocument que traen la factura embebida en CDATA
+// pueden repetir el mismo nodo y duplicarían los montos.
+function cvXmlPrepaid(txt){
+  var re=/<(?:\w+:)?PrepaidPayment[\s>][\s\S]*?<\/(?:\w+:)?PrepaidPayment>/gi,m,pp=[],ppTot={},vistos={};
+  while((m=re.exec(txt))!==null){
+    var blk=m[0],clave=blk.replace(/\s+/g,' ').trim();
+    if(vistos[clave])continue;
+    vistos[clave]=1;
+    var sid=blk.match(/<(?:\w+:)?ID[^>]*schemeID\s*=\s*"([^"]*)"/i);
+    var amt=blk.match(/<(?:\w+:)?PaidAmount[^>]*>([^<]+)/i);
+    var idm=blk.match(/<(?:\w+:)?ID[^>]*>([^<]*)/i);
+    var cod=sid?pad2(sid[1].trim()):'';
+    var val=amt?(parseFloat(String(amt[1]).trim().replace(/,/g,''))||0):0;
+    if(!cod&&!val)continue;
+    pp.push({cod:cod,val:val,id:idm?String(idm[1]).trim():''});
+    if(cod)ppTot[cod]=(ppTot[cod]||0)+val;
+  }
+  return{pp:pp,ppTot:ppTot};
+}
 function cvXmlInfo(txt){
   function rx1(p,s){var m=s.match(p);return m?m[1].trim():'';}
+  var pre=cvXmlPrepaid(txt);
   var mp=cvXmlCampo(txt,'MODALIDAD_PAGO'),cob=cvXmlCampo(txt,'COBERTURA_PLAN_BENEFICIOS');
   var nF=rx1(/<cbc:ParentDocumentID>([^<]+)/,txt)||rx1(/<cbc:ID>([^<]+)/,txt);
   var py=parseFloat(rx1(/PayableAmount[^>]*>([^<]+)/,txt))||0;
@@ -1285,7 +1318,7 @@ function cvXmlInfo(txt){
   while((m2=rNm.exec(txt))!==null)aNm.push(m2[1].trim());
   var cp=rx1(/<Name>CODIGO_PRESTADOR<\/Name>\s*<Value[^>]*>([^<]+)/,txt);
   return{nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null,
-    mp:mp.cod,mpNom:mp.nom,cob:cob.cod,cobNom:cob.nom};
+    mp:mp.cod,mpNom:mp.nom,cob:cob.cod,cobNom:cob.nom,pp:pre.pp,ppTot:pre.ppTot};
 }
 // Modalidades de pago de la FEV en salud (tabla salud_modalidad_pago.gc de SISPRO).
 // Solo el pago por evento lleva valor en cada servicio del RIPS: en las demás,
@@ -1564,10 +1597,12 @@ function pad5(v){v=String(v==null?'':v).trim().replace(/\.0$/,'');return /^\d{1,
 var CSERV_CUPS={'234201':347,'893106':338,'242301':343,'242103':343,'237303':311,'231201':371,'231301':371};
 function csServ(cups,raw){var v=parseInt(raw,10);if(v&&v!==500)return v;return CSERV_CUPS[String(cups)]||334;}
 // Concepto de recaudo 04 (anticipos) solo aplica en la FEV, nunca en el RIPS soporte (Doc. Técnico 1, Res. 948/2026).
-// RVC060: si el concepto es 01 (cuota moderadora) o 03 (pagos compartidos), el valor pago moderador debe ser >=1.
-// Si el Excel no trae concepto explícito y no hubo copago real, no se fuerza ese concepto (queda sin dato).
-// conceptoRecaudo es obligatorio (RVG01): nunca debe quedar null. RVC060 exige valorPagoModerador>=1 si el concepto es 01/03.
-function concRec(v,def,vpm){var c=pad2(v);if(c&&c!=='04'){if((c==='01'||c==='03')&&!(vpm>0))return'05';return c;}if((def==='01'||def==='03')&&!(vpm>0))return'05';return def||'05';}
+// RVC060: los tres conceptos que sí son un recaudo real —01 copago, 02 cuota moderadora y 03 pagos
+// compartidos— exigen valorPagoModerador >= 1; el 05 (no aplica) es el único que va con valor en cero.
+// Si el Excel no trae concepto explícito y no hubo recaudo real, no se fuerza ese concepto (queda en 05).
+// conceptoRecaudo es obligatorio (RVG01): nunca debe quedar null.
+function esRecaudoReal(c){return c==='01'||c==='02'||c==='03';}
+function concRec(v,def,vpm){var c=pad2(v);if(c&&c!=='04'){if(esRecaudoReal(c)&&!(vpm>0))return'05';return c;}if(esRecaudoReal(def)&&!(vpm>0))return'05';return def||'05';}
 window.cvGenerar=function(){
   if(!vX||!vR)return;
   var inp=document.getElementById('cv-numfact');
@@ -1647,10 +1682,13 @@ function rvInitConvenio(){
   if(cvTu&&rvTu&&!rvTu.options.length)rvTu.innerHTML=cvTu.innerHTML;
   window.rvConvenioChange();
 }
-// Concepto de recaudo que corresponde al tipo de usuario deducido de la cobertura.
+// Concepto de recaudo que corresponde al tipo de usuario deducido de la cobertura. Equivale al
+// "Tipo Recaudo Cobertura Dian" que trae el contrato del convenio: contributivo recauda cuota
+// moderadora (02), subsidiado recauda copago (01) y los planes voluntarios pagos compartidos (03).
+// Es un valor por defecto para rellenar vacíos, NUNCA para sobrescribir un concepto válido.
 function rvConPorTu(tu){
-  if(tu==='01'||tu==='02'||tu==='03')return '01';
-  if(tu==='04')return '02';
+  if(tu==='01'||tu==='02'||tu==='03')return '02';
+  if(tu==='04')return '01';
   if(tu==='11')return '03';
   return '05';
 }
@@ -1679,6 +1717,26 @@ function rvResolverConvenio(base,xml){
     aviso:'La cobertura '+cod+' ('+COB948_NOMBRES[cod]+') no tiene un tipo de usuario único: '+COB948_AMBIGUAS[cod]+'. Elige el convenio a mano para revisar el tipo de usuario.'};
   return{tu:'',con:base.con,conv:'cobertura '+cod+' del XML (desconocida)',
     aviso:'El XML declara la cobertura '+cod+', que no está en la tabla del Documento Técnico 1.'};
+}
+// Resuelve el conceptoRecaudo que corresponde al contrato SIN inventarlo: nunca por heurísticas,
+// promedios ni "el valor más común", porque el código depende del campo "Tipo Recaudo Cobertura Dian"
+// del contrato del convenio en DentOS. Orden de prioridad, del más autoritativo al menos:
+//   1. El "Tipo Recaudo Cobertura Dian" elegido arriba: es ese campo del contrato.
+//   2. El único PrepaidPayment de la FEV con schemeID distinto de 04: la factura la emitió esa misma
+//      configuración de contrato, así que es evidencia de la factura, no una suposición nuestra.
+//   3. La cobertura del XML mapeada a régimen, solo para rellenar vacíos.
+//   4. Nada: se reporta el error y no se corrige ningún concepto.
+function rvResolverConcepto(sel,xml,conCob){
+  sel=pad2(sel);
+  if(esRecaudoReal(sel))return{con:sel,contrato:true,fuente:'el Tipo Recaudo Cobertura Dian que elegiste, '+conEtq(sel)};
+  var unicos={};
+  ((xml&&xml.pp)||[]).forEach(function(p){if(p.cod&&p.cod!=='04'&&p.val>0)unicos[p.cod]=1;});
+  var ks=Object.keys(unicos);
+  if(ks.length===1&&esRecaudoReal(ks[0]))return{con:ks[0],contrato:true,
+    fuente:'el único concepto que declara la factura (PrepaidPayment schemeID "'+ks[0]+'", '+conNom(ks[0])+')'};
+  conCob=pad2(conCob);
+  if(esRecaudoReal(conCob))return{con:conCob,contrato:true,fuente:'la cobertura declarada en el XML, '+conEtq(conCob)};
+  return{con:sel||'05',contrato:false,fuente:''};
 }
 window.rvModPagoChange=function(){
   var hint=document.getElementById('rv-modpago-hint');
@@ -1727,6 +1785,9 @@ function rvNum(v){
 // Audita (y opcionalmente corrige) un JSON. Devuelve {json, h:[hallazgos], tot, nServ}.
 function rvAudit(json,xml,cfg){
   var H=[],fix=cfg.fix,hoy=new Date().toISOString().slice(0,10),totServ=0,nServ=0;
+  // Recaudos del JSON agrupados por conceptoRecaudo, para el cruce RVG09 contra los PrepaidPayment
+  // de la FEV. recJson: {código: suma de valorPagoModerador}; recN: cuántos servicios lo reportan.
+  var recJson={},recN={};
   var mod=cfg.mp||MODALIDAD_EVENTO,modNom=cfg.mpNom||MODALIDAD_PAGO[mod]||('modalidad '+mod);
   var esEvento=esPagoPorEvento(mod,modNom);
   var esCapita=/capitaci/i.test(modNom||'')||mod==='03';
@@ -1762,6 +1823,7 @@ function rvAudit(json,xml,cfg){
   var L0='Encabezado';
   if(cfg.avisoConv)add('advertencia','Convenio',L0,'tipoUsuario',cfg.avisoConv,(xml&&xml.cob)||'(sin dato)',null);
   if(cfg.avisoMod)add('advertencia','Modalidad de pago',L0,'vrServicio',cfg.avisoMod,(xml&&xml.mp)||'(sin dato)',null);
+  if(cfg.avisoCon)add('advertencia','Concepto recaudo',L0,'conceptoRecaudo',cfg.avisoCon,null,null);
   var nioS=String(json.numDocumentoIdObligado==null?'':json.numDocumentoIdObligado).trim();
   if(!nioS)add('error','Obligatorio',L0,'numDocumentoIdObligado','Falta el NIT del prestador obligado a facturar.',json.numDocumentoIdObligado,null);
   else{
@@ -1995,15 +2057,34 @@ function rvAudit(json,xml,cfg){
         else fixNum(s,'valorPagoModerador',vpm,'Formato',SL,'El valor de pago moderador va como número, sin comillas.');
         var vpmF=rvNum(s.valorPagoModerador)||0;
         var cr=pad2(s.conceptoRecaudo),crNuevo=concRec(cr,cfg.con,vpmF);
-        if(cr==='04')put(s,'conceptoRecaudo',crNuevo,'Concepto recaudo',SL,'El concepto 04 (anticipos) solo aplica en la factura electrónica, nunca en el RIPS; se cambió a '+crNuevo+'.');
-        else if(!cr)put(s,'conceptoRecaudo',crNuevo,'Obligatorio',SL,'Falta el concepto de recaudo, que es obligatorio; se asignó '+crNuevo+'.');
-        else if(RV_CON.indexOf(cr)<0)put(s,'conceptoRecaudo',crNuevo,'Tabla de referencia',SL,'El concepto de recaudo "'+cr+'" no existe; se asignó '+crNuevo+'.');
-        else if((cr==='01'||cr==='03')&&!(vpmF>0))put(s,'conceptoRecaudo','05','Concepto recaudo',SL,'El concepto '+cr+' exige un pago moderador mayor o igual a 1 y aquí es 0; se cambió a 05.');
+        // El concepto de recaudo NO se puede deducir del monto ni del "valor más común": sale del campo
+        // "Tipo Recaudo Cobertura Dian" del contrato del convenio (cfg.conFuente dice de dónde salió).
+        // Si no hay un código respaldado por el contrato, se reporta el error y no se inventa nada.
+        var conOK=!!cfg.conContrato;
+        // crFinal = concepto con el que queda el servicio después de la auditoría. Se lleva aparte de
+        // s.conceptoRecaudo porque en modo auditoría put() no modifica el JSON, y tanto las
+        // validaciones de coherencia como el cruce RVG09 deben razonar sobre el valor ya resuelto.
+        var crFinal=cr;
+        if(cr==='04'){
+          if(conOK){crFinal=cfg.con;put(s,'conceptoRecaudo',cfg.con,'Concepto recaudo',SL,'El concepto 04 (anticipos) solo existe en la factura electrónica y nunca debe ir en el RIPS soporte (Doc. Técnico 1, Res. 948/2026): con él el validador rechaza el paquete. Se cambió a '+conEtq(cfg.con)+', el que corresponde a '+cfg.conFuente+'.');}
+          else add('error','Estructura',SL,'conceptoRecaudo','El concepto 04 (anticipos) solo existe en la factura electrónica y nunca debe ir en el RIPS soporte: el validador rechaza el paquete. No se corrige solo porque el código correcto depende del campo "Tipo Recaudo Cobertura Dian" del contrato del convenio en DentOS: elígelo arriba y vuelve a analizar.',cr,null);
+        }
+        else if(cfg.conForzar&&conOK&&vpmF>0&&cr!==cfg.con){crFinal=cfg.con;put(s,'conceptoRecaudo',cfg.con,'Concepto recaudo',SL,'El contrato de este convenio recauda '+conEtq(cfg.con)+' ('+cfg.conFuente+') y aquí venía '+conEtq(cr)+'.');}
+        else if(!cr){crFinal=crNuevo;put(s,'conceptoRecaudo',crNuevo,'Obligatorio',SL,'Falta el concepto de recaudo, que es obligatorio; se asignó '+conEtq(crNuevo)+'.');}
+        else if(RV_CON.indexOf(cr)<0){crFinal=crNuevo;put(s,'conceptoRecaudo',crNuevo,'Tabla de referencia',SL,'El concepto de recaudo "'+cr+'" no existe en la tabla del Documento Técnico 1; se asignó '+conEtq(crNuevo)+'.');}
+        else if(esRecaudoReal(cr)&&!(vpmF>0)){crFinal='05';put(s,'conceptoRecaudo','05','Concepto recaudo',SL,'El concepto '+conEtq(cr)+' es un recaudo real y exige un valorPagoModerador mayor o igual a 1 (RVC060), pero aquí es 0; se cambió a 05 (No aplica).');}
         else fixTo(s,'conceptoRecaudo',cr,'Formato',SL,'El concepto de recaudo va a dos dígitos.');
         // El concepto de recaudo tiene que ser coherente con el régimen del paciente.
-        var crF=pad2(s.conceptoRecaudo),tuF=pad2(u.tipoUsuario);
-        if(crF==='01'&&['01','02','03'].indexOf(tuF)<0)add('advertencia','Concepto recaudo',SL,'conceptoRecaudo','La cuota moderadora (01) solo aplica al régimen contributivo y este paciente es tipo '+tuF+'.',crF,null);
+        var crF=pad2(crFinal),tuF=pad2(u.tipoUsuario);
+        if(crF==='02'&&['01','02','03'].indexOf(tuF)<0)add('advertencia','Concepto recaudo',SL,'conceptoRecaudo','La cuota moderadora (02) solo aplica al régimen contributivo y este paciente es tipo '+tuF+'.',crF,null);
         if(crF==='03'&&tuF!=='11')add('advertencia','Concepto recaudo',SL,'conceptoRecaudo','Los pagos compartidos (03) solo aplican a planes voluntarios de salud (tipo 11) y este paciente es tipo '+tuF+'.',crF,null);
+        // Lo recaudado se acumula por concepto para cruzarlo contra los PrepaidPayment de la FEV (RVG09).
+        if(vpmF>0){
+          recJson[crF]=(recJson[crF]||0)+vpmF;
+          recN[crF]=(recN[crF]||0)+1;
+          // Plata reportada bajo 05 (No aplica) que la FEV no puede respaldar con ningún PrepaidPayment.
+          if(crF==='05')add('error','Concepto recaudo',SL,'conceptoRecaudo','Hay un recaudo de '+fm(vpmF)+' con concepto 05 (No aplica): si el paciente pagó, el concepto tiene que ser el del contrato (01 copago, 02 cuota moderadora o 03 pagos compartidos), porque la factura no puede respaldar ese valor con ningún PrepaidPayment.',crF,null);
+        }
         if(vpmF>0){
           if(s.numFEVPagoModerador==null||String(s.numFEVPagoModerador).trim()==='')add('error','Coherencia',SL,'numFEVPagoModerador','Hay pago moderador ('+fm(vpmF)+') pero falta el número de factura que lo soporta.',s.numFEVPagoModerador,null);
         }
@@ -2064,7 +2145,36 @@ function rvAudit(json,xml,cfg){
     var dif=Math.round((totServ-xml.py)*100)/100;
     if(Math.abs(dif)>=1)add('advertencia','Cruce con XML',L0,'vrServicio','La suma de los servicios ('+fm(totServ)+') no coincide con el valor de la factura ('+fm(xml.py)+'). Diferencia: '+fm(dif)+'.',totServ,xml.py);
   }
-  return{json:json,h:H,tot:totServ,nServ:nServ};
+
+  // ── RVG09 ────────────────────────────────────────────────────────────────
+  // El total recaudado por cada concepto en el RIPS (suma de valorPagoModerador agrupada por
+  // conceptoRecaudo) debe coincidir con lo que la FEV declara en el PrepaidPayment del mismo
+  // schemeID. Si no cuadra, el Mecanismo Único de Validación rechaza el paquete.
+  if(xml){
+    var ppTot=xml.ppTot||{},codigos={},k;
+    // El 04 (anticipos) es legítimo en la FEV y no se le exige contrapartida en el RIPS.
+    for(k in ppTot)if(k!=='04'&&ppTot[k])codigos[k]=1;
+    // Del lado del RIPS se excluyen el 05 (no aplica, no es recaudo) y el 04 (que ya tiene su propio
+    // hallazgo de estructura): ninguno de los dos puede tener contrapartida en la FEV.
+    for(k in recJson)if(k!=='05'&&k!=='04'&&recJson[k])codigos[k]=1;
+    var cods=Object.keys(codigos).sort(),huboPP=(xml.pp||[]).length>0;
+    cods.forEach(function(c){
+      var vJ=Math.round((recJson[c]||0)*100)/100,vX=Math.round((ppTot[c]||0)*100)/100;
+      var dif=Math.round((vJ-vX)*100)/100;
+      if(Math.abs(dif)<1)return;
+      var nSrv=recN[c]||0;
+      if(vX===0){
+        add('error','Cruce con XML',L0,'valorPagoModerador','RVG09: el RIPS reporta '+fm(vJ)+' en concepto '+conEtq(c)+' ('+nSrv+' servicio(s)) y la factura electrónica no declara ningún <PrepaidPayment> con schemeID "'+c+'"'+(huboPP?'.':': la factura no trae ningún pago anticipado.')+' El validador rechaza el paquete porque el recaudo del RIPS no está soportado en la FEV: corrige el concepto en el RIPS o pide la factura con el PrepaidPayment que falta.',vJ,vX);
+        return;
+      }
+      if(vJ===0){
+        add('error','Cruce con XML',L0,'valorPagoModerador','RVG09: la factura electrónica declara '+fm(vX)+' en concepto '+conEtq(c)+' (PrepaidPayment schemeID "'+c+'") y ningún servicio del RIPS reporta ese recaudo. El validador rechaza el paquete: los servicios que generaron ese pago deben llevar conceptoRecaudo "'+c+'" con su valorPagoModerador.',vJ,vX);
+        return;
+      }
+      add('error','Cruce con XML',L0,'valorPagoModerador','RVG09: el RIPS reporta '+fm(vJ)+' en concepto '+conEtq(c)+' ('+nSrv+' servicio(s)) y la factura electrónica reporta '+fm(vX)+' en el mismo concepto (PrepaidPayment schemeID "'+c+'"). Diferencia de '+fm(dif)+': con este descuadre el validador rechaza el paquete.',vJ,vX);
+    });
+  }
+  return{json:json,h:H,tot:totServ,nServ:nServ,rec:recJson};
 }
 
 function rvsok(n,msg,ok){
@@ -2095,6 +2205,12 @@ function rvRenderFiles(){
   var btn=document.getElementById('rv-btn');
   if(btn){btn.disabled=!ok;btn.style.opacity=ok?'1':'.4';}
 }
+// Resumen legible de los PrepaidPayment de una factura, para que se vea contra qué se cruza (RVG09).
+function rvPPTxt(info){
+  var t=(info&&info.ppTot)||{},ks=Object.keys(t).sort();
+  if(!ks.length)return 'sin PrepaidPayment';
+  return ks.map(function(c){return c+' '+conNom(c)+' '+fm(t[c]);}).join(' · ');
+}
 function rvRenderXml(){
   rvX.sort(function(a,b){return a.name<b.name?-1:1;});
   var el=document.getElementById('rv-xml-list');
@@ -2107,7 +2223,8 @@ function rvRenderXml(){
           +'<span>📄</span><span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--gray-700);">'+esc(x.name)+'</span>'
           +'<span style="color:var(--gray-500);font-size:.72rem;">Factura '+esc(x.info.nF||'?')+' · '+esc((x.info.st||'?')+' a '+(x.info.en||'?'))+' · '+fm(x.info.py)
           +' · prestador '+esc(x.info.cp||'?')+' · pago '+esc(x.info.mp?(x.info.mp+' '+(MODALIDAD_PAGO[pad2(x.info.mp)]||'')):'no declarado')
-          +' · cobertura '+esc(x.info.cob||'no declarada')+'</span></div>';
+          +' · cobertura '+esc(x.info.cob||'no declarada')
+          +' · recaudos '+esc(rvPPTxt(x.info))+'</span></div>';
       });
       h+='</div>';
     }
@@ -2141,14 +2258,19 @@ window.rvAnalizar=function(){
   var prestRaw=g('rv-prest').replace(/\D/g,''),modSel=g('rv-modpago');
   var prof=g('rv-prof'),mun=g('rv-mun'),numFactRips=g('rv-numfact');
   var prest12=/^\d{12}$/.test(prestRaw)?prestRaw:'';
+  var conForzar=!!(document.getElementById('rv-con-forzar')||{}).checked;
   rvRes=validos.map(function(f){
     var xml=rvMatchXml(f);
     var xcp=(xml&&xml.cp)?String(xml.cp).replace(/\D/g,''):'';
     var cv=rvResolverConvenio(base,xml);
+    // El concepto de recaudo se resuelve por contrato, no por heurística (ver rvResolverConcepto).
+    var cc=rvResolverConcepto(base.con,xml,cv.con);
     var mp=modSel||((xml&&xml.mp)?pad2(xml.mp):'');
     var mpNom=modSel?(MODALIDAD_PAGO[modSel]||''):((xml&&xml.mpNom)||MODALIDAD_PAGO[mp]||'');
     var avisoMod=mp?'':((xml?'El XML no declara MODALIDAD_PAGO':'No cargaste el XML')+': se asume pago por evento y se exige valor mayor que cero en cada servicio. Si el contrato es por cápita, PGP o conjunto integral, elígelo arriba — en esas modalidades el valor debe ir en cero.');
-    var cfg={fix:base.fix,tu:cv.tu,con:cv.con||'05',conv:cv.conv,avisoConv:cv.aviso,
+    var cfg={fix:base.fix,tu:cv.tu,con:cc.con||'05',conContrato:cc.contrato,conFuente:cc.fuente,
+      conForzar:conForzar&&cc.contrato,conv:cv.conv,avisoConv:cv.aviso,
+      avisoCon:(conForzar&&!cc.contrato)?'Marcaste “exigirlo en todos los servicios”, pero no hay un concepto de recaudo respaldado por el contrato: elige el Tipo Recaudo Cobertura Dian del convenio arriba. No se sobrescribió ningún concepto.':'',
       mp:mp||MODALIDAD_EVENTO,mpNom:mpNom,avisoMod:avisoMod,prof:prof,mun:mun,numFactRips:numFactRips,
       prest12:prest12,sede:prest12?prest12.slice(10):'',
       prest10:prest12?prest12.slice(0,10):(/^\d{10}$/.test(prestRaw)?prestRaw:xcp.slice(0,10))};
