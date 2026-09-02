@@ -711,7 +711,7 @@ function loadPatientFile(input) {
         patientSexMap = new Map(); patientNameMap = new Map();
         let ok=0, skip=0;
         results.data.forEach(row => {
-          const doc  = String(row.documento||'').trim();
+          const doc  = limpiarDoc(row.documento);
           const sexo = String(row.sexo||'').trim().toLowerCase();
           const nom1 = String(row.nom1||'').trim().toUpperCase();
           if (!doc) return;
@@ -734,7 +734,7 @@ function getCie10(cupsCode) {
   return CUPS_CIE10[String(cupsCode).trim()] || 'K089';
 }
 function getSexo(docNum) {
-  const d = String(docNum||'').trim();
+  const d = limpiarDoc(docNum);
   if (patientSexMap.has(d)) return patientSexMap.get(d);
   if (patientNameMap.has(d)) {
     const sx = NAMES_GENDER[patientNameMap.get(d)];
@@ -801,6 +801,31 @@ function fCUPS(val){
 function fCIE(val){
   if(!val||typeof val!=='string')return{v:val,c:false};const f=val.trim().toUpperCase().replace(/\./g,'');return{v:f,c:f!==val};
 }
+// Número de documento: el validador del MinSalud rechaza con RVG01 ("solo puede contener
+// letras y números, sin caracteres especiales") cualquier documento que traiga espacios,
+// puntos, guiones o espacios duros. Se dejan únicamente letras y dígitos.
+function limpiarDoc(val){
+  if(val==null)return '';
+  return String(val).trim().replace(/\.0+$/,'').replace(/[^0-9A-Za-z]/g,'');
+}
+// Versión para aF(): corrige el campo solo si el valor limpio cambia respecto al original.
+function fDOC(val){
+  if(val==null||val==='')return{v:val,c:false};
+  const limpio=limpiarDoc(val);
+  if(!limpio)return{v:val,c:false};
+  return{v:limpio,c:limpio!==String(val)};
+}
+// NIT del obligado a facturar: solo dígitos y sin el dígito de verificación (lo que va tras el guion).
+function limpiarNit(val){
+  const s=String(val==null?'':val).trim();
+  return s.indexOf('-')>-1?s.split('-')[0].replace(/\D/g,''):s.replace(/\D/g,'');
+}
+function fNIT(val){
+  if(val==null||val==='')return{v:val,c:false};
+  const limpio=limpiarNit(val);
+  if(!limpio)return{v:val,c:false};
+  return{v:limpio,c:limpio!==String(val)};
+}
 function eNum(val){
   if(val==null)return{v:val,c:false};if(typeof val==='number')return{v:val,c:false};
   const n=parseFloat(String(val).replace(/,/g,'.'));return isNaN(n)?{v:val,c:false}:{v:n,c:true};
@@ -819,8 +844,16 @@ function fixJson(data,xml){
   const cobId=coberturaId?('0'+String(coberturaId).trim()).slice(-2):null;
   const eTU=cobId?(COB948_TIPOUSR[cobId]||null):null;
   let fC=0,cC=0,cobC=0,vC=0; const cobL=[],docL=[],invC=[];
+  fC+=aF(data,'numDocumentoIdObligado',fNIT);
   if(!Array.isArray(data.usuarios))return{data,fC,cC,cobC,vC,cobL,docL,invC};
   data.usuarios.forEach((usr,ui)=>{
+    // Un espacio (o punto/guion) en el documento del usuario hace que el validador
+    // del MinSalud rechace el paquete completo con RVG01: se limpia antes de cualquier
+    // otra corrección, porque el documento es la llave con la que se cruza el CSV.
+    fC+=aF(usr,'numDocumentoIdentificacion',fDOC);
+    // Si tras limpiarlo no queda nada (venía vacío o solo con espacios) no hay valor que inventar:
+    // se reporta como pendiente para que el usuario lo complete antes de enviar.
+    if(!limpiarDoc(usr.numDocumentoIdentificacion))invC.push({campo:`U${ui+1}.numDocumentoIdentificacion`,valor:'(vacío)',tipo:'OBLIGATORIO'});
     if(eTU&&usr.tipoUsuario!==eTU){cobL.push({u:ui+1,antes:usr.tipoUsuario,despues:eTU,cob:cobId,cobNom:COB948_NOMBRES[cobId]||cobId});usr.tipoUsuario=eTU;cobC++;}
     // Cobertura que admite varios regímenes: no se puede deducir el tipo, se reporta en vez de adivinar.
     else if(cobId&&!eTU&&COB948_AMBIGUAS[cobId])invC.push({campo:`U${ui+1}.tipoUsuario`,valor:usr.tipoUsuario,tipo:`Cobertura ${cobId} (${COB948_NOMBRES[cobId]||''}): ${COB948_AMBIGUAS[cobId]}`});
@@ -834,6 +867,7 @@ function fixJson(data,xml){
     function pS(arr,cf,esCons){
       if(!Array.isArray(arr))return;
       arr.forEach((s,i)=>{
+        fC+=aF(s,'numDocumentoIdentificacion',fDOC);
         fC+=aF(s,'fechaInicioAtencion',toSD);fC+=aF(s,'fechaFinAtencion',toSD);
         if(cf&&s[cf]){const r=fCUPS(s[cf]);if(r.c){s[cf]=r.v;fC++;}}
         ['codDiagnosticoPrincipal','codDiagnosticoRelacionado','codDiagnosticoRelacionado1','codDiagnosticoRelacionado2','codDiagnosticoRelacionado3','codComplicacion'].forEach(f=>{if(s[f]){const r=fCIE(s[f]);if(r.c){s[f]=r.v;fC++;}}});
@@ -846,8 +880,8 @@ function fixJson(data,xml){
     }
     pS(svc.procedimientos,'codProcedimiento');pS(svc.consultas,'codConsulta',true);
     pS(svc.urgencias,null);pS(svc.hospitalizacion,null);pS(svc.otrosServicios,'codTecnologiaSalud');
-    if(Array.isArray(svc.recienNacidos)){svc.recienNacidos.forEach(r=>{fC+=aF(r,'fechaNacimiento',toDO);if(r.codDiagnosticoPrincipal){const f=fCIE(r.codDiagnosticoPrincipal);if(f.c){r.codDiagnosticoPrincipal=f.v;fC++;}}if(!r.codDiagnosticoPrincipal){r.codDiagnosticoPrincipal='K089';cC++;}fC+=aF(r,'vrServicio',eNum);fC+=aF(r,'valorPagoModerador',dZ);fC+=aF(r,'consecutivo',eInt);});}
-    if(Array.isArray(svc.medicamentos)){svc.medicamentos.forEach(m=>{fC+=aF(m,'fechaDispensAdmon',toSD);fC+=aF(m,'vrServicio',eNum);fC+=aF(m,'valorPagoModerador',dZ);fC+=aF(m,'cantidadMedicamento',eNum);fC+=aF(m,'vrUnitMedicamento',eNum);fC+=aF(m,'consecutivo',eInt);});}
+    if(Array.isArray(svc.recienNacidos)){svc.recienNacidos.forEach(r=>{fC+=aF(r,'numDocumentoIdentificacion',fDOC);fC+=aF(r,'fechaNacimiento',toDO);if(r.codDiagnosticoPrincipal){const f=fCIE(r.codDiagnosticoPrincipal);if(f.c){r.codDiagnosticoPrincipal=f.v;fC++;}}if(!r.codDiagnosticoPrincipal){r.codDiagnosticoPrincipal='K089';cC++;}fC+=aF(r,'vrServicio',eNum);fC+=aF(r,'valorPagoModerador',dZ);fC+=aF(r,'consecutivo',eInt);});}
+    if(Array.isArray(svc.medicamentos)){svc.medicamentos.forEach(m=>{fC+=aF(m,'numDocumentoIdentificacion',fDOC);fC+=aF(m,'fechaDispensAdmon',toSD);fC+=aF(m,'vrServicio',eNum);fC+=aF(m,'valorPagoModerador',dZ);fC+=aF(m,'cantidadMedicamento',eNum);fC+=aF(m,'vrUnitMedicamento',eNum);fC+=aF(m,'consecutivo',eInt);});}
   });
   if(payableAmount&&payableAmount>0){
     const aS=[];(data.usuarios||[]).forEach(u=>{const s=u.servicios||{};['procedimientos','consultas','urgencias','hospitalizacion','otrosServicios','medicamentos'].forEach(k=>{if(Array.isArray(s[k]))aS.push(...s[k]);});});
@@ -1003,6 +1037,7 @@ function chgTipo(c){
   if(/^fecha/i.test(c))return'Formato fecha';
   if(/codDiagnostico|codComplicacion/i.test(c))return'CIE-10';
   if(/tipoUsuario/i.test(c))return'Tipo usuario';
+  if(/numDocumento/i.test(c))return'Nº documento';
   if(/tipoDocumento/i.test(c))return'Documento';
   if(/codSexo/i.test(c))return'Sexo';
   if(/^(vr|valor|cantidad)/i.test(c))return'Valor';
@@ -1360,7 +1395,7 @@ function exDate(v){if(v==null||v==='')return '';if(typeof v==='number'&&v>20000)
 function mapSexoCv(s){s=String(s||'').trim().toUpperCase();if(s==='H')return 'M';if(s==='M')return 'M';if(s==='F')return 'F';if(s.indexOf('MASC')===0||s.indexOf('HOMB')===0)return 'M';if(s.indexOf('FEM')===0||s.indexOf('MUJ')===0)return 'F';return '';}
 function cvGet(f){var sel=document.getElementById('cvmap-'+f);if(sel)return parseInt(sel.value);return cvMap[f]==null?-1:cvMap[f];}
 window.cvRefrescar=function(){cvApplyMap();};
-function cvApplyMap(){if(!cvRows.length)return;vR=[];for(var j=cvHi+1;j<cvRows.length;j++){var r=cvRows[j];if(!r)continue;var g=function(f){var i=cvGet(f);return(i>=0&&i<r.length)?r[i]:'';};var fn=function(f){return String(g(f)).trim().replace(/\.0$/,'');};var doc=fn('doc'),cups=fn('cups');if(!doc&&!cups)continue;vR.push({doc:doc,td:fn('td')||'CC',nombre:[g('ape1'),g('ape2'),g('nom1'),g('nom2')].map(function(x){return String(x||'').trim();}).join(' ').replace(/\s+/g,' ').trim(),nac:exDate(g('nac')),sexo:String(g('sexo')).trim(),tu:fn('tu'),mun:fn('mun'),fecha:g('fecha'),prof:fn('prof'),aut:fn('aut2')||fn('aut'),cups:cups,dx:String(g('dx')).trim().toUpperCase(),causa:fn('causa'),tdx:fn('tdx'),cserv:fn('cserv'),fin:fn('fin'),mod:fn('mod'),via:fn('via'),grupo:fn('grupo'),valor:parseFloat(String(g('valor')).replace(/[^0-9.]/g,''))||0,con:fn('con'),vpm:parseFloat(String(g('vpm')).replace(/[^0-9.]/g,''))||0,tipo:String(g('tipo')).trim()});}var out=document.getElementById('cvxlout');renderCvPreview();if(!vR.length){if(out)out.innerHTML='<div style="font-size:.76rem;color:var(--red);margin-top:8px;">No se detectaron filas. Revisa el mapeo (Documento y CUPS).</div>';return;}var pacs={};vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={total:0,n:0};pacs[rw.doc].total+=rw.valor;pacs[rw.doc].n++;});var nPac=Object.keys(pacs).length,tot=vR.reduce(function(a,r){return a+r.valor;},0);if(out)out.innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+cvI('Pacientes',''+nPac,'mono')+cvI('Servicios',''+vR.length,'mono')+cvI('Total',fm(tot),'')+'</div>';cvUV();}
+function cvApplyMap(){if(!cvRows.length)return;vR=[];for(var j=cvHi+1;j<cvRows.length;j++){var r=cvRows[j];if(!r)continue;var g=function(f){var i=cvGet(f);return(i>=0&&i<r.length)?r[i]:'';};var fn=function(f){return String(g(f)).trim().replace(/\.0$/,'');};var doc=limpiarDoc(g('doc')),cups=fn('cups');if(!doc&&!cups)continue;vR.push({doc:doc,td:fn('td')||'CC',nombre:[g('ape1'),g('ape2'),g('nom1'),g('nom2')].map(function(x){return String(x||'').trim();}).join(' ').replace(/\s+/g,' ').trim(),nac:exDate(g('nac')),sexo:String(g('sexo')).trim(),tu:fn('tu'),mun:fn('mun'),fecha:g('fecha'),prof:limpiarDoc(g('prof')),aut:fn('aut2')||fn('aut'),cups:cups,dx:String(g('dx')).trim().toUpperCase(),causa:fn('causa'),tdx:fn('tdx'),cserv:fn('cserv'),fin:fn('fin'),mod:fn('mod'),via:fn('via'),grupo:fn('grupo'),valor:parseFloat(String(g('valor')).replace(/[^0-9.]/g,''))||0,con:fn('con'),vpm:parseFloat(String(g('vpm')).replace(/[^0-9.]/g,''))||0,tipo:String(g('tipo')).trim()});}var out=document.getElementById('cvxlout');renderCvPreview();if(!vR.length){if(out)out.innerHTML='<div style="font-size:.76rem;color:var(--red);margin-top:8px;">No se detectaron filas. Revisa el mapeo (Documento y CUPS).</div>';return;}var pacs={};vR.forEach(function(rw){if(!pacs[rw.doc])pacs[rw.doc]={total:0,n:0};pacs[rw.doc].total+=rw.valor;pacs[rw.doc].n++;});var nPac=Object.keys(pacs).length,tot=vR.reduce(function(a,r){return a+r.valor;},0);if(out)out.innerHTML='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+cvI('Pacientes',''+nPac,'mono')+cvI('Servicios',''+vR.length,'mono')+cvI('Total',fm(tot),'')+'</div>';cvUV();}
 function renderCvPreview(){
   var el=document.getElementById('cv-preview');if(!el)return;
   if(!vR||!vR.length){el.style.display='none';el.innerHTML='';return;}
@@ -1421,7 +1456,7 @@ window.cvLC=function(f){
         ln=ln.replace(/\r/g,'');
         var c=ln.split(';');
         if(c.length<9)return;
-        var d=String(c[2]||'').trim().replace(/"/g,'');
+        var d=limpiarDoc(String(c[2]||'').replace(/"/g,''));
         var n=String(c[7]||'').trim().replace(/"/g,'');
         var sx=String(c[8]||'').trim().toLowerCase().replace(/"/g,'');
         if(d&&n&&n!=='fch_nac'&&n.length>4){
@@ -1827,7 +1862,7 @@ function rvAudit(json,xml,cfg){
   var nioS=String(json.numDocumentoIdObligado==null?'':json.numDocumentoIdObligado).trim();
   if(!nioS)add('error','Obligatorio',L0,'numDocumentoIdObligado','Falta el NIT del prestador obligado a facturar.',json.numDocumentoIdObligado,null);
   else{
-    var soloDig=nioS.indexOf('-')>-1?nioS.split('-')[0].replace(/\D/g,''):nioS.replace(/\D/g,'');
+    var soloDig=limpiarNit(nioS);
     if(soloDig!==nioS)fixTo(json,'numDocumentoIdObligado',soloDig,'Formato',L0,'El NIT no debe llevar puntos, guiones ni dígito de verificación.');
     if(xml&&xml.nP&&soloDig&&soloDig!==xml.nP)add('advertencia','Cruce con XML',L0,'numDocumentoIdObligado','El NIT del JSON no coincide con el del prestador en la factura.',soloDig,xml.nP);
   }
@@ -1863,7 +1898,7 @@ function rvAudit(json,xml,cfg){
 
   var vistosUsr={},vistosServ={};
   json.usuarios.forEach(function(u,ui){
-    var nd=String(u.numDocumentoIdentificacion==null?'':u.numDocumentoIdentificacion).trim().replace(/[\s.]/g,'');
+    var nd=limpiarDoc(u.numDocumentoIdentificacion);
     var L='Usuario '+(ui+1)+(nd?' · '+nd:'');
     var svc=u.servicios;
     if(!svc||typeof svc!=='object'||Array.isArray(svc)){add('error','Estructura',L,'servicios','El usuario no trae el objeto servicios.',null,null);svc={};}
@@ -1886,7 +1921,7 @@ function rvAudit(json,xml,cfg){
     }
     if(!nd)add('error','Obligatorio',L,'numDocumentoIdentificacion','Falta el número de documento del usuario.',u.numDocumentoIdentificacion,null);
     else{
-      fixTo(u,'numDocumentoIdentificacion',nd,'Formato',L,'El número de documento no debe llevar puntos ni espacios.');
+      fixTo(u,'numDocumentoIdentificacion',nd,'Formato',L,'El número de documento solo puede llevar letras y números: se le quitaron espacios, puntos y otros caracteres especiales (RVG01).');
       var kU=td+'|'+nd;
       if(vistosUsr[kU])add('advertencia','Duplicado',L,'numDocumentoIdentificacion','Este paciente aparece más de una vez: el validador espera un solo registro por paciente con todos sus servicios.',nd,null);
       else vistosUsr[kU]=1;
@@ -2031,11 +2066,11 @@ function rvAudit(json,xml,cfg){
           fixTo(s,'tipoDocumentoIdentificacion',ptd,'Formato',SL,'El tipo de documento del profesional va en mayúsculas.');
           if(RV_TDOC.indexOf(ptd)<0)add('error','Tabla de referencia',SL,'tipoDocumentoIdentificacion','"'+ptd+'" no está en la tabla de tipos de documento.',ptd,null);
         }
-        var pnd=String(s.numDocumentoIdentificacion==null?'':s.numDocumentoIdentificacion).trim().replace(/[\s.]/g,'');
+        var pnd=limpiarDoc(s.numDocumentoIdentificacion);
         if(!pnd||/^0+$/.test(pnd)){
           if(cfg.prof)put(s,'numDocumentoIdentificacion',cfg.prof,'Obligatorio',SL,'Falta el documento del profesional; se usó el CC de respaldo.');
           else add('error','Obligatorio',SL,'numDocumentoIdentificacion','Falta el documento del profesional que atendió.',s.numDocumentoIdentificacion,null);
-        }else fixTo(s,'numDocumentoIdentificacion',pnd,'Formato',SL,'El documento del profesional no debe llevar puntos ni espacios.');
+        }else fixTo(s,'numDocumentoIdentificacion',pnd,'Formato',SL,'El documento del profesional solo puede llevar letras y números: se le quitaron espacios, puntos y otros caracteres especiales (RVG01).');
       }
       if('numAutorizacion' in s&&s.numAutorizacion!=null){
         var aus=String(s.numAutorizacion).trim().replace(/\.0$/,'');
