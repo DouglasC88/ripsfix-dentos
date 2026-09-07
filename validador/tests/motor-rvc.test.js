@@ -25,6 +25,9 @@ var CUPS_CIE10_REF = {
   '237101': 'K040', '242103': 'K053', '233101': 'K083', '231100': 'K029'
 };
 
+// El fixture es un paquete de CAPITACIÓN, así que el contexto lo declara. Sin
+// modalidad el motor asume pago por evento —el caso general— y el periodo
+// esperado sería el facturado, no el anterior.
 function contexto(extra) {
   extra = extra || {};
   return {
@@ -33,6 +36,7 @@ function contexto(extra) {
       periodo: Fixture.FEV.periodo,
       cobertura: Fixture.FEV.cobertura
     },
+    modalidadPago: extra.modalidadPago || { codigo: '03' },
     tablas: extra.tablas || {},
     opciones: Object.assign({ reportarNoEvaluables: false }, extra.opciones || {})
   };
@@ -157,7 +161,7 @@ test('el desfase de numFactura entre RIPS y FEV no genera ningún hallazgo', fun
 });
 
 test('sin InvoicePeriod, RVC014 se declara no evaluable en vez de aprobar el paquete', function () {
-  var r = Motor.validar(PAQUETE_57, { fev: { numFactura: 'FE10' }, tablas: {} });
+  var r = Motor.validar(PAQUETE_57, { fev: { numFactura: 'FE10' }, modalidadPago: { codigo: '03' }, tablas: {} });
   assert.equal(hallazgosDe(r, 'RVC014').filter(function (h) { return !h._noEvaluable; }).length, 0);
   var ne = r.reglasNoEvaluables.filter(function (x) { return x.codigo === 'RVC014'; });
   assert.equal(ne.length, 1);
@@ -317,6 +321,7 @@ test('RVC017 soporta el contrato "todo incluido salvo estos códigos"', function
 test('RVC017 avisa cuando la FEV no declara cobertura, en vez de aprobar', function () {
   var r = Motor.validar(PAQUETE_57, {
     fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    modalidadPago: { codigo: '03' },
     tablas: { cupsPorCobertura: { '17': { incluidos: Tablas.indice(['890203']) } } },
     opciones: { reportarNoEvaluables: false }
   });
@@ -442,6 +447,7 @@ test('se puede correr un subconjunto de reglas', function () {
 test('RVG01 y FED137 salen listadas como pendientes de la validación oficial', function () {
   var r = Motor.validar(PAQUETE_57, {
     fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo, cobertura: '17' },
+    modalidadPago: { codigo: '03' },
     tablas: { cups: CUPS_REF }
   });
   ['RVG01', 'FED137'].forEach(function (cod) {
@@ -487,6 +493,7 @@ test('ctx.periodo manda sobre la derivación del periodo facturado', function ()
   // prueba de que el rango lo decide el dato y no el supuesto.
   var r = Motor.validar(PAQUETE_57, {
     fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    modalidadPago: { codigo: '03' },
     periodo: { inicio: '2026-08-01', fin: '2026-08-31' },
     tablas: {}, opciones: { reportarNoEvaluables: false }
   });
@@ -500,6 +507,7 @@ test('ctx.periodo manda sobre la derivación del periodo facturado', function ()
 
 test('con periodo prestado a mano no hace falta el periodo facturado', function () {
   var r = Motor.validar(PAQUETE_57, {
+    modalidadPago: { codigo: '03' },
     periodo: { inicio: '2026-07-01', fin: '2026-07-31' },
     tablas: {}, opciones: { reportarNoEvaluables: false }
   });
@@ -511,6 +519,7 @@ test('con periodo prestado a mano no hace falta el periodo facturado', function 
 test('el periodo facturado se conserva junto al prestado fijado a mano', function () {
   var r = Motor.validar(PAQUETE_57, {
     fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    modalidadPago: { codigo: '03' },
     periodo: { inicio: '2026-07-01', fin: '2026-07-31' },
     tablas: {}, opciones: { reportarNoEvaluables: false }
   });
@@ -524,6 +533,7 @@ test('un periodo prestado a mano inválido no cae de vuelta en la derivación', 
   // que se validó contra el periodo que escribió.
   var r = Motor.validar(PAQUETE_57, {
     fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    modalidadPago: { codigo: '03' },
     periodo: { inicio: '2026-07-31', fin: '2026-07-01' },
     tablas: {}
   });
@@ -534,11 +544,291 @@ test('un periodo prestado a mano inválido no cae de vuelta en la derivación', 
 });
 
 test('un resultado ya calculado por RipsPeriodo se puede reinyectar sin alterarlo', function () {
-  var calculado = Motor.Periodo.calcularPeriodoAnterior(Fixture.FEV.periodo);
+  var calculado = Motor.Periodo.calcularPeriodoEsperado(Fixture.FEV.periodo,
+    { modalidad: Motor.Periodo.resolverModalidad('03', null) });
   var r = Motor.validar(PAQUETE_57, {
     periodo: calculado, tablas: {}, opciones: { reportarNoEvaluables: false }
   });
   assert.equal(r.periodo.origen, 'derivado');
   assert.equal(r.periodo.inicio, '2026-07-01');
   assert.equal(hallazgosDe(r, 'RVC014').length, 109);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EL VALIDADOR NO ES SOLO PARA CAPITACIÓN
+// ═══════════════════════════════════════════════════════════════════════════
+// Lo único que cambia entre un RIPS de particulares, uno de convenio por evento
+// y uno de capitación es contra qué periodo se comparan las fechas. Las demás
+// reglas se aplican igual.
+
+test('el mismo paquete da distinto RVC014 según la modalidad de pago', function () {
+  var por = {};
+  ['01', '02', '03', '04'].forEach(function (cod) {
+    var r = Motor.validar(PAQUETE_57, contexto({ modalidadPago: { codigo: cod } }));
+    por[cod] = {
+      estrategia: r.periodo.estrategia,
+      periodo: r.periodo.inicio + '..' + r.periodo.fin,
+      rvc014: hallazgosDe(r, 'RVC014').length
+    };
+  });
+  // Evento y caso/paquete: las atenciones deben caer DENTRO del periodo facturado.
+  assert.equal(por['04'].periodo, '2026-08-01..2026-08-31');
+  assert.equal(por['01'].periodo, '2026-08-01..2026-08-31');
+  // Capitación y global prospectivo: en el periodo ANTERIOR.
+  assert.equal(por['03'].periodo, '2026-07-01..2026-07-31');
+  assert.equal(por['02'].periodo, '2026-07-01..2026-07-31');
+  // Y por tanto el conteo cambia: es el mismo paquete leído con otra regla.
+  assert.equal(por['03'].rvc014, 109);
+  assert.notEqual(por['04'].rvc014, 109);
+  assert.equal(por['04'].rvc014, por['01'].rvc014);
+  assert.equal(por['02'].rvc014, por['03'].rvc014);
+});
+
+test('un RIPS de particulares por evento se valida dentro del periodo facturado', function () {
+  var paquete = {
+    numDocumentoIdObligado: '9001234567', numFactura: 'FE100',
+    usuarios: [{ codSexo: 'F', fechaNacimiento: '1990-01-01', servicios: { consultas: [
+      { codConsulta: '890203', fechaInicioAtencion: '2026-08-10 08:00', codDiagnosticoPrincipal: 'K021' },
+      { codConsulta: '890203', fechaInicioAtencion: '2026-07-10 08:00', codDiagnosticoPrincipal: 'K021' }
+    ] } }]
+  };
+  var r = Motor.validar(paquete, {
+    fev: { numFactura: 'FE100', periodo: { inicio: '2026-08-01', fin: '2026-08-31' } },
+    modalidadPago: { codigo: '04' },
+    tablas: {}, opciones: { reportarNoEvaluables: false }
+  });
+  var h = hallazgosDe(r, 'RVC014');
+  assert.equal(h.length, 1, 'solo la atención de julio queda fuera');
+  assert.match(h[0].PathFuente, /consultas\[1\]/);
+  // Y el mensaje no puede hablar de FEV anticipada: en evento es al contrario.
+  assert.doesNotMatch(h[0].Observaciones, /anticipada/);
+});
+
+test('las demás reglas se aplican igual en cualquier modalidad', function () {
+  var tablas = { cups: CUPS_REF, cupsCie10: CUPS_CIE10_REF };
+  var conteos = ['01', '02', '03', '04'].map(function (cod) {
+    var r = Motor.validar(PAQUETE_57, contexto({ modalidadPago: { codigo: cod }, tablas: tablas }));
+    return hallazgosDe(r, 'RVC096').length + ':' + hallazgosDe(r, 'RVC019').length;
+  });
+  assert.deepEqual(conteos, ['1:1', '1:1', '1:1', '1:1'],
+    'RVC096 y RVC019 no dependen de la modalidad');
+});
+
+test('la modalidad se puede leer del XML por nombre y llega hasta el resultado', function () {
+  var r = Motor.validar(PAQUETE_57, {
+    fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo, mp: '99', mpNom: 'Pago por Capitación' },
+    tablas: {}, opciones: { reportarNoEvaluables: false }
+  });
+  assert.equal(r.modalidadPago.codigo, '03');
+  assert.equal(r.modalidadPago.anticipada, true);
+  assert.equal(r.periodo.inicio, '2026-07-01');
+});
+
+test('sin modalidad reconocible se asume evento y queda marcado para revisar', function () {
+  var r = Motor.validar(PAQUETE_57, {
+    fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    tablas: {}, opciones: { reportarNoEvaluables: false }
+  });
+  assert.equal(r.modalidadPago.reconocida, false);
+  assert.equal(r.modalidadPago.confirmar, true);
+  assert.equal(r.periodo.estrategia, 'mismoPeriodo');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORRECCIÓN DEL PAQUETE
+// ═══════════════════════════════════════════════════════════════════════════
+var CIE10_REF = { 'K021': 1, 'K029': 1, 'K040': 1, 'K053': 1, 'K083': 1, 'K088': 1 };
+
+function paqueteCorregible() {
+  return {
+    numDocumentoIdObligado: '9001234567', numFactura: 'FE100',
+    usuarios: [{ codSexo: 'F', fechaNacimiento: '1990-01-01', servicios: { procedimientos: [
+      // 0) CUPS con separador: es formato, se corrige.
+      { codProcedimiento: '242103.0', codDiagnosticoPrincipal: 'K053', codServicio: 343,
+        fechaInicioAtencion: '2026-08-05 08:00' },
+      // 1) diagnóstico que no existe en CIE-10: se corrige al de referencia.
+      { codProcedimiento: '237101', codDiagnosticoPrincipal: 'ZZZZ', codServicio: 334,
+        fechaInicioAtencion: '2026-08-06 08:00' },
+      // 2) diagnóstico válido pero incoherente: NO se corrige, es criterio clínico.
+      { codProcedimiento: '237101', codDiagnosticoPrincipal: 'K083', codServicio: 334,
+        fechaInicioAtencion: '2026-08-07 08:00' },
+      // 3) codServicio que no corresponde al CUPS: se corrige por tabla.
+      { codProcedimiento: '242103', codDiagnosticoPrincipal: 'K053', codServicio: 999,
+        fechaInicioAtencion: '2026-08-08 08:00' }
+    ] } }]
+  };
+}
+
+function ctxCorreccion() {
+  return {
+    fev: { numFactura: 'FE100', periodo: { inicio: '2026-08-01', fin: '2026-08-31' } },
+    modalidadPago: { codigo: '04' },
+    tablas: {
+      cups: CUPS_REF, cie10: CIE10_REF, cupsCie10: CUPS_CIE10_REF,
+      cupsCodServicio: { '242103': 343, '237101': 334 }
+    },
+    opciones: { reportarNoEvaluables: false }
+  };
+}
+
+test('corrige el CUPS mal escrito, el diagnóstico inválido y el codServicio', function () {
+  var r = Motor.validarYCorregir(paqueteCorregible(), ctxCorreccion());
+  var porCodigo = {};
+  r.correcciones.aplicadas.forEach(function (c) { porCodigo[c.codigo] = c; });
+  assert.equal(r.correcciones.total, 3);
+  assert.equal(r.correcciones.noAplicadas.length, 0);
+  assert.equal(porCodigo.RVC096.despues, '242103');
+  assert.equal(porCodigo.RVC019.despues, 'K040');
+  assert.equal(porCodigo.RVC059.despues, 343);
+});
+
+test('corregir no toca el paquete de entrada: trabaja sobre una copia', function () {
+  var paquete = paqueteCorregible();
+  var antes = JSON.stringify(paquete);
+  var r = Motor.validarYCorregir(paquete, ctxCorreccion());
+  assert.equal(JSON.stringify(paquete), antes, 'el paquete original quedó modificado');
+  var proc = r.corregido.paquete.usuarios[0].servicios.procedimientos;
+  assert.equal(proc[0].codProcedimiento, '242103');
+  assert.equal(proc[1].codDiagnosticoPrincipal, 'K040');
+  assert.equal(proc[3].codServicio, 343);
+});
+
+test('la segunda pasada prueba que la corrección sirvió', function () {
+  var r = Motor.validarYCorregir(paqueteCorregible(), ctxCorreccion());
+  assert.ok(r.resumen.rechazados > r.corregido.resumen.rechazados,
+    'debe haber menos rechazos después de corregir');
+  assert.equal(r.corregido.resumen.rechazados, 0);
+});
+
+test('no corrige el diagnóstico válido que no cuadra con el CUPS: es criterio clínico', function () {
+  var r = Motor.validarYCorregir(paqueteCorregible(), ctxCorreccion());
+  var quedan = r.corregido.hallazgos.filter(function (h) { return h.Codigo === 'RVC019'; });
+  assert.equal(quedan.length, 1, 'el K083 del registro 2 sigue reportado');
+  assert.match(quedan[0].PathFuente, /procedimientos\[2\]/);
+  assert.match(quedan[0].Observaciones, /la decisión es clínica/);
+  assert.equal(r.corregido.paquete.usuarios[0].servicios.procedimientos[2].codDiagnosticoPrincipal, 'K083');
+});
+
+test('sin tabla CIE-10 no se reemplaza ningún diagnóstico', function () {
+  // Sin poder distinguir un diagnóstico inválido de uno válido, reemplazar
+  // sería pisar criterio clínico a ciegas.
+  var ctx = ctxCorreccion();
+  delete ctx.tablas.cie10;
+  var r = Motor.validarYCorregir(paqueteCorregible(), ctx);
+  assert.equal(r.correcciones.aplicadas.filter(function (c) { return c.codigo === 'RVC019'; }).length, 0);
+  assert.equal(r.corregido.paquete.usuarios[0].servicios.procedimientos[1].codDiagnosticoPrincipal, 'ZZZZ');
+});
+
+test('RVC014 nunca se corrige reescribiendo la fecha de la atención', function () {
+  // Hacer entrar la fecha al periodo a la fuerza haría pasar el paquete
+  // reportando atenciones en días en que no ocurrieron.
+  var r = Motor.validarYCorregir(PAQUETE_57, contexto());
+  assert.equal(hallazgosDe(r, 'RVC014').length, 109);
+  assert.equal(r.correcciones.aplicadas.filter(function (c) { return c.codigo === 'RVC014'; }).length, 0);
+  assert.equal(r.corregido.resumen.porRegla.RVC014.total, 109, 'siguen los 109 después de corregir');
+  // Y las fechas quedaron intactas en la copia.
+  assert.equal(r.corregido.paquete.usuarios[0].servicios.consultas[1].fechaInicioAtencion,
+    PAQUETE_57.usuarios[0].servicios.consultas[1].fechaInicioAtencion);
+});
+
+test('el CUPS de 7 dígitos no se trunca para hacerlo "existir"', function () {
+  // 1005371 es un CUPS real que no está en la tabla que carga la app.
+  // Rellenar a 6 y recortar lo convertiría en 005371, un código que nadie usó.
+  var paquete = {
+    numFactura: 'FE100',
+    usuarios: [{ servicios: { procedimientos: [
+      { codProcedimiento: '1005371', codDiagnosticoPrincipal: 'K053',
+        fechaInicioAtencion: '2026-08-05 08:00' }
+    ] } }]
+  };
+  assert.deepEqual(Motor.candidatosCups('1005371'), ['1005371'], 'no debe proponer recortes');
+  var r = Motor.validarYCorregir(paquete, ctxCorreccion());
+  var h = hallazgosDe(r, 'RVC096');
+  assert.equal(h.length, 1);
+  assert.equal(h[0]._correccion, undefined, 'no hay corrección posible');
+  assert.match(h[0].Observaciones, /7 dígitos/);
+  assert.equal(r.corregido.paquete.usuarios[0].servicios.procedimientos[0].codProcedimiento, '1005371');
+});
+
+test('aplicarCorrecciones es independiente de validar y reporta lo que no pudo aplicar', function () {
+  var paquete = paqueteCorregible();
+  var falso = [{
+    Clase: 'Rechazado', Codigo: 'RVC096', Descripcion: 'x', Observaciones: 'y',
+    PathFuente: 'usuarios[0].servicios.procedimientos[99].codProcedimiento',
+    _correccion: { campo: 'codProcedimiento', antes: 'a', despues: 'b', motivo: 'z' }
+  }];
+  var r = Motor.aplicarCorrecciones(paquete, falso);
+  assert.equal(r.aplicadas.length, 0);
+  assert.equal(r.noAplicadas.length, 1);
+  assert.match(r.noAplicadas[0].razon, /No se encontró/);
+});
+
+test('un paquete sin nada corregible lo dice, no falla', function () {
+  var r = Motor.validarYCorregir(PAQUETE_57, contexto());
+  assert.equal(r.correcciones.total, 0);
+  assert.equal(r.correcciones.noAplicadas.length, 0);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIAGNÓSTICO DEL DESFASE
+// ═══════════════════════════════════════════════════════════════════════════
+test('con el paquete pegado a la factura equivocada dice cuál le corresponde', function () {
+  var paquete = {
+    numFactura: 'FE8',
+    usuarios: [{ servicios: { consultas: [
+      { codConsulta: '890203', fechaInicioAtencion: '2026-06-03 08:00' },
+      { codConsulta: '890203', fechaInicioAtencion: '2026-06-11 08:00' },
+      { codConsulta: '890203', fechaInicioAtencion: '2026-06-27 08:00' }
+    ] } }]
+  };
+  var d = Motor.diagnosticarDesfase(paquete, {
+    fev: { periodo: { inicio: '2026-08-01', fin: '2026-08-31' } },
+    modalidadPago: { codigo: '03' }, tablas: {}
+  });
+  assert.equal(d.coincide, false);
+  assert.equal(d.concentrado, true);
+  assert.deepEqual(d.periodoRips, { inicio: '2026-06-01', fin: '2026-06-30' });
+  assert.deepEqual(d.facturaEsperada, { inicio: '2026-07-01', fin: '2026-07-31' });
+  assert.match(d.mensaje, /2026-07-01 a 2026-07-31/);
+  assert.match(d.mensaje, /reescribir las fechas/);
+});
+
+test('si el paquete mezcla periodos no propone ninguna factura', function () {
+  // Proponer una sola factura para un paquete de tres meses sería engañoso.
+  var d = Motor.diagnosticarDesfase(PAQUETE_57, contexto());
+  assert.equal(d.concentrado, false);
+  assert.equal(d.periodoRips, null);
+  assert.equal(d.facturaEsperada, null);
+  assert.match(d.mensaje, /mezcla atenciones de varios periodos/);
+  assert.match(d.mensaje, /2026-06, 2026-07, 2026-08/);
+});
+
+test('cuando el paquete sí cae en el periodo esperado lo dice sin alarmar', function () {
+  var paquete = {
+    numFactura: 'FE100',
+    usuarios: [{ servicios: { consultas: [
+      { codConsulta: '890203', fechaInicioAtencion: '2026-08-05 08:00' },
+      { codConsulta: '890203', fechaInicioAtencion: '2026-08-20 08:00' }
+    ] } }]
+  };
+  var d = Motor.diagnosticarDesfase(paquete, {
+    fev: { periodo: { inicio: '2026-08-01', fin: '2026-08-31' } },
+    modalidadPago: { codigo: '04' }, tablas: {}
+  });
+  assert.equal(d.coincide, true);
+  assert.match(d.mensaje, /caen dentro del periodo esperado/);
+});
+
+test('el diagnóstico viene incluido en el resultado de validar', function () {
+  var r = Motor.validar(PAQUETE_57, contexto());
+  assert.ok(r.desfase);
+  assert.equal(r.desfase.registrosConFecha, 225);
+  assert.deepEqual(r.desfase.cobertura, { inicio: '2026-06-25', fin: '2026-08-27' });
+});
+
+test('sin fechas utilizables el diagnóstico devuelve null en vez de inventar', function () {
+  assert.equal(Motor.diagnosticarDesfase({ usuarios: [] }, contexto()), null);
+  assert.equal(Motor.diagnosticarDesfase({
+    usuarios: [{ servicios: { consultas: [{ codConsulta: '890203' }] } }]
+  }, contexto()), null);
 });

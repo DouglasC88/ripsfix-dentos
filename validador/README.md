@@ -1,22 +1,45 @@
-# Validador local de RIPS para capitación
+# Validador local de RIPS
 
 Motor de reglas que corre en el navegador y en Node, para detectar antes de
-radicar los errores que hoy solo aparecen al validar contra SISPRO.
+radicar los errores que hoy solo aparecen al validar contra SISPRO. Sirve para
+**cualquier RIPS**: particulares, convenios por evento, por caso o paquete,
+global prospectivo y capitación.
 
-## Por qué existe
+## La modalidad de pago es lo único que cambia
 
-En pago por **capitación** la factura electrónica se emite **anticipada** para
-un periodo futuro, pero el RIPS que la soporta reporta las atenciones **ya
-prestadas**, que son las del periodo anterior al facturado.
+Todas las reglas se aplican igual en cualquier RIPS. La única parte que depende
+del contrato es **contra qué periodo se compara la fecha de la atención**:
 
-De ahí salen las dos consecuencias que gobiernan todo este módulo:
+| Modalidad | Estrategia | Las atenciones caen… |
+|---|---|---|
+| `04` Pago por evento | `mismoPeriodo` | **dentro** del periodo facturado |
+| `01` Pago por caso, conjunto integral, paquete o canasta | `mismoPeriodo` | **dentro** del periodo facturado |
+| `02` Pago global prospectivo | `mesAnterior` | en el periodo **anterior** al facturado |
+| `03` Pago por capitación | `mesAnterior` | en el periodo **anterior** al facturado |
+
+La razón: en evento y por caso el servicio se factura **después** de prestarlo,
+así que la atención está dentro del periodo que la factura cubre. En capitación
+y global prospectivo la factura se emite **anticipada** para un periodo futuro,
+pero el RIPS que la soporta reporta lo **ya prestado**.
+
+Sin modalidad declarada se asume **pago por evento**, que es el caso general.
+Asumir capitación marcaría como rechazo un paquete de particulares correcto.
+
+### Consecuencias en las modalidades anticipadas
 
 1. Si el `InvoicePeriod` de la FEV cubre **A → B**, ninguna `fechaInicioAtencion`
-   del RIPS debe caer en A → B: todas deben caer en el periodo previo. Cuando no
-   es así, el validador oficial rechaza el paquete por **RVC014**.
+   debe caer en A → B: todas deben caer en el periodo previo. Cuando no es así,
+   el validador oficial rechaza el paquete por **RVC014**.
 2. El **desfase de `numFactura`** entre el RIPS y la FEV (el RIPS dice `FE8` y la
    factura es `FE10`) es **normal y esperado**. El motor lo muestra como dato en
    el reporte y **nunca** lo reporta como hallazgo.
+
+### Lo que se tomó por analogía
+
+Hay evidencia directa para capitación (paquetes reales) y para evento (es lo que
+ya asumía el resto de la app). Para **`01` y `02` la regla salió por analogía**
+con esas dos, y el reporte lo dice en cada corrida para que se contraste contra
+el contrato. `resolverModalidad()` lo marca con `confirmar: true`.
 
 ## Dónde vive el código
 
@@ -48,7 +71,7 @@ script, bajo `VALIDACIÓN DE CAPITACIÓN (panel)`.
 
 `tests/cargar-motor.js` recorta ese bloque del propio `index.html` y lo evalúa,
 así que **los tests prueban el código que se despliega**, no un duplicado que se
-desincroniza. Dos consecuencias prácticas:
+desincroniza (son 109 casos). Dos consecuencias prácticas:
 
 - No borres ni renombres los marcadores: si desaparecen, los tests fallan de
   inmediato con un mensaje claro en vez de validar algo viejo.
@@ -63,24 +86,33 @@ nada de lo que hay aquí se despliega ni hace falta en tiempo de ejecución.
 Los cuatro globales quedan disponibles en la página tras cargar `index.html`:
 
 ```js
-var res = RipsMotorRVC.validar(paqueteRips, {
+var ctx = {
   fev: {
     numFactura: 'FE10',
     periodo: { inicio: '2026-08-01', fin: '2026-08-31' }, // InvoicePeriod de la FEV
     cobertura: '17'                                       // COBERTURA_PLAN_BENEFICIOS
   },
+  modalidadPago: { codigo: '03' },  // o { nombre: 'Pago por capitación' }
   tablas: RipsTablas.construir({
     cups: CUPS_DATA,            // tabla de referencia CUPSRips
+    cie10: CIE10_DATA,          // para distinguir un diagnóstico roto de uno válido
     cupsCie10: CUPS_CIE10,      // CUPS -> diagnóstico de referencia
     cupsCodServicio: CSERV_CUPS // CUPS -> codServicio
-  }),
-  opciones: { estrategiaPeriodo: 'mesAnterior' }
-});
+  })
+};
+
+var res = RipsMotorRVC.validar(paqueteRips, ctx);          // solo reporta
+var res = RipsMotorRVC.validarYCorregir(paqueteRips, ctx); // reporta y corrige
 
 console.log(RipsReporte.reporteTexto(res));   // tabla para consola
 RipsReporte.reporteHTML(res);                 // documento HTML con las dos pestañas
 RipsReporte.reporteCSV(res);                  // CSV con separador ";" y BOM
 ```
+
+`modalidadPago` acepta el código, el nombre o las dos cosas; el **nombre manda
+sobre el código**, igual que en el resto de la app, para que un emisor con otra
+codificación se siga reconociendo. También se lee del XML vía `fev.mp` /
+`fev.mpNom`, que es lo que devuelve `cvXmlInfo()`.
 
 Cada hallazgo trae exactamente las cinco columnas de la pantalla oficial:
 
@@ -103,9 +135,9 @@ no salen en el reporte.
 
 | Código | Clase | Qué revisa | Tabla que necesita |
 |---|---|---|---|
-| `RVC014` | Rechazado | Fecha de la atención dentro del periodo de prestación esperado. Cubre `fechaInicioAtencion`, `fechaEgreso`, `fechaDispensAdmon` y `fechaSuministroTecnologia`. | — (solo el periodo de la FEV) |
+| `RVC014` | Rechazado | Fecha de la atención dentro del periodo esperado **según la modalidad**. Cubre `fechaInicioAtencion`, `fechaEgreso`, `fechaDispensAdmon` y `fechaSuministroTecnologia`. | — (el periodo de la FEV y la modalidad) |
 | `RVC096` | Rechazado | El CUPS existe en CUPSRips. | `cups` |
-| `RVC019` | Notificación | CUPS coherente con el diagnóstico principal, comparando por categoría CIE-10 (3 primeros caracteres). Se puede endurecer a rechazo con `opciones.claseRVC019`. | `cupsCie10` |
+| `RVC019` | Notificación | CUPS coherente con el diagnóstico principal, comparando por categoría CIE-10 (3 primeros caracteres). Se puede endurecer a rechazo con `opciones.claseRVC019`. | `cupsCie10`, y `cie10` para corregir |
 | `RVC017` | Rechazado | CUPS incluido en la cobertura o plan de beneficios de la FEV. | `cupsPorCobertura` |
 | `RVC051` | Rechazado | Finalidad de la tecnología coherente con el sexo y la edad del usuario **el día de la atención**. | `finalidadRestricciones` |
 | `RVC059` | Rechazado / Notificación | CUPS coherente con grupo de servicios, finalidad y causa; y `codServicio` coherente con el CUPS. | `cupsGrupoServicio` y/o `cupsCodServicio` |
@@ -128,6 +160,60 @@ forma exacta está documentada ahí, junto a cada constante) o pásalas por
 `RVG01` y `FED137` cruzan contra bases del Ministerio (BDUA/RUAF, la FEV
 radicada ante la DIAN). Sin conectividad a SISPRO no se pueden evaluar, y el
 motor **no las simula**: las lista como pendientes de la validación oficial.
+
+## Corrección del JSON
+
+`validarYCorregir()` aplica lo corregible **sobre una copia** —el paquete de
+entrada nunca se toca— y vuelve a validar el resultado, para probar que la
+corrección sirvió:
+
+```js
+var res = RipsMotorRVC.validarYCorregir(paquete, ctx);
+res.correcciones.aplicadas;          // [{codigo, path, campo, antes, despues, motivo}]
+res.corregido.paquete;               // el JSON corregido, listo para exportar
+res.corregido.resumen.rechazados;    // lo que sigue mal: eso va al origen
+```
+
+Las reglas siguen siendo funciones puras: no corrigen nada, solo dejan la
+corrección propuesta en el hallazgo (`_correccion`). Aplicarla es un paso aparte
+(`aplicarCorrecciones()`), así que se puede reportar sin corregir y comparar
+antes/después.
+
+### Qué se corrige y qué no
+
+| Regla | ¿Se corrige? | Por qué |
+|---|---|---|
+| `RVC096` | **Sí**, si es formato | Separadores o ceros a la izquierda: el código es el mismo mal escrito. |
+| `RVC019` | **Solo si el diagnóstico no existe en CIE-10** | Ahí no hay criterio clínico que respetar, hay un dato roto. Si el diagnóstico es válido pero no cuadra con el CUPS, la decisión es del profesional que atendió. |
+| `RVC059` | **Sí** | El `codServicio` se deriva del CUPS por tabla de referencia. |
+| `RVC014` | **No, nunca** | Reescribir la fecha para que entre en el periodo haría pasar el paquete **reportando atenciones en días en que no ocurrieron**. Ver abajo. |
+| `RVC017`, `RVC051` | **No** | No hay un valor correcto que deducir. |
+
+Requisito para que RVC019 corrija: `ctx.tablas.cie10`. Sin ella el motor no puede
+distinguir un diagnóstico roto de uno válido y **no reemplaza ninguno**, para no
+pisar criterio clínico a ciegas.
+
+### RVC014 no se corrige: se diagnostica
+
+Cuando un bloque grande de atenciones cae fuera del periodo, la causa casi nunca
+es que las fechas estén mal — es que **el RIPS quedó pegado a la factura
+equivocada**. Reescribir 109 fechas haría pasar el paquete falseando cuándo se
+prestó el servicio.
+
+Así que en vez de corregir, el motor diagnostica. `res.desfase` (incluido en todo
+resultado de `validar()`) mira qué periodo cubre realmente el paquete y, con la
+inversa de la estrategia de la modalidad, dice a qué factura corresponde:
+
+```
+El paquete reporta atenciones de 2026-06 (3 de 3 registros). Con la regla de
+esta modalidad, un RIPS de ese periodo acompaña a la factura cuyo periodo
+facturado sea 2026-07-01 a 2026-07-31. Antes de tocar una sola fecha, revisa si
+este RIPS quedó pegado a la factura equivocada: reescribir las fechas haría
+pasar el paquete reportando atenciones en días en que no ocurrieron.
+```
+
+Si el paquete mezcla varios periodos no propone ninguna factura —proponer una
+sola sería engañoso— y dice que hay que separarlo por periodo.
 
 ## El periodo de prestación no está en el XML
 
@@ -168,10 +254,13 @@ derivarlo» lo limpia.
 
 ### Derivarlo del periodo facturado (el supuesto)
 
-`calcularPeriodoAnterior(periodoFEV, { estrategia })` acepta dos estrategias:
+`calcularPeriodoEsperado(periodoFEV, { modalidad, estrategia })` acepta tres
+estrategias. Normalmente la pone la modalidad; `estrategia` la fuerza:
 
-- **`mesAnterior`** (por defecto): el mes calendario inmediatamente anterior al
-  mes en que arranca el periodo facturado. FEV de agosto → RIPS de julio.
+- **`mismoPeriodo`**: el periodo facturado tal cual. Evento y caso/paquete.
+- **`mesAnterior`**: el mes calendario inmediatamente anterior al mes en que
+  arranca el periodo facturado. FEV de agosto → RIPS de julio. Capitación y
+  global prospectivo.
 - **`ventanaPrevia`**: ventana de la misma longitud que el periodo facturado,
   terminando el día anterior a su inicio. Para quincenas o periodos partidos.
 
@@ -187,8 +276,9 @@ derivarlo» lo limpia.
 
 ```js
 RipsMotorRVC.diagnosticarPeriodo(paquete, { inicio: '2026-08-01', fin: '2026-08-31' });
-// [ { estrategia:'mesAnterior',  periodo:{inicio:'2026-07-01',fin:'2026-07-31'}, registros:109, usuarios:42 },
-//   { estrategia:'ventanaPrevia', periodo:{inicio:'2026-07-01',fin:'2026-07-31'}, registros:109, usuarios:42 } ]
+// [ { estrategia:'mismoPeriodo',  periodo:{inicio:'2026-08-01',fin:'2026-08-31'}, registros:137, … },
+//   { estrategia:'mesAnterior',   periodo:{inicio:'2026-07-01',fin:'2026-07-31'}, registros:109, … },
+//   { estrategia:'ventanaPrevia', periodo:{inicio:'2026-07-01',fin:'2026-07-31'}, registros:109, … } ]
 ```
 
 ## Tests
@@ -219,12 +309,26 @@ node validador/tests/fixtures/generar-rips-capitacion.js
 
 ## Dentro de la app
 
-La pestaña **🗓️ Validar Capitación** carga el JSON del paquete y el XML de la
-factura, resuelve el periodo, corre el motor con las tablas que la página ya
-tiene en memoria (`CUPS_DATA`, `CUPS_CIE10`, `CSERV_CUPS`) y muestra el
-resultado con las pestañas Rechazados / Notificaciones, más los botones para ver
-o descargar el reporte en HTML y CSV.
+La pestaña **✅ Validar Paquete** carga el JSON del paquete y el XML de la
+factura, resuelve la modalidad y el periodo, corre el motor con las tablas que la
+página ya tiene en memoria (`CUPS_DATA`, `CIE10_DATA`, `CUPS_CIE10`,
+`CSERV_CUPS`) y muestra el resultado con las pestañas Rechazados /
+Notificaciones, más los botones para ver o descargar el reporte en HTML y CSV.
 
-Los dos periodos se pueden escribir a mano: el **facturado** cuando el XML no
-trae `InvoicePeriod` o lo trae mal, y el **prestado** cuando se conoce de primera
-mano. Con el prestado lleno, el facturado deja de ser necesario.
+- **Modalidad de pago**: se lee del XML, y se puede forzar a mano cuando el XML
+  no la trae o usa otra codificación.
+- **Corregir lo corregible**: casilla opcional. Al marcarla aparece el botón para
+  descargar el JSON corregido y una tabla con cada cambio (antes → después → por
+  qué).
+- **Los dos periodos** se pueden escribir a mano: el **facturado** cuando el XML
+  no trae `InvoicePeriod` o lo trae mal, y el **prestado** cuando se conoce de
+  primera mano. Con el prestado lleno, el facturado deja de ser necesario.
+
+## Un defecto aparte, en el corrector de particulares
+
+`fCUPS()` —que usa `fixJson()`, no este motor— hace
+`padStart(6,'0').slice(-6)`, así que **trunca los CUPS de 7 dígitos**:
+`1005371` queda en `005371` y `1000034` en `000034`, códigos que nadie reportó.
+Hay CUPS de 7 dígitos reales en uso (están en `C10` y `CSERV_CUPS` de esta misma
+app). Este motor no comparte ese código: su `candidatosCups()` solo rellena
+cuando el código quedó **más corto** que 6 y nunca recorta.

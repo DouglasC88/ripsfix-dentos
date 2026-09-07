@@ -319,7 +319,7 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
       <button class="nav-item active" id="nav-proc" onclick="switchTab('proc')"><span class="nav-icon">⚙️</span>RIPS Particulares</button>
       <button class="nav-item" id="nav-convenios" onclick="switchTab('convenios')"><span class="nav-icon">🤝</span>RIPS Convenios</button>
       <button class="nav-item" id="nav-sinfactura" onclick="switchTab('sinfactura')"><span class="nav-icon">📄</span>RIPS sin Factura</button>
-      <button class="nav-item" id="nav-capita" onclick="switchTab('capita')"><span class="nav-icon">🗓️</span>Validar Capitación</button>
+      <button class="nav-item" id="nav-capita" onclick="switchTab('capita')"><span class="nav-icon">✅</span>Validar Paquete</button>
       <div class="sidebar-group">Consultas</div>
       <button class="nav-item" id="nav-search" onclick="switchTab('search')"><span class="nav-icon">🔍</span>Buscar Código</button>
     </nav>
@@ -675,11 +675,11 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
   <!-- VALIDAR CAPITACIÓN -->
   <div class="panel" id="tab-capita">
     <div class="card">
-      <div class="card-title">🗓️ Validar RIPS de capitación antes de radicar</div>
-      <p class="card-sub">Corre localmente las reglas del MinSalud sobre el RIPS y su factura electrónica, y muestra el resultado con el mismo formato de la pantalla <em>Resultados de Validación del Paquete</em>. En capitación la FEV se emite anticipada para un periodo futuro, pero el RIPS debe traer las atenciones del <strong>periodo anterior</strong>: esa es la regla que más rechazos produce (RVC014).</p>
+      <div class="card-title">✅ Validar paquete RIPS antes de radicar</div>
+      <p class="card-sub">Corre localmente las reglas del MinSalud sobre el RIPS y su factura electrónica, y muestra el resultado con el mismo formato de la pantalla <em>Resultados de Validación del Paquete</em>. Sirve para <strong>cualquier RIPS</strong>: particulares, convenios por evento, por caso o paquete, global prospectivo y capitación. Lo único que cambia entre ellos es contra qué periodo se comparan las fechas de atención, y eso lo decide la <strong>modalidad de pago</strong>.</p>
 
       <div style="background:var(--blue-light);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:12px;">
-        ℹ️ El <strong>desfase de <code>numFactura</code></strong> entre el RIPS y la FEV es normal en capitación (el RIPS dice “FE8” y la factura es “FE10”): se muestra como dato y nunca como hallazgo.
+        ℹ️ En las modalidades <strong>anticipadas</strong> (capitación y global prospectivo) el <strong>desfase de <code>numFactura</code></strong> entre el RIPS y la FEV es normal —el RIPS dice “FE8” y la factura es “FE10”—: se muestra como dato y nunca como hallazgo.
       </div>
 
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
@@ -700,13 +700,23 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
       <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
           <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">2</span>
-          <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Periodo facturado en la FEV</span>
+          <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Modalidad de pago y periodo facturado</span>
           <span id="cap-s2" style="font-size:.72rem;color:var(--gray-500);">Pendiente</span>
         </div>
         <div style="padding:12px 16px;">
           <div onclick="document.getElementById('cap-i-xml').click()" style="border:2px dashed var(--gray-300);border-radius:8px;padding:18px;text-align:center;cursor:pointer;margin-bottom:10px;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-300)'">
             <input type="file" id="cap-i-xml" accept=".xml" style="display:none" onchange="capCargarXml(this)">
             <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> para cargar el XML de la factura — se lee el <code>InvoicePeriod</code></div>
+          </div>
+          <div style="margin-bottom:10px;"><label class="form-label">Modalidad de pago del contrato</label>
+            <select id="cap-modalidad" class="form-input" onchange="capPintarPeriodo()">
+              <option value="">— la que declare el XML —</option>
+              <option value="04">04 · Pago por evento (particulares y convenios por evento)</option>
+              <option value="01">01 · Pago por caso, conjunto integral, paquete o canasta</option>
+              <option value="02">02 · Pago global prospectivo</option>
+              <option value="03">03 · Pago por capitación</option>
+            </select>
+            <div style="font-size:.68rem;color:var(--gray-500);margin-top:4px;">Decide contra qué periodo se comparan las fechas: en evento y caso/paquete las atenciones caen <strong>dentro</strong> del periodo facturado; en capitación y global prospectivo, en el <strong>anterior</strong>.</div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
             <div style="flex:1;min-width:130px;"><label class="form-label">Inicio del periodo facturado</label>
@@ -715,6 +725,8 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
               <input type="date" id="cap-fev-fin" class="form-input" onchange="capPintarPeriodo()"></div>
             <div style="flex:1;min-width:150px;"><label class="form-label">Cómo se calcula el periodo prestado</label>
               <select id="cap-estrategia" class="form-input" onchange="capPintarPeriodo()">
+                <option value="">— la de la modalidad —</option>
+                <option value="mismoPeriodo">Dentro del periodo facturado</option>
                 <option value="mesAnterior">Mes calendario anterior</option>
                 <option value="ventanaPrevia">Ventana previa del mismo largo</option>
               </select></div>
@@ -743,8 +755,17 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
         </div>
       </div>
 
+      <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:12px;padding:12px 16px;">
+        <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;">
+          <input type="checkbox" id="cap-corregir" style="margin-top:3px;">
+          <span style="font-size:.8rem;"><strong>Corregir lo corregible</strong> y dejar el JSON listo para descargar.
+          <span style="display:block;font-size:.72rem;color:var(--gray-500);margin-top:3px;">Se corrige el formato del CUPS, el diagnóstico que no existe en CIE-10 y el <code>codServicio</code> que se deriva del CUPS. <strong>No</strong> se tocan las fechas de atención (RVC014): reescribirlas haría pasar el paquete reportando atenciones en días en que no ocurrieron. Tampoco se pisa un diagnóstico válido que no cuadre con el CUPS, porque esa decisión es clínica.</span></span>
+        </label>
+      </div>
+
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
         <button onclick="capValidar()" style="padding:10px 18px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.82rem;font-weight:700;cursor:pointer;">▶️ Validar paquete</button>
+        <button onclick="capDescargarJson()" id="cap-btn-json" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--green);border-radius:8px;color:#15803D;font-family:var(--display);font-size:.8rem;font-weight:700;cursor:pointer;display:none;">⬇️ JSON corregido</button>
         <button onclick="capAbrirReporte()" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--blue);border-radius:8px;color:var(--blue-dark);font-family:var(--display);font-size:.8rem;font-weight:700;cursor:pointer;">📄 Ver reporte</button>
         <button onclick="capDescargarReporte()" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--gray-300);border-radius:8px;color:var(--gray-700);font-family:var(--display);font-size:.8rem;font-weight:700;cursor:pointer;">⬇️ HTML</button>
         <button onclick="capDescargarCsv()" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--gray-300);border-radius:8px;color:var(--gray-700);font-family:var(--display);font-size:.8rem;font-weight:700;cursor:pointer;">⬇️ CSV</button>
@@ -2630,20 +2651,29 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
 // ─────────────────────────────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PERIODO DE PRESTACIÓN EN CAPITACIÓN
+// PERIODO DE PRESTACIÓN QUE DEBE TRAER EL RIPS
 // ═══════════════════════════════════════════════════════════════════════════
-// En pago por capitación la factura electrónica (FEV) se emite de forma
-// ANTICIPADA para un periodo futuro, pero el RIPS que la soporta reporta las
-// atenciones YA PRESTADAS, que son las del periodo anterior al que factura.
+// Contra qué periodo se valida la fecha de la atención NO es igual en todas las
+// modalidades de pago, y esa es la única parte de la validación que depende de
+// la modalidad:
 //
-// Consecuencia práctica: si el InvoicePeriod de la FEV cubre A→B, ninguna
-// fechaInicioAtencion del RIPS debe caer en A→B; todas deben caer en el
-// periodo previo. Por eso también es NORMAL que el numFactura del RIPS vaya
-// desfasado respecto al de la FEV (el RIPS dice "FE8" y la factura es "FE10"):
-// ese desfase no es un error y este módulo no lo trata como tal.
+//   · Pago por evento y pago por caso/paquete/canasta: el servicio se factura
+//     después de prestarlo, así que las atenciones caen DENTRO del periodo que
+//     la factura cubre. Estrategia "mismoPeriodo".
 //
-// Cómo se calcula el periodo previo no está fijado por un anexo técnico, así
-// que se deja como estrategia configurable y se documenta el supuesto.
+//   · Pago por capitación y pago global prospectivo: la factura se emite de
+//     forma ANTICIPADA para un periodo futuro, pero el RIPS que la soporta
+//     reporta las atenciones YA PRESTADAS, que son las del periodo anterior al
+//     que factura. Estrategia "mesAnterior".
+//
+// En las modalidades anticipadas hay dos consecuencias que conviene tener
+// presentes: si el InvoicePeriod de la FEV cubre A→B, ninguna
+// fechaInicioAtencion debe caer en A→B; y es NORMAL que el numFactura del RIPS
+// vaya desfasado respecto al de la FEV (el RIPS dice "FE8" y la factura es
+// "FE10"). Ese desfase no es un error y este módulo no lo trata como tal.
+//
+// Ningún anexo técnico fija cómo se calcula el periodo previo, así que la
+// estrategia es configurable y el resultado siempre dice cuál se aplicó.
 (function (raiz, fabrica) {
   raiz.RipsPeriodo = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
@@ -2703,8 +2733,13 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
   }
 
   var ESTRATEGIAS = {
-    // Supuesto por defecto: el RIPS trae el mes calendario anterior al mes en
-    // que arranca el periodo facturado. Es lo que se observa en los paquetes
+    // Modalidades que se facturan después de prestar el servicio: la atención
+    // cae dentro del periodo que la propia factura cubre.
+    mismoPeriodo: function (fev) {
+      return { inicio: fev.inicio, fin: fev.fin };
+    },
+    // Modalidades anticipadas: el RIPS trae el mes calendario anterior al mes
+    // en que arranca el periodo facturado. Es lo que se observa en los paquetes
     // reales de capitación con facturación mensual anticipada.
     mesAnterior: function (fev) {
       return mesAnteriorDe(fev.inicio);
@@ -2719,7 +2754,55 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     }
   };
 
-  var ESTRATEGIA_POR_DEFECTO = 'mesAnterior';
+  // Sin modalidad conocida se asume pago por evento, que es el caso general y
+  // el que ya asumía el resto de la app.
+  var ESTRATEGIA_POR_DEFECTO = 'mismoPeriodo';
+
+  // Modalidades de pago de la FEV en salud (tabla salud_modalidad_pago.gc) y
+  // la estrategia de periodo que le corresponde a cada una.
+  //
+  // `confirmar: true` marca las modalidades en las que la estrategia sale de la
+  // analogía con otra modalidad y no de evidencia directa: el reporte lo dice
+  // para que se contraste contra el contrato antes de confiar en el resultado.
+  var MODALIDADES = {
+    '01': { nombre: 'Pago individual por caso, conjunto integral de atenciones, paquete o canasta',
+            estrategia: 'mismoPeriodo', anticipada: false, confirmar: true },
+    '02': { nombre: 'Pago global prospectivo',
+            estrategia: 'mesAnterior', anticipada: true, confirmar: true },
+    '03': { nombre: 'Pago por capitación',
+            estrategia: 'mesAnterior', anticipada: true, confirmar: false },
+    '04': { nombre: 'Pago por evento',
+            estrategia: 'mismoPeriodo', anticipada: false, confirmar: false }
+  };
+
+  /**
+   * Modalidad de pago a partir de lo que trae la FEV. El nombre manda sobre el
+   * código, igual que en el resto de la app: si el emisor usa otra
+   * codificación, "Pago por evento" se sigue reconociendo por el texto.
+   *
+   * @returns {Object} { codigo, nombre, estrategia, anticipada, confirmar, reconocida }
+   */
+  function resolverModalidad(codigo, nombre) {
+    var txt = String(nombre == null ? '' : nombre);
+    var porNombre = null;
+    if (/evento/i.test(txt)) porNombre = '04';
+    else if (/capitaci/i.test(txt)) porNombre = '03';
+    else if (/global prospectivo/i.test(txt)) porNombre = '02';
+    else if (/paquete|canasta|conjunto integral|por caso/i.test(txt)) porNombre = '01';
+
+    var cod = porNombre || (codigo == null ? '' : ('0' + String(codigo).trim()).slice(-2));
+    var def = MODALIDADES[cod];
+    if (!def) {
+      return {
+        codigo: cod || null, nombre: txt || null, reconocida: false,
+        estrategia: ESTRATEGIA_POR_DEFECTO, anticipada: false, confirmar: true
+      };
+    }
+    return {
+      codigo: cod, nombre: def.nombre, reconocida: true,
+      estrategia: def.estrategia, anticipada: def.anticipada, confirmar: def.confirmar
+    };
+  }
 
   // Normaliza el periodo de la FEV desde cualquiera de las formas en que llega:
   // el objeto de parseXML() ({periodStart, periodEnd}), un {inicio, fin} o el
@@ -2734,23 +2817,29 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
   }
 
   /**
-   * Periodo de prestación que el RIPS debe reportar para una FEV de capitación.
+   * Periodo de prestación que el RIPS debe reportar para una FEV.
    *
    * @param {Object} periodoFEV InvoicePeriod de la factura, en cualquiera de
    *        las formas que acepta normalizarPeriodoFEV().
    * @param {Object} [opciones]
-   * @param {string} [opciones.estrategia='mesAnterior'] 'mesAnterior' | 'ventanaPrevia'
-   * @returns {Object} { inicio, fin, estrategia, periodoFactura, valido, motivo }
+   * @param {string} [opciones.estrategia] Fuerza la estrategia. Si no viene, se
+   *        toma la de `opciones.modalidad`; si tampoco, ESTRATEGIA_POR_DEFECTO.
+   * @param {Object} [opciones.modalidad] Resultado de resolverModalidad().
+   * @returns {Object} { inicio, fin, estrategia, origen, modalidad,
+   *                     periodoFactura, valido, motivo }
    */
-  function calcularPeriodoAnterior(periodoFEV, opciones) {
+  function calcularPeriodoEsperado(periodoFEV, opciones) {
     opciones = opciones || {};
-    var nombre = opciones.estrategia || ESTRATEGIA_POR_DEFECTO;
+    var mod = opciones.modalidad || null;
+    // La estrategia explícita manda; si no hay, la pone la modalidad.
+    var nombre = opciones.estrategia || (mod && mod.estrategia) || ESTRATEGIA_POR_DEFECTO;
     var fev = normalizarPeriodoFEV(periodoFEV);
     if (!fev) {
       return {
         valido: false,
         motivo: 'La factura electrónica no trae un InvoicePeriod con fecha de inicio y fin válidas.',
-        origen: 'derivado', estrategia: nombre, periodoFactura: null, inicio: null, fin: null
+        origen: 'derivado', estrategia: nombre, modalidad: mod,
+        periodoFactura: null, inicio: null, fin: null
       };
     }
     var fn = ESTRATEGIAS[nombre];
@@ -2758,13 +2847,14 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
       return {
         valido: false,
         motivo: 'Estrategia de periodo desconocida: "' + nombre + '".',
-        origen: 'derivado', estrategia: nombre, periodoFactura: fev, inicio: null, fin: null
+        origen: 'derivado', estrategia: nombre, modalidad: mod,
+        periodoFactura: fev, inicio: null, fin: null
       };
     }
     var prev = fn(fev);
     return {
-      valido: true, motivo: null, origen: 'derivado', estrategia: nombre, periodoFactura: fev,
-      inicio: prev.inicio, fin: prev.fin
+      valido: true, motivo: null, origen: 'derivado', estrategia: nombre, modalidad: mod,
+      periodoFactura: fev, inicio: prev.inicio, fin: prev.fin
     };
   }
 
@@ -2772,7 +2862,7 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
    * Periodo de prestación fijado a mano.
    *
    * El XML de la FEV NO trae el periodo prestado: solo trae el InvoicePeriod,
-   * que es el periodo facturado. Todo lo que calcularPeriodoAnterior() devuelve
+   * que es el periodo facturado. Todo lo que calcularPeriodoEsperado() devuelve
    * es una derivación —un supuesto— sobre ese periodo facturado. Cuando se sabe
    * de primera mano qué periodo trae el RIPS (porque lo dice el contrato o el
    * área que armó el paquete), este camino lo fija y saca el supuesto del medio.
@@ -2780,20 +2870,48 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
    * @param {Object} entrada        {inicio, fin} del periodo prestado.
    * @param {Object} [periodoFactura] InvoicePeriod de la FEV, solo informativo.
    */
-  function periodoPrestadoExplicito(entrada, periodoFactura) {
+  function periodoPrestadoExplicito(entrada, periodoFactura, modalidad) {
     var p = normalizarPeriodoFEV(entrada); // misma normalización de {inicio, fin}
     var fev = normalizarPeriodoFEV(periodoFactura);
     if (!p) {
       return {
-        valido: false, origen: 'manual', estrategia: null, periodoFactura: fev,
-        inicio: null, fin: null,
+        valido: false, origen: 'manual', estrategia: null, modalidad: modalidad || null,
+        periodoFactura: fev, inicio: null, fin: null,
         motivo: 'El periodo de prestación indicado a mano no tiene fecha de inicio y fin válidas.'
       };
     }
     return {
       valido: true, motivo: null, origen: 'manual', estrategia: null,
-      periodoFactura: fev, inicio: p.inicio, fin: p.fin
+      modalidad: modalidad || null, periodoFactura: fev, inicio: p.inicio, fin: p.fin
     };
+  }
+
+  /**
+   * Inversa de la estrategia: dado el periodo que el RIPS SÍ trae, cuál debería
+   * ser el periodo facturado de la FEV que le corresponde.
+   *
+   * Sirve para el caso que más rechazos produce: el RIPS quedó pegado a la
+   * factura equivocada. Ahí el arreglo no es tocar las fechas de atención
+   * —eso sería reportar servicios en días en que no ocurrieron— sino adjuntar
+   * el RIPS a la factura correcta.
+   */
+  function periodoFacturaEsperado(periodoRips, estrategia) {
+    var p = normalizarPeriodoFEV(periodoRips);
+    if (!p) return null;
+    if (estrategia === 'mismoPeriodo') return { inicio: p.inicio, fin: p.fin };
+    if (estrategia === 'mesAnterior') {
+      // Si el RIPS trae el mes M, la factura es la del mes siguiente.
+      var q = partes(p.inicio);
+      var mes = q.mes + 1, anio = q.anio;
+      if (mes === 13) { mes = 1; anio += 1; }
+      return { inicio: armar(anio, mes, 1), fin: armar(anio, mes, diasEnMes(anio, mes)) };
+    }
+    if (estrategia === 'ventanaPrevia') {
+      var largo = diasEntre(p.inicio, p.fin) + 1;
+      var ini = sumarDias(p.fin, 1);
+      return { inicio: ini, fin: sumarDias(ini, largo - 1) };
+    }
+    return null;
   }
 
   function dentroDelPeriodo(fecha, periodo) {
@@ -2827,8 +2945,11 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     diasEnMes: diasEnMes,
     mesAnteriorDe: mesAnteriorDe,
     normalizarPeriodoFEV: normalizarPeriodoFEV,
-    calcularPeriodoAnterior: calcularPeriodoAnterior,
+    MODALIDADES: MODALIDADES,
+    resolverModalidad: resolverModalidad,
+    calcularPeriodoEsperado: calcularPeriodoEsperado,
     periodoPrestadoExplicito: periodoPrestadoExplicito,
+    periodoFacturaEsperado: periodoFacturaEsperado,
     dentroDelPeriodo: dentroDelPeriodo,
     desfaseEnDias: desfaseEnDias,
     etiqueta: etiqueta
@@ -2937,6 +3058,25 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     return { anios: anios, dias: dias };
   }
 
+  // Normaliza un código de tecnología en salud sin perder dígitos. Devuelve los
+  // candidatos en orden de preferencia para buscarlos en la tabla de referencia.
+  //
+  // OJO con el rellenado a la izquierda: hay CUPS de 7 dígitos (1005371,
+  // 1000034). Rellenar a 6 y recortar por la derecha los convertiría en otro
+  // código que no existe, así que aquí solo se rellena cuando el código quedó
+  // MÁS CORTO que 6 y nunca se recorta.
+  function candidatosCups(valor) {
+    var bruto = texto(valor);
+    if (bruto === '') return [];
+    var limpio = bruto.replace(/\s+/g, '').replace(/\.0+$/, '').replace(/\./g, '');
+    var cand = [];
+    function agregar(c) { if (c && cand.indexOf(c) < 0) cand.push(c); }
+    agregar(bruto);
+    agregar(limpio);
+    if (/^\d+$/.test(limpio) && limpio.length < 6) agregar(limpio.padStart(6, '0'));
+    return cand;
+  }
+
   function rutaUsuario(iUsuario) { return 'usuarios[' + iUsuario + ']'; }
 
   function rutaServicio(iUsuario, bloque, iServicio, campo) {
@@ -3004,11 +3144,15 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
   // El hallazgo central de la capitación: la factura va anticipada, el RIPS
   // va atrasado. Cualquier fecha de atención que caiga en el periodo que la
   // factura cubre (o fuera del periodo previo) es un rechazo.
+  // El hallazgo central del periodo. Contra qué rango se compara lo decide la
+  // modalidad de pago (ver el módulo de periodo): dentro del periodo facturado
+  // en evento y caso/paquete, en el periodo anterior en capitación y global
+  // prospectivo.
   var RVC014 = {
     codigo: 'RVC014',
     clase: RECHAZADO,
     nombre: 'Fecha de la atención fuera del periodo de prestación',
-    descripcion: 'La fecha de la atención debe corresponder al periodo de prestación de servicios que soporta la factura. En pago por capitación ese periodo es el inmediatamente anterior al periodo facturado en la FEV.',
+    descripcion: 'La fecha de la atención debe corresponder al periodo de prestación de servicios que soporta la factura.',
     requiere: [],
     requierePeriodo: true,
     evaluar: function (paquete, ctx) {
@@ -3017,6 +3161,13 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
       if (!periodo || !periodo.inicio || !periodo.fin) return out;
       var etqPrev = Periodo.etiqueta(periodo);
       var etqFev = Periodo.etiqueta(periodo.periodoFactura);
+      // En las modalidades anticipadas, que la fecha caiga en el periodo que la
+      // factura cubre es EL error típico y merece decirlo con nombre propio. En
+      // evento es justo lo contrario, así que el mensaje no puede ser el mismo.
+      var anticipada = periodo.estrategia
+        ? periodo.estrategia !== 'mismoPeriodo'
+        : !!(ctx.modalidadPago && ctx.modalidadPago.anticipada);
+      var modNom = (ctx.modalidadPago && ctx.modalidadPago.nombre) || 'la modalidad de pago declarada';
       recorrerServicios(paquete, function (reg) {
         reg.def.fechas.forEach(function (campo, iCampo) {
           if (!Object.prototype.hasOwnProperty.call(reg.servicio, campo)) return;
@@ -3035,12 +3186,16 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
           var desfase = Periodo.desfaseEnDias(dia, periodo);
           var enPeriodoFacturado = periodo.periodoFactura &&
             Periodo.dentroDelPeriodo(dia, periodo.periodoFactura);
-          var detalle = enPeriodoFacturado
-            ? 'La fecha cae dentro del periodo que la factura cubre (' + etqFev + '), no en el periodo prestado. ' +
-              'En capitación la FEV es anticipada: el RIPS debe traer las atenciones del periodo anterior.'
-            : (desfase < 0
+          var detalle;
+          if (anticipada && enPeriodoFacturado) {
+            detalle = 'La fecha cae dentro del periodo que la factura cubre (' + etqFev + '), no en el periodo prestado. ' +
+              'En ' + modNom.toLowerCase() + ' la FEV es anticipada: el RIPS debe traer las atenciones del periodo anterior. ' +
+              'Revisa si este RIPS quedó pegado a la factura equivocada.';
+          } else {
+            detalle = (desfase < 0
               ? 'La atención es ' + Math.abs(desfase) + ' día(s) anterior al inicio del periodo de prestación.'
               : 'La atención es ' + desfase + ' día(s) posterior al fin del periodo de prestación.');
+          }
           out.push(hallazgo(RVC014, RECHAZADO,
             campo + ' = ' + dia + ' está fuera del periodo de prestación esperado (' + etqPrev + '). ' + detalle,
             rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, campo),
@@ -3065,11 +3220,31 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
         var cod = reg.codigo;
         if (cod === '') return; // código ausente lo cubre la validación de obligatoriedad
         if (existeEnTabla(tabla, cod)) return;
+        var path = rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, reg.campoCodigo);
+        var meta = { _regla: 'RVC096', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path };
+        // ¿Es solo cuestión de formato? Si alguno de los candidatos sí existe,
+        // la corrección es segura: el código es el mismo, escrito bien.
+        var arreglo = null, cands = candidatosCups(reg.servicio[reg.campoCodigo]);
+        for (var i = 0; i < cands.length; i++) {
+          if (cands[i] !== cod && existeEnTabla(tabla, cands[i])) { arreglo = cands[i]; break; }
+        }
+        if (arreglo) {
+          meta._correccion = {
+            campo: reg.campoCodigo, antes: reg.servicio[reg.campoCodigo], despues: arreglo,
+            motivo: 'El código "' + cod + '" no existe en CUPSRips, pero "' + arreglo +
+              '" sí: era un problema de formato (separadores o ceros a la izquierda).'
+          };
+          out.push(hallazgo(RVC096, RECHAZADO,
+            'El código "' + cod + '" no existe en CUPSRips. Escrito como "' + arreglo +
+            '" sí existe, así que es un problema de formato y se puede corregir.',
+            path, meta));
+          return;
+        }
         out.push(hallazgo(RVC096, RECHAZADO,
-          'El código "' + cod + '" no existe en CUPSRips. Revisa que no le falten ceros a la izquierda ' +
-          'ni le sobren separadores; si el código es correcto, la tabla de referencia está desactualizada.',
-          rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, reg.campoCodigo),
-          { _regla: 'RVC096', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+          'El código "' + cod + '" no existe en CUPSRips y no hay ninguna forma de escribirlo que sí exista. ' +
+          'Si el código es correcto, la tabla de referencia está desactualizada: los CUPS de 7 dígitos ' +
+          'no están en la tabla que carga esta app.',
+          path, meta));
       });
       return out;
     }
@@ -3088,7 +3263,7 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     descripcion: 'El código de la tecnología en salud debe ser coherente con el diagnóstico principal reportado en la atención.',
     requiere: ['cupsCie10'],
     evaluar: function (paquete, ctx) {
-      var out = [], tabla = ctx.tablas.cupsCie10;
+      var out = [], tabla = ctx.tablas.cupsCie10, cie10 = ctx.tablas.cie10;
       var largo = ctx.opciones.longitudCategoriaCie10;
       var clase = ctx.opciones.claseRVC019 || RVC019.clase;
       recorrerServicios(paquete, function (reg) {
@@ -3103,12 +3278,32 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
           return dx === e || dx.slice(0, largo) === e.slice(0, largo);
         });
         if (coincide) return;
+        var path = rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, 'codDiagnosticoPrincipal');
+        var meta = { _regla: 'RVC019', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path };
+        // Solo se propone reemplazar el diagnóstico cuando el declarado NO es un
+        // CIE-10 válido: ahí no hay criterio clínico que respetar, hay un dato
+        // roto. Si el diagnóstico existe pero no cuadra con el CUPS, la
+        // decisión es del profesional que atendió, no del validador: se
+        // notifica y no se toca.
+        var dxInvalido = cie10 && !tablaVacia(cie10) && !existeEnTabla(cie10, dx);
+        if (dxInvalido) {
+          meta._correccion = {
+            campo: 'codDiagnosticoPrincipal', antes: reg.servicio.codDiagnosticoPrincipal,
+            despues: esperados[0],
+            motivo: 'El diagnóstico "' + dx + '" no existe en la tabla CIE-10, así que no hay criterio ' +
+              'clínico que preservar: se usa el de referencia para el CUPS "' + cod + '".'
+          };
+          out.push(hallazgo(RVC019, clase,
+            'El diagnóstico principal "' + dx + '" no existe en la tabla CIE-10. Para el CUPS "' + cod +
+            '" la referencia es ' + esperados.join(' o ') + ', y se puede corregir.',
+            path, meta));
+          return;
+        }
         out.push(hallazgo(RVC019, clase,
           'El diagnóstico principal "' + dx + '" no corresponde a la categoría CIE-10 esperada para el CUPS "' + cod +
-          '" (referencia: ' + esperados.join(', ') + '). Verifica el diagnóstico antes de radicar: ' +
-          'si la atención sí lo justifica, documéntalo; si no, corrígelo.',
-          rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, 'codDiagnosticoPrincipal'),
-          { _regla: 'RVC019', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+          '" (referencia: ' + esperados.join(', ') + '). No se corrige automáticamente porque el diagnóstico ' +
+          'es válido y la decisión es clínica: si la atención lo justifica, documéntalo; si no, corrígelo en el origen.',
+          path, meta));
       });
       return out;
     }
@@ -3279,9 +3474,14 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
               out.push(hallazgo(RVC059, NOTIFICACION,
                 'El CUPS "' + cod + '" corresponde al servicio ' + texto(esperado) +
                 ' según la tabla de referencia, y el registro declara codServicio ' + declarado +
-                '. Revisa el grupo/servicio antes de radicar.',
+                '. Se puede corregir.',
                 rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, 'codServicio'),
-                { _regla: 'RVC059', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+                { _regla: 'RVC059', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path,
+                  _correccion: {
+                    campo: 'codServicio', antes: reg.servicio.codServicio, despues: esperado,
+                    motivo: 'La tabla de referencia deriva el servicio ' + texto(esperado) +
+                      ' del CUPS "' + cod + '".'
+                  } }));
             }
           }
         }
@@ -3308,6 +3508,14 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     ctx = ctx || {};
     var opciones = ctx.opciones || {};
     var fev = ctx.fev ? (ctx.fev.periodo || ctx.fev.invoicePeriod || ctx.fev) : null;
+    // La modalidad de pago es lo único que cambia entre un RIPS de particulares,
+    // uno de convenio por evento y uno de capitación: decide contra qué periodo
+    // se comparan las fechas de atención. Todo lo demás se valida igual.
+    var mod = ctx.modalidadPago && ctx.modalidadPago.estrategia
+      ? ctx.modalidadPago
+      : Periodo.resolverModalidad(
+          ctx.modalidadPago ? ctx.modalidadPago.codigo : (ctx.fev ? (ctx.fev.modalidadPago || ctx.fev.mp) : null),
+          ctx.modalidadPago ? ctx.modalidadPago.nombre : (ctx.fev ? (ctx.fev.modalidadPagoNombre || ctx.fev.mpNom) : null));
     var periodo = ctx.periodo;
     // Dos formas de saber qué periodo debe traer el RIPS, y la diferencia
     // importa: el XML de la FEV solo trae el periodo FACTURADO, nunca el
@@ -3317,21 +3525,25 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     if (periodo) {
       // Un periodo ya resuelto por RipsPeriodo se respeta; un {inicio, fin}
       // suelto se normaliza y valida antes de usarlo.
-      if (periodo.origen == null) periodo = Periodo.periodoPrestadoExplicito(periodo, fev);
+      if (periodo.origen == null) periodo = Periodo.periodoPrestadoExplicito(periodo, fev, mod);
       else if (periodo.periodoFactura == null && fev) {
-        periodo = Periodo.periodoPrestadoExplicito(periodo, fev);
+        periodo = Periodo.periodoPrestadoExplicito(periodo, fev, mod);
       }
     } else if (fev) {
-      periodo = Periodo.calcularPeriodoAnterior(fev, { estrategia: opciones.estrategiaPeriodo });
+      periodo = Periodo.calcularPeriodoEsperado(fev, {
+        estrategia: opciones.estrategiaPeriodo, modalidad: mod
+      });
     }
     return {
+      modalidadPago: mod,
       periodo: periodo || null,
       fev: ctx.fev || null,
       cobertura: ctx.cobertura != null ? ctx.cobertura :
         (ctx.fev ? (ctx.fev.cobertura || ctx.fev.coberturaId) : null),
       tablas: ctx.tablas || {},
       opciones: {
-        estrategiaPeriodo: opciones.estrategiaPeriodo || Periodo.ESTRATEGIA_POR_DEFECTO,
+        estrategiaPeriodo: opciones.estrategiaPeriodo || null,
+        corregir: opciones.corregir === true,
         longitudCategoriaCie10: opciones.longitudCategoriaCie10 || 3,
         claseRVC019: opciones.claseRVC019 || null,
         reportarNoEvaluables: opciones.reportarNoEvaluables !== false,
@@ -3360,7 +3572,9 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
    * @param {Object} paquete RIPS con la estructura del anexo técnico.
    * @param {Object} ctx
    *   ctx.fev       {numFactura, periodo:{inicio,fin}, cobertura} — o ctx.periodo ya calculado
-   *   ctx.tablas    {cups, cupsCie10, cupsPorCobertura, finalidadRestricciones,
+   *   ctx.modalidadPago  {codigo, nombre} o el resultado de resolverModalidad().
+   *                  Decide contra qué periodo se comparan las fechas.
+   *   ctx.tablas    {cups, cie10, cupsCie10, cupsPorCobertura, finalidadRestricciones,
    *                  cupsGrupoServicio, cupsCodServicio}
    *   ctx.opciones  {estrategiaPeriodo, longitudCategoriaCie10, claseRVC019,
    *                  reportarNoEvaluables, reglas:[códigos]}
@@ -3422,8 +3636,12 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
         servicios: contarServicios(paquete)
       },
       fev: c.fev ? { numFactura: c.fev.numFactura || c.fev.nF || null } : null,
+      modalidadPago: c.modalidadPago,
       periodo: c.periodo,
-      estrategiaPeriodo: (c.periodo && c.periodo.origen === 'manual') ? null : c.opciones.estrategiaPeriodo,
+      desfase: calcularDesfase(paquete, c),
+      estrategiaPeriodo: (c.periodo && c.periodo.origen === 'manual')
+        ? null
+        : (c.opciones.estrategiaPeriodo || (c.periodo && c.periodo.estrategia) || null),
       hallazgos: hallazgos,
       reglasEvaluadas: evaluadas,
       reglasNoEvaluables: noEvaluables,
@@ -3446,6 +3664,193 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
       if (h._registro && !e.registros[h._registro]) { e.registros[h._registro] = true; e.nRegistros += 1; }
     });
     return r;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CORRECCIÓN DEL PAQUETE
+  // ═══════════════════════════════════════════════════════════════════════
+  // Las reglas siguen siendo funciones puras: no corrigen nada, solo dejan la
+  // corrección propuesta en el hallazgo (`_correccion`). Aplicarla es un paso
+  // aparte que trabaja sobre una COPIA, así que el paquete original nunca se
+  // toca y se puede comparar antes/después.
+  //
+  // Qué se corrige y qué no, y por qué:
+  //
+  //   · RVC096 → sí, cuando el código es el mismo mal escrito (separadores o
+  //     ceros a la izquierda). Es formato, no contenido.
+  //   · RVC019 → solo si el diagnóstico declarado no existe en CIE-10. Si es
+  //     válido pero no cuadra con el CUPS, la decisión es clínica.
+  //   · RVC059 → sí, el codServicio se deriva del CUPS por tabla.
+  //   · RVC014 → NO. Reescribir la fecha para que entre en el periodo haría
+  //     pasar el paquete reportando atenciones en días en que no ocurrieron.
+  //     Cuando el bloque entero está desfasado, casi siempre el RIPS quedó
+  //     pegado a la factura equivocada: eso lo dice diagnosticarDesfase().
+  //   · RVC017 y RVC051 → NO hay un valor correcto que deducir.
+
+  // Resuelve un PathFuente ('usuarios[2].servicios.procedimientos[7].campo')
+  // sobre el paquete y devuelve el objeto contenedor, o null si no existe.
+  function resolverContenedor(paquete, path) {
+    var partes = String(path || '').split('.');
+    if (!partes.length) return null;
+    var actual = paquete;
+    // El último segmento es el campo, no se navega.
+    for (var i = 0; i < partes.length - 1; i++) {
+      var m = /^([A-Za-z0-9_]+)(?:\[(\d+)\])?$/.exec(partes[i]);
+      if (!m || actual == null) return null;
+      actual = actual[m[1]];
+      if (m[2] != null) {
+        if (!esArreglo(actual)) return null;
+        actual = actual[+m[2]];
+      }
+    }
+    return (actual != null && typeof actual === 'object') ? actual : null;
+  }
+
+  function clonar(v) { return JSON.parse(JSON.stringify(v)); }
+
+  /**
+   * Aplica sobre una COPIA del paquete las correcciones propuestas por los
+   * hallazgos. No muta la entrada.
+   *
+   * @returns {Object} { paquete, aplicadas, noAplicadas, corregibles }
+   */
+  function aplicarCorrecciones(paquete, hallazgos) {
+    var copia = clonar(paquete);
+    var aplicadas = [], noAplicadas = [];
+    (hallazgos || []).forEach(function (h) {
+      var c = h._correccion;
+      if (!c) return;
+      var contenedor = resolverContenedor(copia, h.PathFuente);
+      var registro = {
+        codigo: h.Codigo, clase: h.Clase, path: h.PathFuente, campo: c.campo,
+        antes: c.antes, despues: c.despues, motivo: c.motivo
+      };
+      if (!contenedor || !Object.prototype.hasOwnProperty.call(contenedor, c.campo)) {
+        registro.razon = 'No se encontró el campo ' + c.campo + ' en ' + h.PathFuente + '.';
+        noAplicadas.push(registro);
+        return;
+      }
+      contenedor[c.campo] = c.despues;
+      aplicadas.push(registro);
+    });
+    return {
+      paquete: copia, aplicadas: aplicadas, noAplicadas: noAplicadas,
+      corregibles: aplicadas.length + noAplicadas.length
+    };
+  }
+
+  /**
+   * Valida, aplica lo corregible y vuelve a validar la copia corregida.
+   *
+   * La segunda pasada no es adorno: es la prueba de que la corrección sirvió.
+   * `pendientes` son los hallazgos que siguen ahí después de corregir, que es
+   * lo que hay que arreglar en el origen.
+   *
+   * @returns {Object} resultado de la primera pasada + { correcciones, corregido }
+   */
+  function validarYCorregir(paquete, ctx) {
+    var antes = validar(paquete, ctx);
+    var corr = aplicarCorrecciones(paquete, antes.hallazgos);
+    var despues = validar(corr.paquete, ctx);
+    antes.correcciones = {
+      aplicadas: corr.aplicadas, noAplicadas: corr.noAplicadas,
+      total: corr.aplicadas.length
+    };
+    antes.corregido = {
+      paquete: corr.paquete,
+      hallazgos: despues.hallazgos,
+      resumen: despues.resumen,
+      pendientes: despues.resumen.rechazados
+    };
+    return antes;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // DIAGNÓSTICO DEL DESFASE DE PERIODO
+  // ═══════════════════════════════════════════════════════════════════════
+  /**
+   * Cuando muchas atenciones caen fuera del periodo esperado, la pregunta útil
+   * no es "qué fecha le pongo" sino "¿este RIPS va con esta factura?".
+   *
+   * Esto mira qué periodo cubre REALMENTE el paquete y, aplicando la inversa de
+   * la estrategia de la modalidad, dice cuál debería ser el periodo facturado
+   * de la factura que le corresponde.
+   *
+   * @returns {Object|null} null si no hay fechas utilizables.
+   */
+  function diagnosticarDesfase(paquete, ctx) {
+    return calcularDesfase(paquete, normalizarContexto(ctx));
+  }
+
+  function calcularDesfase(paquete, c) {
+    var periodo = c.periodo;
+    var dias = [], porMes = {};
+    recorrerServicios(paquete, function (reg) {
+      var campo = reg.def.fechas[0];
+      var dia = Periodo.aDia(reg.servicio[campo]);
+      if (!dia || !Periodo.esDiaValido(dia)) return;
+      dias.push(dia);
+      var mes = dia.slice(0, 7);
+      porMes[mes] = (porMes[mes] || 0) + 1;
+    });
+    if (!dias.length) return null;
+    dias.sort();
+
+    var meses = Object.keys(porMes).sort(function (a, b) { return porMes[b] - porMes[a]; });
+    var dominante = meses[0];
+    var enDominante = porMes[dominante];
+    var cobertura = { inicio: dias[0], fin: dias[dias.length - 1] };
+
+    var estrategia = (periodo && periodo.estrategia) ||
+      (c.modalidadPago && c.modalidadPago.estrategia) || Periodo.ESTRATEGIA_POR_DEFECTO;
+
+    // El periodo que el RIPS parece cubrir. Solo tiene sentido hablar de "el
+    // periodo del RIPS" si las atenciones están concentradas en un mes; si el
+    // paquete abarca varios, no hay una sola factura que le corresponda y
+    // proponer una sería engañoso.
+    var concentrado = enDominante / dias.length >= 0.8;
+    var periodoRips = concentrado
+      ? { inicio: dominante + '-01',
+          fin: dominante + '-' + ('0' + Periodo.diasEnMes(+dominante.slice(0, 4), +dominante.slice(5, 7))).slice(-2) }
+      : null;
+
+    var facturaEsperada = concentrado
+      ? Periodo.periodoFacturaEsperado(periodoRips, estrategia)
+      : null;
+    var coincide = !!(periodo && periodo.inicio &&
+      Periodo.dentroDelPeriodo(cobertura.inicio, periodo) &&
+      Periodo.dentroDelPeriodo(cobertura.fin, periodo));
+
+    var mensaje;
+    if (coincide) {
+      mensaje = 'Las atenciones del paquete (' + cobertura.inicio + ' a ' + cobertura.fin +
+        ') caen dentro del periodo esperado.';
+    } else if (concentrado && facturaEsperada) {
+      mensaje = 'El paquete reporta atenciones de ' + dominante + ' (' + enDominante + ' de ' +
+        dias.length + ' registros). Con la regla de esta modalidad, un RIPS de ese periodo ' +
+        'acompaña a la factura cuyo periodo facturado sea ' + facturaEsperada.inicio + ' a ' +
+        facturaEsperada.fin + '. Antes de tocar una sola fecha, revisa si este RIPS quedó ' +
+        'pegado a la factura equivocada: reescribir las fechas haría pasar el paquete ' +
+        'reportando atenciones en días en que no ocurrieron.';
+    } else {
+      mensaje = 'El paquete mezcla atenciones de varios periodos (' + Object.keys(porMes).sort().join(', ') +
+        '), así que no hay una sola factura que le corresponda. Sepáralo por periodo antes de radicar.';
+    }
+
+    return {
+      registrosConFecha: dias.length,
+      cobertura: cobertura,
+      mensaje: mensaje,
+      mesDominante: dominante,
+      registrosEnMesDominante: enDominante,
+      concentrado: concentrado,
+      mesesPresentes: porMes,
+      periodoEsperado: periodo && periodo.inicio ? { inicio: periodo.inicio, fin: periodo.fin } : null,
+      coincide: coincide,
+      estrategia: estrategia,
+      periodoRips: periodoRips,
+      facturaEsperada: facturaEsperada
+    };
   }
 
   /**
@@ -3479,7 +3884,11 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     FUERA_DE_ALCANCE: FUERA_DE_ALCANCE,
     Periodo: Periodo,
     validar: validar,
+    validarYCorregir: validarYCorregir,
+    aplicarCorrecciones: aplicarCorrecciones,
+    diagnosticarDesfase: diagnosticarDesfase,
     diagnosticarPeriodo: diagnosticarPeriodo,
+    candidatosCups: candidatosCups,
     recorrerServicios: recorrerServicios,
     contarServicios: contarServicios,
     edadEnFecha: edadEnFecha,
@@ -3515,6 +3924,10 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function vDisp(v) {
+    return (v == null || v === '') ? '(vacío)' : String(v);
+  }
+
   // Solo las cinco columnas oficiales: los campos internos del motor (_regla,
   // _usuario, …) sirven para agrupar y filtrar, no para el reporte.
   function fila(h) {
@@ -3537,6 +3950,25 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     if (r.rechazados > 0) return { texto: 'RECHAZADO', detalle: r.rechazados + ' hallazgo(s) de rechazo', ok: false };
     if (r.notificaciones > 0) return { texto: 'ACEPTADO CON NOTIFICACIONES', detalle: r.notificaciones + ' notificación(es)', ok: true };
     return { texto: 'ACEPTADO', detalle: 'sin hallazgos', ok: true };
+  }
+
+  function lineaModalidad(resultado) {
+    var m = resultado.modalidadPago;
+    if (!m) return '';
+    if (!m.reconocida) {
+      return 'Modalidad de pago: no reconocida' + (m.codigo ? ' (código "' + m.codigo + '")' : '') +
+        '. Se asumió pago por evento, así que las atenciones se esperan DENTRO del periodo facturado; ' +
+        'si el contrato es capitación o global prospectivo, elígelo a mano.';
+    }
+    var txt = 'Modalidad de pago: ' + m.codigo + ' — ' + m.nombre + '. ' +
+      (m.anticipada
+        ? 'La factura es anticipada, así que el RIPS debe traer el periodo ANTERIOR al facturado.'
+        : 'El servicio se factura después de prestarlo, así que las atenciones caen DENTRO del periodo facturado.');
+    if (m.confirmar) {
+      txt += ' La regla de periodo para esta modalidad se tomó por analogía, no de evidencia directa: ' +
+        'confírmala contra el contrato.';
+    }
+    return txt;
   }
 
   function lineaPeriodo(resultado) {
@@ -3562,8 +3994,11 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     var fev = resultado.fev && resultado.fev.numFactura;
     if (!fev) return 'numFactura del RIPS: ' + rips + '.';
     if (String(rips) === String(fev)) return 'numFactura: ' + rips + ' (RIPS y FEV coinciden).';
-    return 'numFactura del RIPS: ' + rips + ' · de la FEV: ' + fev +
-      '. En capitación el desfase es esperado (la FEV va anticipada), no es un hallazgo.';
+    var m = resultado.modalidadPago;
+    return 'numFactura del RIPS: ' + rips + ' · de la FEV: ' + fev + '. ' +
+      (m && m.anticipada
+        ? 'En ' + m.nombre.toLowerCase() + ' el desfase es esperado (la FEV va anticipada), no es un hallazgo.'
+        : 'Este validador no lo reporta como hallazgo; verifica que el RIPS corresponda a esta factura.');
   }
 
   // ── Texto ───────────────────────────────────────────────────────────────
@@ -3600,10 +4035,32 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     out += 'Obligado: ' + (p.numDocumentoIdObligado || '(sin dato)') + ' · ' +
       (p.usuarios || 0) + ' usuario(s) · ' + (p.servicios || 0) + ' registro(s) de servicio\n';
     out += lineaFactura(resultado) + '\n';
+    var lm = lineaModalidad(resultado);
+    if (lm) out += lm + '\n';
     out += lineaPeriodo(resultado) + '\n';
-    out += 'Estado: ' + est.texto + ' (' + est.detalle + ')\n\n';
+    out += 'Estado: ' + est.texto + ' (' + est.detalle + ')\n';
+    if (resultado.desfase && resultado.desfase.mensaje) {
+      out += '\nPERIODO QUE CUBRE EL PAQUETE\n  ' + resultado.desfase.mensaje + '\n';
+    }
+    out += '\n';
     out += 'RECHAZADOS (' + partes.rechazados.length + ')\n' + tablaTexto(partes.rechazados, anchos) + '\n';
     out += 'NOTIFICACIONES (' + partes.notificaciones.length + ')\n' + tablaTexto(partes.notificaciones, anchos);
+    var corr = resultado.correcciones;
+    if (corr) {
+      out += '\nCORRECCIONES APLICADAS (' + corr.aplicadas.length + ')\n';
+      if (!corr.aplicadas.length) out += '  (ninguna: nada de lo hallado es corregible automáticamente)\n';
+      corr.aplicadas.forEach(function (c) {
+        out += '  ' + c.codigo + ' · ' + c.path + ': ' +
+          vDisp(c.antes) + ' → ' + vDisp(c.despues) + '\n';
+      });
+      corr.noAplicadas.forEach(function (c) {
+        out += '  [no aplicada] ' + c.codigo + ' · ' + c.path + ': ' + c.razon + '\n';
+      });
+      if (resultado.corregido) {
+        out += '  Rechazos: ' + resultado.resumen.rechazados + ' antes → ' +
+          resultado.corregido.resumen.rechazados + ' después de corregir.\n';
+      }
+    }
     var porRegla = (resultado.resumen && resultado.resumen.porRegla) || {};
     var codigos = Object.keys(porRegla).sort();
     if (codigos.length) {
@@ -3682,6 +4139,11 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     '.tag{border-radius:5px;padding:2px 8px;font-size:.66rem;font-weight:800;white-space:nowrap;}' +
     '.tag.rech{background:#FEE2E2;color:#B91C1C;}.tag.noti{background:#FEF3C7;color:#92400E;}' +
     '.none{color:#6B8599;font-size:.8rem;margin:4px 0;}' +
+    '.aviso{border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.8rem;line-height:1.5;}' +
+    '.aviso b{display:block;margin-bottom:4px;font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;}' +
+    '.aviso.ok{background:#F0FDF4;border:1px solid #BBF7D0;color:#15803D;}' +
+    '.aviso.alerta{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;}' +
+    'td.old{color:#B91C1C;text-decoration:line-through;}td.new{color:#15803D;font-weight:700;}' +
     'section.res{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:14px 16px;}' +
     'section.res h2{font-size:.85rem;margin:0 0 8px;color:#1D4ED8;}' +
     '@media print{body{background:#fff;}.tabs{display:none;}.pane{display:block!important;border-radius:10px;margin-top:10px;}' +
@@ -3691,6 +4153,48 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
     "function rvPane(n){var p=['rech','noti'];p.forEach(function(k){" +
     "document.getElementById('pane-'+k).classList.toggle('hidden',k!==n);" +
     "document.getElementById('tab-'+k).classList.toggle('active',k===n);});}";
+
+  // El periodo que cubre el paquete: cuando no coincide con el esperado, esta
+  // caja es la que dice qué hacer, y lo que hay que hacer casi nunca es tocar
+  // las fechas.
+  function desfaseHTML(resultado) {
+    var d = resultado.desfase;
+    if (!d || !d.mensaje) return '';
+    var clase = d.coincide ? 'aviso ok' : 'aviso alerta';
+    return '<div class="' + clase + '"><b>Periodo que cubre el paquete</b><div>' +
+      esc(d.mensaje) + '</div></div>';
+  }
+
+  function correccionesHTML(resultado) {
+    var corr = resultado.correcciones;
+    if (!corr) return '';
+    var h = '<section class="res"><h2>Correcciones aplicadas (' + corr.aplicadas.length + ')</h2>';
+    if (resultado.corregido) {
+      h += '<p class="none">Rechazos: <b>' + resultado.resumen.rechazados + '</b> antes → <b>' +
+        resultado.corregido.resumen.rechazados + '</b> después de corregir. ' +
+        'Lo que queda hay que arreglarlo en el origen.</p>';
+    }
+    if (!corr.aplicadas.length && !corr.noAplicadas.length) {
+      return h + '<p class="none">Nada de lo hallado es corregible automáticamente.</p></section>';
+    }
+    h += '<div class="tw"><table><thead><tr><th>Código</th><th>PathFuente</th><th>Campo</th>' +
+      '<th>Antes</th><th>Después</th><th>Motivo</th></tr></thead><tbody>';
+    corr.aplicadas.forEach(function (c) {
+      h += '<tr><td><code>' + esc(c.codigo) + '</code></td>' +
+        '<td><code class="path">' + esc(c.path) + '</code></td>' +
+        '<td><code>' + esc(c.campo) + '</code></td>' +
+        '<td class="old">' + esc(vDisp(c.antes)) + '</td>' +
+        '<td class="new">' + esc(vDisp(c.despues)) + '</td>' +
+        '<td>' + esc(c.motivo) + '</td></tr>';
+    });
+    corr.noAplicadas.forEach(function (c) {
+      h += '<tr><td><code>' + esc(c.codigo) + '</code></td>' +
+        '<td><code class="path">' + esc(c.path) + '</code></td>' +
+        '<td><code>' + esc(c.campo) + '</code></td>' +
+        '<td colspan="3">No aplicada: ' + esc(c.razon) + '</td></tr>';
+    });
+    return h + '</tbody></table></div></section>';
+  }
 
   function reporteHTML(resultado, opciones) {
     opciones = opciones || {};
@@ -3735,8 +4239,10 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
       '<div class="meta">' +
       '<div>Obligado a facturar: <code>' + esc(p.numDocumentoIdObligado || '(sin dato)') + '</code></div>' +
       '<div>' + esc(lineaFactura(resultado)) + '</div>' +
+      (lineaModalidad(resultado) ? '<div>' + esc(lineaModalidad(resultado)) + '</div>' : '') +
       '<div>' + esc(lineaPeriodo(resultado)) + '</div>' +
       '</div>' +
+      desfaseHTML(resultado) +
       '<div class="kpis">' +
       '<div class="kpi"><b>' + (p.usuarios || 0) + '</b><span>Usuarios</span></div>' +
       '<div class="kpi"><b>' + (p.servicios || 0) + '</b><span>Registros de servicio</span></div>' +
@@ -3749,6 +4255,7 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
       '</div>' +
       '<div class="pane" id="pane-rech">' + tablaHTML(partes.rechazados, 'Sin hallazgos de rechazo.') + '</div>' +
       '<div class="pane hidden" id="pane-noti">' + tablaHTML(partes.notificaciones, 'Sin notificaciones.') + '</div>' +
+      correccionesHTML(resultado) +
       resumen +
       '<script>' + JS + '<\/script></div></body></html>';
   }
@@ -3838,12 +4345,16 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
    * no se pase deja su regla como no evaluable.
    *
    * En index.html se llama con las tablas que ya están cargadas:
-   *   RipsTablas.construir({ cups: CUPS_DATA, cupsCie10: CUPS_CIE10, cupsCodServicio: CSERV_CUPS })
+   *   RipsTablas.construir({ cups: CUPS_DATA, cie10: CIE10_DATA,
+   *                          cupsCie10: CUPS_CIE10, cupsCodServicio: CSERV_CUPS })
    */
   function construir(fuentes) {
     fuentes = fuentes || {};
     return {
       cups: fuentes.cups || null,
+      // cie10 es lo que permite distinguir un diagnóstico roto de uno válido:
+      // sin ella RVC019 nunca propone reemplazo (ver la corrección de RVC019).
+      cie10: fuentes.cie10 || null,
       cupsCie10: fuentes.cupsCie10 || null,
       cupsCodServicio: fuentes.cupsCodServicio || null,
       cupsPorCobertura: fuentes.cupsPorCobertura || CUPS_POR_COBERTURA,
@@ -3878,7 +4389,8 @@ function capTablas(){
   // El mapa odontológico de la app es más específico: pisa al genérico donde exista.
   var odo=ref.cupsCie10Odonto||{};
   for(k in odo)if(Object.prototype.hasOwnProperty.call(odo,k))cie[k]=odo[k];
-  return RipsTablas.construir({cups:CUPS_DATA,cupsCie10:cie,cupsCodServicio:ref.cupsCodServicio||null});
+  return RipsTablas.construir({cups:CUPS_DATA,cie10:CIE10_DATA,cupsCie10:cie,
+    cupsCodServicio:ref.cupsCodServicio||null});
 }
 
 function capEstado(id,txt,color){
@@ -3908,6 +4420,7 @@ function capCargarXml(input){
     if(!lector){capEstado('cap-s2','No se pudo leer el XML: escribe el periodo a mano','var(--red)');return;}
     var info=lector(String(fr.result));
     capFev={numFactura:info.nF||null,cobertura:info.cob||null,
+      modalidadPago:info.mp||null,modalidadPagoNombre:info.mpNom||null,
       periodo:{inicio:info.st||null,fin:info.en||null}};
     if(info.st)document.getElementById('cap-fev-ini').value=String(info.st).slice(0,10);
     if(info.en)document.getElementById('cap-fev-fin').value=String(info.en).slice(0,10);
@@ -3925,6 +4438,16 @@ function capPeriodoFev(){
   var fin=(document.getElementById('cap-fev-fin')||{}).value||'';
   if(ini&&fin)return{inicio:ini,fin:fin};
   return capFev?capFev.periodo:null;
+}
+
+// Modalidad de pago que se va a usar: lo elegido a mano manda sobre lo que
+// declare el XML, porque el XML a veces no la trae o la trae con otra
+// codificación. Es lo único que decide contra qué periodo se valida la fecha.
+function capModalidad(){
+  var sel=(document.getElementById('cap-modalidad')||{}).value||'';
+  if(sel)return RipsPeriodo.resolverModalidad(sel,null);
+  return RipsPeriodo.resolverModalidad(
+    capFev&&capFev.modalidadPago,capFev&&capFev.modalidadPagoNombre);
 }
 
 // Periodo prestado escrito a mano, si está completo. El XML nunca lo trae: solo
@@ -3945,10 +4468,10 @@ function capLimpiarPrestado(){
 // Periodo que se va a usar, con su origen. Es la misma decisión que toma el
 // motor: si hay periodo prestado a mano se respeta, si no se deriva del facturado.
 function capResolverPeriodo(){
-  var prestado=capPeriodoPrestado(),fev=capPeriodoFev();
-  if(prestado)return RipsPeriodo.periodoPrestadoExplicito(prestado,fev);
-  var est=(document.getElementById('cap-estrategia')||{}).value||'mesAnterior';
-  return RipsPeriodo.calcularPeriodoAnterior(fev,{estrategia:est});
+  var prestado=capPeriodoPrestado(),fev=capPeriodoFev(),mod=capModalidad();
+  if(prestado)return RipsPeriodo.periodoPrestadoExplicito(prestado,fev,mod);
+  var est=(document.getElementById('cap-estrategia')||{}).value||null;
+  return RipsPeriodo.calcularPeriodoEsperado(fev,{estrategia:est,modalidad:mod});
 }
 
 function capPintarPeriodo(){
@@ -3959,10 +4482,13 @@ function capPintarPeriodo(){
   if(!r.valido){hint.innerHTML='⚠️ '+esc(r.motivo)+' Sin periodo no se puede evaluar RVC014.';hint.style.color='var(--red)';return;}
   hint.style.color='var(--gray-500)';
   var fev=r.periodoFactura;
+  var mod=r.modalidad||capModalidad();
+  var comoSalio=manual?'periodo prestado fijado a mano'
+    :('modalidad '+(mod.reconocida?mod.codigo:'no reconocida')+', estrategia '+r.estrategia);
   hint.innerHTML=(fev?('La FEV cubre <strong>'+esc(fev.inicio)+'</strong> a <strong>'+esc(fev.fin)+'</strong>. '):'')
     +'El RIPS debe traer atenciones entre <strong>'+esc(r.inicio)+'</strong> y <strong>'+esc(r.fin)+'</strong> ('
-    +(manual?'periodo prestado fijado a mano':'derivado del periodo facturado')
-    +'). Cualquier <code>fechaInicioAtencion</code> fuera de ese rango sale como RVC014.';
+    +esc(comoSalio)+'). Cualquier <code>fechaInicioAtencion</code> fuera de ese rango sale como RVC014.'
+    +(mod.reconocida?'':' <strong>No se reconoció la modalidad</strong>: se asumió pago por evento. Si el contrato es capitación o global prospectivo, elígelo arriba.');
   if(fev)capEstado('cap-s2',fev.inicio+' a '+fev.fin,'var(--green)');
 }
 
@@ -3970,12 +4496,17 @@ function capValidar(){
   if(!capJson){alert('Primero carga el JSON del paquete RIPS.');return;}
   var fev=capPeriodoFev(),prestado=capPeriodoPrestado();
   if(!fev&&!prestado){alert('Falta el periodo: carga el XML de la factura, escribe el periodo facturado, o fija el periodo prestado a mano.');return;}
-  capRes=RipsMotorRVC.validar(capJson,{
+  var ctx={
     fev:{numFactura:(capFev&&capFev.numFactura)||null,periodo:fev,cobertura:capFev&&capFev.cobertura},
+    modalidadPago:capModalidad(),
     periodo:prestado,
     tablas:capTablas(),
-    opciones:{estrategiaPeriodo:(document.getElementById('cap-estrategia')||{}).value||'mesAnterior'}
-  });
+    opciones:{estrategiaPeriodo:(document.getElementById('cap-estrategia')||{}).value||null}
+  };
+  var corregir=!!(document.getElementById('cap-corregir')||{}).checked;
+  capRes=corregir?RipsMotorRVC.validarYCorregir(capJson,ctx):RipsMotorRVC.validar(capJson,ctx);
+  var btn=document.getElementById('cap-btn-json');
+  if(btn)btn.style.display=(corregir&&capRes.correcciones&&capRes.correcciones.total)?'':'none';
   capRender();
 }
 
@@ -4023,6 +4554,18 @@ function capRender(){
     +(est.ok?'background:#DCFCE7;color:#15803D;':'background:#FEE2E2;color:#B91C1C;')+'">'
     +esc(est.texto)+' · '+esc(est.detalle)+'</div>';
 
+  var mod=capRes.modalidadPago;
+  if(mod){
+    h+='<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--gray-700);margin-bottom:10px;">'
+      +'💳 <strong>Modalidad '+esc(mod.reconocida?mod.codigo:'no reconocida')+'</strong>'
+      +(mod.reconocida?' — '+esc(mod.nombre):'')+'. '
+      +(mod.anticipada
+        ?'Factura anticipada: el RIPS debe traer el periodo anterior al facturado.'
+        :'El servicio se factura después de prestarlo: las atenciones caen dentro del periodo facturado.')
+      +(mod.confirmar?' <strong>Confírmalo contra el contrato.</strong>':'')
+      +'</div>';
+  }
+
   var e14=r.porRegla.RVC014;
   if(e14){
     h+='<div style="background:var(--blue-light);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:10px;">'
@@ -4033,6 +4576,42 @@ function capRender(){
         ?'Ese periodo lo fijaste a mano.'
         :'Ese periodo se derivó del periodo facturado (estrategia “'+esc(capRes.estrategiaPeriodo)+'”): el XML no trae el prestado.')
       +'</div>';
+  }
+
+  // Qué periodo cubre el paquete. Cuando no coincide, esto es lo que hay que
+  // mirar antes de tocar cualquier fecha.
+  var d=capRes.desfase;
+  if(d&&d.mensaje&&!d.coincide){
+    h+='<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:.78rem;color:#92400E;margin-bottom:10px;">'
+      +'🗓️ <strong>Periodo que cubre el paquete</strong><div style="margin-top:3px;">'+esc(d.mensaje)+'</div></div>';
+  }
+
+  var corr=capRes.correcciones;
+  if(corr){
+    h+='<div style="background:'+(corr.total?'#F0FDF4':'var(--gray-50)')+';border:1px solid '
+      +(corr.total?'#BBF7D0':'var(--gray-200)')+';border-radius:8px;padding:10px 12px;font-size:.78rem;color:'
+      +(corr.total?'#15803D':'var(--gray-700)')+';margin-bottom:10px;">'
+      +'🔧 <strong>'+corr.total+' corrección(es) aplicada(s)</strong>'
+      +(corr.total
+        ?'. Rechazos: '+r.rechazados+' antes → '+capRes.corregido.resumen.rechazados+' después. '
+         +'Descarga el JSON corregido y revisa lo que quedó pendiente: eso hay que arreglarlo en el origen.'
+        :'. Nada de lo hallado es corregible automáticamente.')
+      +'</div>';
+    if(corr.total){
+      h+='<div style="border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;margin-bottom:10px;">'
+        +'<div style="max-height:220px;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:.72rem;">'
+        +'<thead><tr>'+['Código','PathFuente','Antes','Después','Motivo'].map(function(c){
+          return '<th style="position:sticky;top:0;background:#F0FDF4;color:#15803D;text-align:left;padding:6px 9px;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">'+c+'</th>';
+        }).join('')+'</tr></thead><tbody>';
+      corr.aplicadas.forEach(function(c){
+        h+='<tr><td style="padding:6px 9px;border-top:1px solid var(--gray-100);"><code>'+esc(c.codigo)+'</code></td>'
+          +'<td style="padding:6px 9px;border-top:1px solid var(--gray-100);"><code style="word-break:break-all;">'+esc(c.path)+'</code></td>'
+          +'<td style="padding:6px 9px;border-top:1px solid var(--gray-100);color:var(--red);text-decoration:line-through;">'+esc(vDisp(c.antes))+'</td>'
+          +'<td style="padding:6px 9px;border-top:1px solid var(--gray-100);color:var(--green);font-weight:700;">'+esc(vDisp(c.despues))+'</td>'
+          +'<td style="padding:6px 9px;border-top:1px solid var(--gray-100);color:var(--gray-500);">'+esc(c.motivo)+'</td></tr>';
+      });
+      h+='</tbody></table></div></div>';
+    }
   }
 
   h+='<div style="display:flex;gap:6px;margin-bottom:8px;">'
@@ -4063,6 +4642,12 @@ function capBajar(contenido,tipo,nombre){
   var a=document.createElement('a');
   a.href=URL.createObjectURL(b);a.download=nombre;a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+}
+
+function capDescargarJson(){
+  if(!capRes||!capRes.corregido){alert('Marca “Corregir lo corregible” y vuelve a validar.');return;}
+  capBajar(JSON.stringify(capRes.corregido.paquete,null,2),'application/json;charset=utf-8',
+    (capJsonNombre||'paquete').replace(/\.json$/i,'')+'_corregido.json');
 }
 
 function capAbrirReporte(){
