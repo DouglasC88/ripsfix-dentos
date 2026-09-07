@@ -18,20 +18,49 @@ De ahí salen las dos consecuencias que gobiernan todo este módulo:
    factura es `FE10`) es **normal y esperado**. El motor lo muestra como dato en
    el reporte y **nunca** lo reporta como hallazgo.
 
-## Archivos
+## Dónde vive el código
 
-| Archivo | Qué hace |
-|---|---|
-| `periodo.js` | Calcula el periodo de prestación que el RIPS debe traer, a partir del `InvoicePeriod` de la FEV. |
-| `motor-rvc.js` | Registro de reglas y ejecutor. Cada regla es una función pura. |
-| `reporte-validacion.js` | Reporte en el formato de la pantalla *Resultados de Validación del Paquete* (HTML, texto y CSV). |
-| `tablas-referencia.js` | Arma el `ctx.tablas` del motor y define la forma de las tablas que hay que cargar a mano. |
-| `tests/` | Tests unitarios y el fixture de 57 usuarios / 109 registros fuera de periodo. |
+**El motor está dentro de `index.html`.** La app es un solo archivo a propósito:
+así el despliegue no depende de ningún otro recurso y no hay forma de publicar un
+`index.html` al que le falten sus scripts.
 
-Ninguno toca el DOM ni lee archivos: el mismo código corre en la página y en los
-tests. Se cargan como scripts clásicos (UMD), sin build ni dependencias.
+El bloque está delimitado por dos marcadores en el script de `index.html`:
+
+```js
+// ═══ INICIO DEL MOTOR DE VALIDACIÓN DE CAPITACIÓN ═══
+…
+// ═══ FIN DEL MOTOR DE VALIDACIÓN DE CAPITACIÓN ═══
+```
+
+y contiene cuatro módulos, en este orden (importa: el motor usa el de periodo):
+
+| Módulo | Global | Qué hace |
+|---|---|---|
+| periodo | `RipsPeriodo` | Resuelve el periodo de prestación que el RIPS debe traer. |
+| motor-rvc | `RipsMotorRVC` | Registro de reglas y ejecutor. Cada regla es una función pura. |
+| reporte-validacion | `RipsReporte` | Reporte con el formato de *Resultados de Validación del Paquete* (HTML, texto, CSV). |
+| tablas-referencia | `RipsTablas` | Arma el `ctx.tablas` y define la forma de las tablas que hay que cargar a mano. |
+
+Ninguno toca el DOM ni lee archivos. La UI que los usa está más abajo en el mismo
+script, bajo `VALIDACIÓN DE CAPITACIÓN (panel)`.
+
+### Los tests no tienen copia del motor
+
+`tests/cargar-motor.js` recorta ese bloque del propio `index.html` y lo evalúa,
+así que **los tests prueban el código que se despliega**, no un duplicado que se
+desincroniza. Dos consecuencias prácticas:
+
+- No borres ni renombres los marcadores: si desaparecen, los tests fallan de
+  inmediato con un mensaje claro en vez de validar algo viejo.
+- Cualquier cambio en el motor se hace en `index.html` y se comprueba con
+  `node --test`.
+
+Este directorio, por tanto, solo tiene tests, fixtures y esta documentación:
+nada de lo que hay aquí se despliega ni hace falta en tiempo de ejecución.
 
 ## Uso
+
+Los cuatro globales quedan disponibles en la página tras cargar `index.html`:
 
 ```js
 var res = RipsMotorRVC.validar(paqueteRips, {
@@ -90,8 +119,9 @@ notificación en el reporte. Así no se confunde “no lo revisé” con “est�
 `RVC017` y `RVC051` salen de fábrica sin tabla, porque sus datos son del anexo
 técnico vigente y cargarlos de memoria produciría falsos rechazos justo en las
 reglas que menos ruido toleran. Para activarlas, llena `CUPS_POR_COBERTURA` y
-`RESTRICCIONES_FINALIDAD` en `tablas-referencia.js` (la forma exacta está
-documentada ahí) o pásalas por `ctx.tablas`.
+`RESTRICCIONES_FINALIDAD` en el módulo de tablas dentro de `index.html` (la
+forma exacta está documentada ahí, junto a cada constante) o pásalas por
+`ctx.tablas`.
 
 ### Fuera de alcance local
 
@@ -189,9 +219,9 @@ node validador/tests/fixtures/generar-rips-capitacion.js
 
 ## Dentro de la app
 
-La pestaña **🗓️ Validar Capitación** de `index.html` carga el JSON del paquete y
-el XML de la factura, resuelve el periodo, corre el motor con las tablas que la
-página ya tiene en memoria (`CUPS_DATA`, `CUPS_CIE10`, `CSERV_CUPS`) y muestra el
+La pestaña **🗓️ Validar Capitación** carga el JSON del paquete y el XML de la
+factura, resuelve el periodo, corre el motor con las tablas que la página ya
+tiene en memoria (`CUPS_DATA`, `CUPS_CIE10`, `CSERV_CUPS`) y muestra el
 resultado con las pestañas Rechazados / Notificaciones, más los botones para ver
 o descargar el reporte en HTML y CSV.
 

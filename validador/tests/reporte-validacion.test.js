@@ -2,8 +2,10 @@
 'use strict';
 var test = require('node:test');
 var assert = require('node:assert/strict');
-var Motor = require('../motor-rvc.js');
-var Reporte = require('../reporte-validacion.js');
+// El motor se lee de index.html, no de módulos aparte: la app es un solo archivo.
+var App = require('./cargar-motor.js');
+var Motor = App.RipsMotorRVC;
+var Reporte = App.RipsReporte;
 var Fixture = require('./fixtures/generar-rips-capitacion.js');
 var PAQUETE_57 = require('./fixtures/rips-capitacion-57usuarios.json');
 

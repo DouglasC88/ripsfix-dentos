@@ -8,12 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<!-- Motor de validación local de RIPS por capitación. Se carga en este orden
-     porque motor-rvc.js usa RipsPeriodo y el panel usa las tres. -->
-<script src="validador/periodo.js"></script>
-<script src="validador/motor-rvc.js"></script>
-<script src="validador/reporte-validacion.js"></script>
-<script src="validador/tablas-referencia.js"></script>
 
 <style>
 :root{
@@ -2616,8 +2610,1260 @@ window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_C
 })();
 // === FIN RIPS CONVENIOS ===
 
-// ═══ VALIDACIÓN DE CAPITACIÓN (motor RVC local) ═══
-// Puente entre la UI y los módulos de validador/: el motor no toca el DOM, así
+// ═══ INICIO DEL MOTOR DE VALIDACIÓN DE CAPITACIÓN ═══
+// ─────────────────────────────────────────────────────────────────────────
+// Este bloque es la ÚNICA copia del motor de validación de capitación, y va
+// aquí adentro para que la app siga siendo un solo archivo y el despliegue no
+// dependa de ningún otro recurso.
+//
+// Los tests de validador/tests/ NO tienen una copia: leen este mismo bloque
+// desde index.html (ver validador/tests/cargar-motor.js), recortándolo entre
+// los dos marcadores de arriba y abajo. Por eso:
+//
+//   · No muevas ni edites las líneas "INICIO/FIN DEL MOTOR DE VALIDACIÓN DE
+//     CAPITACIÓN": son las que delimitan lo que cargan los tests.
+//   · El orden importa: motor-rvc usa RipsPeriodo, así que periodo va primero.
+//   · Nada de este bloque toca el DOM. La UI que lo usa está más abajo, en
+//     "VALIDACIÓN DE CAPITACIÓN (panel)".
+//
+// Después de cambiar algo aquí:  node --test "validador/tests/**/*.test.js"
+// ─────────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERIODO DE PRESTACIÓN EN CAPITACIÓN
+// ═══════════════════════════════════════════════════════════════════════════
+// En pago por capitación la factura electrónica (FEV) se emite de forma
+// ANTICIPADA para un periodo futuro, pero el RIPS que la soporta reporta las
+// atenciones YA PRESTADAS, que son las del periodo anterior al que factura.
+//
+// Consecuencia práctica: si el InvoicePeriod de la FEV cubre A→B, ninguna
+// fechaInicioAtencion del RIPS debe caer en A→B; todas deben caer en el
+// periodo previo. Por eso también es NORMAL que el numFactura del RIPS vaya
+// desfasado respecto al de la FEV (el RIPS dice "FE8" y la factura es "FE10"):
+// ese desfase no es un error y este módulo no lo trata como tal.
+//
+// Cómo se calcula el periodo previo no está fijado por un anexo técnico, así
+// que se deja como estrategia configurable y se documenta el supuesto.
+(function (raiz, fabrica) {
+  raiz.RipsPeriodo = fabrica();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var RE_FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+  // Las fechas del RIPS y de la FEV son fechas civiles ("2026-08-01"), no
+  // instantes: se comparan como texto ISO y se aritmetizan en UTC para que el
+  // huso horario del navegador no corra un día el resultado.
+  function aDia(valor) {
+    if (valor == null) return null;
+    var m = String(valor).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!m) return null;
+    return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  }
+
+  function esDiaValido(dia) {
+    var m = RE_FECHA.exec(dia || '');
+    if (!m) return false;
+    var a = +m[1], mes = +m[2], d = +m[3];
+    if (mes < 1 || mes > 12 || d < 1) return false;
+    return d <= diasEnMes(a, mes);
+  }
+
+  function diasEnMes(anio, mes) {
+    return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  }
+
+  function partes(dia) {
+    var m = RE_FECHA.exec(dia);
+    return { anio: +m[1], mes: +m[2], dia: +m[3] };
+  }
+
+  function armar(anio, mes, dia) {
+    return String(anio) + '-' + ('0' + mes).slice(-2) + '-' + ('0' + dia).slice(-2);
+  }
+
+  function sumarDias(dia, n) {
+    var p = partes(dia);
+    var t = Date.UTC(p.anio, p.mes - 1, p.dia) + n * 86400000;
+    var d = new Date(t);
+    return armar(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+
+  function diasEntre(desde, hasta) {
+    var a = partes(desde), b = partes(hasta);
+    return Math.round((Date.UTC(b.anio, b.mes - 1, b.dia) - Date.UTC(a.anio, a.mes - 1, a.dia)) / 86400000);
+  }
+
+  // Mes calendario inmediatamente anterior al mes que contiene `dia`.
+  function mesAnteriorDe(dia) {
+    var p = partes(dia);
+    var mes = p.mes - 1, anio = p.anio;
+    if (mes === 0) { mes = 12; anio -= 1; }
+    return { inicio: armar(anio, mes, 1), fin: armar(anio, mes, diasEnMes(anio, mes)) };
+  }
+
+  var ESTRATEGIAS = {
+    // Supuesto por defecto: el RIPS trae el mes calendario anterior al mes en
+    // que arranca el periodo facturado. Es lo que se observa en los paquetes
+    // reales de capitación con facturación mensual anticipada.
+    mesAnterior: function (fev) {
+      return mesAnteriorDe(fev.inicio);
+    },
+    // Alternativa para periodos que no son meses calendario completos
+    // (quincenas, periodos partidos): ventana de la misma longitud que termina
+    // el día anterior al inicio de la FEV.
+    ventanaPrevia: function (fev) {
+      var largo = diasEntre(fev.inicio, fev.fin) + 1;
+      var fin = sumarDias(fev.inicio, -1);
+      return { inicio: sumarDias(fin, -(largo - 1)), fin: fin };
+    }
+  };
+
+  var ESTRATEGIA_POR_DEFECTO = 'mesAnterior';
+
+  // Normaliza el periodo de la FEV desde cualquiera de las formas en que llega:
+  // el objeto de parseXML() ({periodStart, periodEnd}), un {inicio, fin} o el
+  // InvoicePeriod crudo ({StartDate, EndDate}).
+  function normalizarPeriodoFEV(entrada) {
+    if (!entrada) return null;
+    var ini = aDia(entrada.inicio || entrada.periodStart || entrada.StartDate || entrada.startDate);
+    var fin = aDia(entrada.fin || entrada.periodEnd || entrada.EndDate || entrada.endDate);
+    if (!esDiaValido(ini) || !esDiaValido(fin)) return null;
+    if (fin < ini) return null;
+    return { inicio: ini, fin: fin };
+  }
+
+  /**
+   * Periodo de prestación que el RIPS debe reportar para una FEV de capitación.
+   *
+   * @param {Object} periodoFEV InvoicePeriod de la factura, en cualquiera de
+   *        las formas que acepta normalizarPeriodoFEV().
+   * @param {Object} [opciones]
+   * @param {string} [opciones.estrategia='mesAnterior'] 'mesAnterior' | 'ventanaPrevia'
+   * @returns {Object} { inicio, fin, estrategia, periodoFactura, valido, motivo }
+   */
+  function calcularPeriodoAnterior(periodoFEV, opciones) {
+    opciones = opciones || {};
+    var nombre = opciones.estrategia || ESTRATEGIA_POR_DEFECTO;
+    var fev = normalizarPeriodoFEV(periodoFEV);
+    if (!fev) {
+      return {
+        valido: false,
+        motivo: 'La factura electrónica no trae un InvoicePeriod con fecha de inicio y fin válidas.',
+        origen: 'derivado', estrategia: nombre, periodoFactura: null, inicio: null, fin: null
+      };
+    }
+    var fn = ESTRATEGIAS[nombre];
+    if (!fn) {
+      return {
+        valido: false,
+        motivo: 'Estrategia de periodo desconocida: "' + nombre + '".',
+        origen: 'derivado', estrategia: nombre, periodoFactura: fev, inicio: null, fin: null
+      };
+    }
+    var prev = fn(fev);
+    return {
+      valido: true, motivo: null, origen: 'derivado', estrategia: nombre, periodoFactura: fev,
+      inicio: prev.inicio, fin: prev.fin
+    };
+  }
+
+  /**
+   * Periodo de prestación fijado a mano.
+   *
+   * El XML de la FEV NO trae el periodo prestado: solo trae el InvoicePeriod,
+   * que es el periodo facturado. Todo lo que calcularPeriodoAnterior() devuelve
+   * es una derivación —un supuesto— sobre ese periodo facturado. Cuando se sabe
+   * de primera mano qué periodo trae el RIPS (porque lo dice el contrato o el
+   * área que armó el paquete), este camino lo fija y saca el supuesto del medio.
+   *
+   * @param {Object} entrada        {inicio, fin} del periodo prestado.
+   * @param {Object} [periodoFactura] InvoicePeriod de la FEV, solo informativo.
+   */
+  function periodoPrestadoExplicito(entrada, periodoFactura) {
+    var p = normalizarPeriodoFEV(entrada); // misma normalización de {inicio, fin}
+    var fev = normalizarPeriodoFEV(periodoFactura);
+    if (!p) {
+      return {
+        valido: false, origen: 'manual', estrategia: null, periodoFactura: fev,
+        inicio: null, fin: null,
+        motivo: 'El periodo de prestación indicado a mano no tiene fecha de inicio y fin válidas.'
+      };
+    }
+    return {
+      valido: true, motivo: null, origen: 'manual', estrategia: null,
+      periodoFactura: fev, inicio: p.inicio, fin: p.fin
+    };
+  }
+
+  function dentroDelPeriodo(fecha, periodo) {
+    var d = aDia(fecha);
+    if (!d || !periodo || !periodo.inicio || !periodo.fin) return null; // no evaluable
+    return d >= periodo.inicio && d <= periodo.fin;
+  }
+
+  // Cuántos días de desfase hay entre la fecha y el periodo esperado; negativo
+  // si la atención es anterior al periodo, positivo si es posterior.
+  function desfaseEnDias(fecha, periodo) {
+    var d = aDia(fecha);
+    if (!d || !periodo || !periodo.inicio || !periodo.fin) return null;
+    if (d < periodo.inicio) return diasEntre(periodo.inicio, d);
+    if (d > periodo.fin) return diasEntre(periodo.fin, d);
+    return 0;
+  }
+
+  function etiqueta(periodo) {
+    if (!periodo || !periodo.inicio || !periodo.fin) return '(sin periodo)';
+    return periodo.inicio + ' a ' + periodo.fin;
+  }
+
+  return {
+    ESTRATEGIAS: Object.keys(ESTRATEGIAS),
+    ESTRATEGIA_POR_DEFECTO: ESTRATEGIA_POR_DEFECTO,
+    aDia: aDia,
+    esDiaValido: esDiaValido,
+    sumarDias: sumarDias,
+    diasEntre: diasEntre,
+    diasEnMes: diasEnMes,
+    mesAnteriorDe: mesAnteriorDe,
+    normalizarPeriodoFEV: normalizarPeriodoFEV,
+    calcularPeriodoAnterior: calcularPeriodoAnterior,
+    periodoPrestadoExplicito: periodoPrestadoExplicito,
+    dentroDelPeriodo: dentroDelPeriodo,
+    desfaseEnDias: desfaseEnDias,
+    etiqueta: etiqueta
+  };
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOTOR DE REGLAS RVC — VALIDACIÓN LOCAL DEL RIPS ANTES DE SUBIRLO A SISPRO
+// ═══════════════════════════════════════════════════════════════════════════
+// Cada regla es una función pura: recibe el paquete RIPS y un contexto
+// (periodo esperado + tablas de referencia) y devuelve una lista de hallazgos
+// con el mismo formato que muestra la pantalla "Resultados de Validación del
+// Paquete" del MinSalud: Clase, Codigo, Descripcion, Observaciones, PathFuente.
+//
+// El motor no toca el DOM ni lee archivos: se puede correr en el navegador y
+// en Node (tests) con el mismo código.
+//
+// Las tablas de referencia se INYECTAN por contexto (ctx.tablas). Así el motor
+// no arrastra los 2 MB de CUPS/CIE-10 que ya viven en index.html, y una regla
+// que no tiene su tabla se reporta como "no evaluable localmente" en vez de
+// pasar en silencio y dar una falsa tranquilidad.
+//
+// FUERA DE ALCANCE LOCAL: RVG01 y FED137 cruzan contra bases del Ministerio
+// (BDUA, RUAF, la FEV radicada en la DIAN). Sin conectividad a SISPRO no se
+// pueden evaluar y el motor no los simula.
+(function (raiz, fabrica) {
+  raiz.RipsMotorRVC = fabrica(raiz.RipsPeriodo);
+})(typeof self !== 'undefined' ? self : this, function (Periodo) {
+  'use strict';
+
+  var RECHAZADO = 'Rechazado';
+  var NOTIFICACION = 'Notificación';
+
+  // ── Bloques de servicio del anexo técnico ───────────────────────────────
+  // Para cada bloque: el campo que lleva el código de la tecnología en salud
+  // y los campos de fecha que deben caer dentro del periodo de prestación.
+  // El primer campo de `fechas` es el ancla del registro (el que cuenta como
+  // "registro de servicio fuera de periodo").
+  var BLOQUES = [
+    { clave: 'consultas',      codigo: 'codConsulta',        fechas: ['fechaInicioAtencion'] },
+    { clave: 'procedimientos', codigo: 'codProcedimiento',   fechas: ['fechaInicioAtencion'] },
+    { clave: 'urgencias',      codigo: null,                 fechas: ['fechaInicioAtencion', 'fechaEgreso'] },
+    { clave: 'hospitalizacion',codigo: null,                 fechas: ['fechaInicioAtencion', 'fechaEgreso'] },
+    { clave: 'medicamentos',   codigo: 'codTecnologiaSalud', fechas: ['fechaDispensAdmon'] },
+    { clave: 'otrosServicios', codigo: 'codTecnologiaSalud', fechas: ['fechaSuministroTecnologia'] },
+    { clave: 'recienNacidos',  codigo: null,                 fechas: ['fechaNacimiento'] }
+  ];
+  var BLOQUE_POR_CLAVE = {};
+  BLOQUES.forEach(function (b) { BLOQUE_POR_CLAVE[b.clave] = b; });
+
+  // ── Utilidades ──────────────────────────────────────────────────────────
+  function esArreglo(v) { return Object.prototype.toString.call(v) === '[object Array]'; }
+
+  function texto(v) { return v == null ? '' : String(v).trim(); }
+
+  function mostrar(v) {
+    var s = texto(v);
+    return s === '' ? '(vacío)' : s;
+  }
+
+  function claves(tabla) {
+    if (!tabla) return null;
+    if (typeof tabla.has === 'function') return tabla;         // Set / Map
+    if (typeof tabla === 'object') return tabla;
+    return null;
+  }
+
+  function existeEnTabla(tabla, llave) {
+    if (!tabla) return null;
+    if (typeof tabla.has === 'function') return tabla.has(llave);
+    return Object.prototype.hasOwnProperty.call(tabla, llave);
+  }
+
+  function valorDeTabla(tabla, llave) {
+    if (!tabla) return undefined;
+    if (typeof tabla.get === 'function') return tabla.get(llave);
+    return tabla[llave];
+  }
+
+  function tablaVacia(tabla) {
+    if (!tabla) return true;
+    if (typeof tabla.size === 'number') return tabla.size === 0;
+    return Object.keys(tabla).length === 0;
+  }
+
+  function comoLista(v) {
+    if (v == null) return [];
+    if (esArreglo(v)) return v;
+    if (typeof v.forEach === 'function' && typeof v.size === 'number') { // Set
+      var out = []; v.forEach(function (x) { out.push(x); }); return out;
+    }
+    return [v];
+  }
+
+  // Edad del usuario el día de la atención. Devuelve null si falta un dato o
+  // si la fecha de nacimiento es posterior a la atención (dato inconsistente).
+  function edadEnFecha(fechaNacimiento, fechaAtencion) {
+    var nac = Periodo.aDia(fechaNacimiento), att = Periodo.aDia(fechaAtencion);
+    if (!Periodo.esDiaValido(nac) || !Periodo.esDiaValido(att)) return null;
+    if (nac > att) return null;
+    var dias = Periodo.diasEntre(nac, att);
+    var a = +nac.slice(0, 4), m = +nac.slice(5, 7), d = +nac.slice(8, 10);
+    var a2 = +att.slice(0, 4), m2 = +att.slice(5, 7), d2 = +att.slice(8, 10);
+    var anios = a2 - a;
+    if (m2 < m || (m2 === m && d2 < d)) anios -= 1;
+    return { anios: anios, dias: dias };
+  }
+
+  function rutaUsuario(iUsuario) { return 'usuarios[' + iUsuario + ']'; }
+
+  function rutaServicio(iUsuario, bloque, iServicio, campo) {
+    var p = rutaUsuario(iUsuario) + '.servicios.' + bloque + '[' + iServicio + ']';
+    return campo ? p + '.' + campo : p;
+  }
+
+  /**
+   * Recorre todos los registros de servicio del paquete en el orden del anexo
+   * técnico y llama a `cb` con el contexto de cada uno. Los índices son de base
+   * 0, igual que los que reporta el validador oficial ("usuario 0", "usuario 14").
+   */
+  function recorrerServicios(paquete, cb) {
+    var usuarios = (paquete && paquete.usuarios) || [];
+    if (!esArreglo(usuarios)) return;
+    usuarios.forEach(function (usuario, iUsuario) {
+      var servicios = (usuario && usuario.servicios) || {};
+      BLOQUES.forEach(function (bloque) {
+        var arr = servicios[bloque.clave];
+        if (!esArreglo(arr)) return;
+        arr.forEach(function (servicio, iServicio) {
+          if (servicio == null || typeof servicio !== 'object') return;
+          cb({
+            paquete: paquete,
+            usuario: usuario, iUsuario: iUsuario,
+            bloque: bloque.clave, def: bloque,
+            servicio: servicio, iServicio: iServicio,
+            codigo: bloque.codigo ? texto(servicio[bloque.codigo]) : '',
+            campoCodigo: bloque.codigo,
+            path: rutaServicio(iUsuario, bloque.clave, iServicio, null)
+          });
+        });
+      });
+    });
+  }
+
+  function contarServicios(paquete) {
+    var n = 0;
+    recorrerServicios(paquete, function () { n += 1; });
+    return n;
+  }
+
+  function hallazgo(regla, clase, observaciones, pathFuente, extra) {
+    var h = {
+      Clase: clase || regla.clase,
+      Codigo: regla.codigo,
+      Descripcion: regla.descripcion,
+      Observaciones: observaciones,
+      PathFuente: pathFuente
+    };
+    if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) h[k] = extra[k];
+    return h;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // REGLAS
+  // ═══════════════════════════════════════════════════════════════════════
+  // `descripcion` es el texto que sale en la columna "Descripción" del
+  // reporte. Se puede reemplazar por el literal exacto del validador oficial
+  // sin tocar la lógica: ver DESCRIPCIONES al final del archivo.
+  // `requiere` lista las tablas de ctx.tablas sin las que la regla no puede
+  // evaluarse; si falta alguna, el motor la marca como no evaluable.
+
+  // ── RVC014 ─────────────────────────────────────────────────────────────
+  // El hallazgo central de la capitación: la factura va anticipada, el RIPS
+  // va atrasado. Cualquier fecha de atención que caiga en el periodo que la
+  // factura cubre (o fuera del periodo previo) es un rechazo.
+  var RVC014 = {
+    codigo: 'RVC014',
+    clase: RECHAZADO,
+    nombre: 'Fecha de la atención fuera del periodo de prestación',
+    descripcion: 'La fecha de la atención debe corresponder al periodo de prestación de servicios que soporta la factura. En pago por capitación ese periodo es el inmediatamente anterior al periodo facturado en la FEV.',
+    requiere: [],
+    requierePeriodo: true,
+    evaluar: function (paquete, ctx) {
+      var out = [];
+      var periodo = ctx.periodo;
+      if (!periodo || !periodo.inicio || !periodo.fin) return out;
+      var etqPrev = Periodo.etiqueta(periodo);
+      var etqFev = Periodo.etiqueta(periodo.periodoFactura);
+      recorrerServicios(paquete, function (reg) {
+        reg.def.fechas.forEach(function (campo, iCampo) {
+          if (!Object.prototype.hasOwnProperty.call(reg.servicio, campo)) return;
+          var bruto = reg.servicio[campo];
+          if (texto(bruto) === '') return; // ausencia de fecha es otra regla, no RVC014
+          var dia = Periodo.aDia(bruto);
+          if (!dia || !Periodo.esDiaValido(dia)) {
+            out.push(hallazgo(RVC014, RECHAZADO,
+              'El campo ' + campo + ' trae "' + mostrar(bruto) + '", que no es una fecha válida, ' +
+              'así que no se puede confirmar que la atención esté dentro del periodo de prestación (' + etqPrev + ').',
+              rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, campo),
+              { _regla: 'RVC014', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path, _ancla: iCampo === 0 }));
+            return;
+          }
+          if (Periodo.dentroDelPeriodo(dia, periodo)) return;
+          var desfase = Periodo.desfaseEnDias(dia, periodo);
+          var enPeriodoFacturado = periodo.periodoFactura &&
+            Periodo.dentroDelPeriodo(dia, periodo.periodoFactura);
+          var detalle = enPeriodoFacturado
+            ? 'La fecha cae dentro del periodo que la factura cubre (' + etqFev + '), no en el periodo prestado. ' +
+              'En capitación la FEV es anticipada: el RIPS debe traer las atenciones del periodo anterior.'
+            : (desfase < 0
+              ? 'La atención es ' + Math.abs(desfase) + ' día(s) anterior al inicio del periodo de prestación.'
+              : 'La atención es ' + desfase + ' día(s) posterior al fin del periodo de prestación.');
+          out.push(hallazgo(RVC014, RECHAZADO,
+            campo + ' = ' + dia + ' está fuera del periodo de prestación esperado (' + etqPrev + '). ' + detalle,
+            rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, campo),
+            { _regla: 'RVC014', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path, _ancla: iCampo === 0 }));
+        });
+      });
+      return out;
+    }
+  };
+
+  // ── RVC096 ─────────────────────────────────────────────────────────────
+  var RVC096 = {
+    codigo: 'RVC096',
+    clase: RECHAZADO,
+    nombre: 'Código CUPS inexistente en la tabla de referencia',
+    descripcion: 'El código de la tecnología en salud debe existir en la tabla de referencia CUPSRips vigente.',
+    requiere: ['cups'],
+    evaluar: function (paquete, ctx) {
+      var out = [], tabla = ctx.tablas.cups;
+      recorrerServicios(paquete, function (reg) {
+        if (!reg.campoCodigo) return;
+        var cod = reg.codigo;
+        if (cod === '') return; // código ausente lo cubre la validación de obligatoriedad
+        if (existeEnTabla(tabla, cod)) return;
+        out.push(hallazgo(RVC096, RECHAZADO,
+          'El código "' + cod + '" no existe en CUPSRips. Revisa que no le falten ceros a la izquierda ' +
+          'ni le sobren separadores; si el código es correcto, la tabla de referencia está desactualizada.',
+          rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, reg.campoCodigo),
+          { _regla: 'RVC096', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+      });
+      return out;
+    }
+  };
+
+  // ── RVC019 ─────────────────────────────────────────────────────────────
+  // Coherencia CUPS ↔ diagnóstico principal. La tabla de referencia da un
+  // diagnóstico canónico por CUPS, pero varios diagnósticos pueden ser
+  // válidos para el mismo procedimiento: por eso se compara por categoría
+  // CIE-10 (los 3 primeros caracteres) y el hallazgo sale como notificación,
+  // no como rechazo, salvo que se configure lo contrario.
+  var RVC019 = {
+    codigo: 'RVC019',
+    clase: NOTIFICACION,
+    nombre: 'CUPS incoherente con el diagnóstico principal',
+    descripcion: 'El código de la tecnología en salud debe ser coherente con el diagnóstico principal reportado en la atención.',
+    requiere: ['cupsCie10'],
+    evaluar: function (paquete, ctx) {
+      var out = [], tabla = ctx.tablas.cupsCie10;
+      var largo = ctx.opciones.longitudCategoriaCie10;
+      var clase = ctx.opciones.claseRVC019 || RVC019.clase;
+      recorrerServicios(paquete, function (reg) {
+        if (!reg.campoCodigo) return;
+        var cod = reg.codigo;
+        if (cod === '') return;
+        var esperados = comoLista(valorDeTabla(tabla, cod)).map(function (x) { return texto(x).toUpperCase(); }).filter(Boolean);
+        if (!esperados.length) return; // CUPS sin referencia de diagnóstico: nada que afirmar
+        var dx = texto(reg.servicio.codDiagnosticoPrincipal).toUpperCase();
+        if (dx === '') return;
+        var coincide = esperados.some(function (e) {
+          return dx === e || dx.slice(0, largo) === e.slice(0, largo);
+        });
+        if (coincide) return;
+        out.push(hallazgo(RVC019, clase,
+          'El diagnóstico principal "' + dx + '" no corresponde a la categoría CIE-10 esperada para el CUPS "' + cod +
+          '" (referencia: ' + esperados.join(', ') + '). Verifica el diagnóstico antes de radicar: ' +
+          'si la atención sí lo justifica, documéntalo; si no, corrígelo.',
+          rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, 'codDiagnosticoPrincipal'),
+          { _regla: 'RVC019', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+      });
+      return out;
+    }
+  };
+
+  // ── RVC017 ─────────────────────────────────────────────────────────────
+  // Coherencia CUPS ↔ cobertura / plan de beneficios. Necesita la tabla de
+  // CUPS habilitados por cobertura, que no viene en el paquete: se inyecta.
+  var RVC017 = {
+    codigo: 'RVC017',
+    clase: RECHAZADO,
+    nombre: 'CUPS incoherente con la cobertura o plan de beneficios',
+    descripcion: 'El código de la tecnología en salud debe estar incluido en la cobertura o plan de beneficios declarado para la atención.',
+    requiere: ['cupsPorCobertura'],
+    evaluar: function (paquete, ctx) {
+      var out = [], tabla = ctx.tablas.cupsPorCobertura;
+      var cobertura = texto(ctx.cobertura);
+      if (cobertura === '') {
+        return [hallazgo(RVC017, NOTIFICACION,
+          'No se evaluó: la factura electrónica no declara COBERTURA_PLAN_BENEFICIOS, ' +
+          'así que no hay contra qué comparar los CUPS del paquete.',
+          'numFactura', { _regla: 'RVC017', _noEvaluable: true })];
+      }
+      var def = valorDeTabla(tabla, cobertura);
+      if (def == null) {
+        return [hallazgo(RVC017, NOTIFICACION,
+          'No se evaluó: la tabla de CUPS por cobertura no tiene entrada para la cobertura "' + cobertura + '".',
+          'numFactura', { _regla: 'RVC017', _noEvaluable: true })];
+      }
+      var incluidos = claves(def.incluidos != null ? def.incluidos : def);
+      var excluidos = def.excluidos ? claves(def.excluidos) : null;
+      recorrerServicios(paquete, function (reg) {
+        if (!reg.campoCodigo) return;
+        var cod = reg.codigo;
+        if (cod === '') return;
+        var fuera = false, motivo = '';
+        if (excluidos && existeEnTabla(excluidos, cod)) {
+          fuera = true;
+          motivo = 'está excluido expresamente de esa cobertura';
+        } else if (incluidos && !tablaVacia(incluidos) && !existeEnTabla(incluidos, cod)) {
+          fuera = true;
+          motivo = 'no figura entre los CUPS habilitados para esa cobertura';
+        }
+        if (!fuera) return;
+        out.push(hallazgo(RVC017, RVC017.clase,
+          'El CUPS "' + cod + '" ' + motivo + ' (cobertura ' + cobertura +
+          (def.nombre ? ' — ' + def.nombre : '') + '). El validador rechaza el paquete: ' +
+          'corrige el código o factura ese servicio por la cobertura que sí lo incluye.',
+          rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, reg.campoCodigo),
+          { _regla: 'RVC017', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+      });
+      return out;
+    }
+  };
+
+  // ── RVC051 ─────────────────────────────────────────────────────────────
+  // Coherencia finalidad de la tecnología en salud ↔ sexo y edad del usuario.
+  // Las restricciones por sexo/edad son datos del anexo técnico, no lógica:
+  // se inyectan en ctx.tablas.finalidadRestricciones.
+  var RVC051 = {
+    codigo: 'RVC051',
+    clase: RECHAZADO,
+    nombre: 'Finalidad de la tecnología incoherente con el sexo o la edad',
+    descripcion: 'La finalidad de la tecnología en salud debe ser coherente con el sexo y la edad del usuario a la fecha de la atención.',
+    requiere: ['finalidadRestricciones'],
+    evaluar: function (paquete, ctx) {
+      var out = [], tabla = ctx.tablas.finalidadRestricciones;
+      recorrerServicios(paquete, function (reg) {
+        if (!Object.prototype.hasOwnProperty.call(reg.servicio, 'finalidadTecnologiaSalud')) return;
+        var fin = texto(reg.servicio.finalidadTecnologiaSalud);
+        if (fin === '') return;
+        var r = valorDeTabla(tabla, fin);
+        if (r == null) return; // finalidad sin restricción de sexo/edad
+        var pathFin = rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, 'finalidadTecnologiaSalud');
+        var nombreFin = 'finalidad ' + fin + (r.nombre ? ' (' + r.nombre + ')' : '');
+
+        var sexos = comoLista(r.sexos).map(function (s) { return texto(s).toUpperCase(); }).filter(Boolean);
+        if (sexos.length) {
+          var sexo = texto(reg.usuario && reg.usuario.codSexo).toUpperCase();
+          if (sexo === '') {
+            out.push(hallazgo(RVC051, NOTIFICACION,
+              'No se pudo evaluar la coherencia por sexo de la ' + nombreFin +
+              ': el usuario no trae codSexo.',
+              rutaUsuario(reg.iUsuario) + '.codSexo',
+              { _regla: 'RVC051', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+          } else if (sexos.indexOf(sexo) < 0) {
+            out.push(hallazgo(RVC051, RVC051.clase,
+              'La ' + nombreFin + ' solo aplica a usuarios de sexo ' + sexos.join(' o ') +
+              ', y el usuario está reportado con codSexo "' + sexo + '".',
+              pathFin,
+              { _regla: 'RVC051', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+          }
+        }
+
+        var tieneLimiteEdad = r.edadMinAnios != null || r.edadMaxAnios != null;
+        if (!tieneLimiteEdad) return;
+        var fechaAtencion = reg.servicio[reg.def.fechas[0]];
+        var edad = edadEnFecha(reg.usuario && reg.usuario.fechaNacimiento, fechaAtencion);
+        if (!edad) {
+          out.push(hallazgo(RVC051, NOTIFICACION,
+            'No se pudo evaluar la coherencia por edad de la ' + nombreFin +
+            ': la fecha de nacimiento del usuario (' + mostrar(reg.usuario && reg.usuario.fechaNacimiento) +
+            ') y la fecha de la atención (' + mostrar(fechaAtencion) + ') no permiten calcular la edad.',
+            rutaUsuario(reg.iUsuario) + '.fechaNacimiento',
+            { _regla: 'RVC051', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+          return;
+        }
+        var rango = (r.edadMinAnios != null ? r.edadMinAnios : 0) + ' a ' +
+          (r.edadMaxAnios != null ? r.edadMaxAnios : 'sin límite') + ' años';
+        if ((r.edadMinAnios != null && edad.anios < r.edadMinAnios) ||
+            (r.edadMaxAnios != null && edad.anios > r.edadMaxAnios)) {
+          out.push(hallazgo(RVC051, RVC051.clase,
+            'La ' + nombreFin + ' aplica a usuarios de ' + rango +
+            ', y el usuario tenía ' + edad.anios + ' año(s) el día de la atención.',
+            pathFin,
+            { _regla: 'RVC051', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+        }
+      });
+      return out;
+    }
+  };
+
+  // ── RVC059 ─────────────────────────────────────────────────────────────
+  // Coherencia CUPS ↔ grupo de servicios / finalidad / causa externa.
+  // Dos fuentes posibles, ambas inyectadas: la tabla de combinaciones válidas
+  // (cupsGrupoServicio) y, como apoyo, la derivación de codServicio por CUPS
+  // que ya usa el generador (cupsCodServicio).
+  var RVC059 = {
+    codigo: 'RVC059',
+    clase: RECHAZADO,
+    nombre: 'CUPS incoherente con grupo de servicios, finalidad o causa',
+    descripcion: 'El código de la tecnología en salud debe ser coherente con el grupo de servicios, el servicio, la finalidad de la tecnología y la causa que motiva la atención.',
+    requiere: ['cupsGrupoServicio|cupsCodServicio'],
+    evaluar: function (paquete, ctx) {
+      var out = [];
+      var tGrupo = ctx.tablas.cupsGrupoServicio;
+      var tServ = ctx.tablas.cupsCodServicio;
+      recorrerServicios(paquete, function (reg) {
+        if (!reg.campoCodigo) return;
+        var cod = reg.codigo;
+        if (cod === '') return;
+
+        var def = tGrupo ? valorDeTabla(tGrupo, cod) : null;
+        if (def) {
+          [['grupos', 'grupoServicios', 'grupo de servicios'],
+           ['finalidades', 'finalidadTecnologiaSalud', 'finalidad de la tecnología'],
+           ['causas', 'causaMotivoAtencion', 'causa que motiva la atención']
+          ].forEach(function (par) {
+            var permitidos = comoLista(def[par[0]]).map(texto).filter(Boolean);
+            if (!permitidos.length) return;
+            if (!Object.prototype.hasOwnProperty.call(reg.servicio, par[1])) return;
+            var val = texto(reg.servicio[par[1]]);
+            if (val === '' || permitidos.indexOf(val) >= 0) return;
+            out.push(hallazgo(RVC059, RVC059.clase,
+              'El CUPS "' + cod + '" no admite ' + par[2] + ' "' + val + '"; los valores válidos son ' +
+              permitidos.join(', ') + '.',
+              rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, par[1]),
+              { _regla: 'RVC059', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+          });
+        }
+
+        // codServicio: la tabla de derivación por CUPS dice cuál corresponde.
+        if (tServ && Object.prototype.hasOwnProperty.call(reg.servicio, 'codServicio')) {
+          var esperado = valorDeTabla(tServ, cod);
+          if (esperado != null) {
+            var declarado = texto(reg.servicio.codServicio);
+            if (declarado !== '' && declarado !== texto(esperado)) {
+              out.push(hallazgo(RVC059, NOTIFICACION,
+                'El CUPS "' + cod + '" corresponde al servicio ' + texto(esperado) +
+                ' según la tabla de referencia, y el registro declara codServicio ' + declarado +
+                '. Revisa el grupo/servicio antes de radicar.',
+                rutaServicio(reg.iUsuario, reg.bloque, reg.iServicio, 'codServicio'),
+                { _regla: 'RVC059', _usuario: reg.iUsuario, _bloque: reg.bloque, _registro: reg.path }));
+            }
+          }
+        }
+      });
+      return out;
+    }
+  };
+
+  var REGLAS = [RVC014, RVC017, RVC019, RVC051, RVC059, RVC096];
+  var REGLAS_POR_CODIGO = {};
+  REGLAS.forEach(function (r) { REGLAS_POR_CODIGO[r.codigo] = r; });
+
+  // Reglas que dependen de bases del Ministerio: se listan para que el reporte
+  // diga expresamente que quedan pendientes de la validación oficial.
+  var FUERA_DE_ALCANCE = [
+    { codigo: 'RVG01', motivo: 'cruza el documento del usuario contra BDUA/RUAF en las bases del Ministerio.' },
+    { codigo: 'FED137', motivo: 'cruza el paquete contra la factura electrónica radicada ante la DIAN.' }
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // EJECUTOR
+  // ═══════════════════════════════════════════════════════════════════════
+  function normalizarContexto(ctx) {
+    ctx = ctx || {};
+    var opciones = ctx.opciones || {};
+    var fev = ctx.fev ? (ctx.fev.periodo || ctx.fev.invoicePeriod || ctx.fev) : null;
+    var periodo = ctx.periodo;
+    // Dos formas de saber qué periodo debe traer el RIPS, y la diferencia
+    // importa: el XML de la FEV solo trae el periodo FACTURADO, nunca el
+    // prestado. Si ctx.periodo viene, es un dato: se usa tal cual. Si no, se
+    // DERIVA del periodo facturado, y esa derivación es un supuesto (ver el
+    // módulo de periodo). El resultado lleva `origen` para que el reporte lo diga.
+    if (periodo) {
+      // Un periodo ya resuelto por RipsPeriodo se respeta; un {inicio, fin}
+      // suelto se normaliza y valida antes de usarlo.
+      if (periodo.origen == null) periodo = Periodo.periodoPrestadoExplicito(periodo, fev);
+      else if (periodo.periodoFactura == null && fev) {
+        periodo = Periodo.periodoPrestadoExplicito(periodo, fev);
+      }
+    } else if (fev) {
+      periodo = Periodo.calcularPeriodoAnterior(fev, { estrategia: opciones.estrategiaPeriodo });
+    }
+    return {
+      periodo: periodo || null,
+      fev: ctx.fev || null,
+      cobertura: ctx.cobertura != null ? ctx.cobertura :
+        (ctx.fev ? (ctx.fev.cobertura || ctx.fev.coberturaId) : null),
+      tablas: ctx.tablas || {},
+      opciones: {
+        estrategiaPeriodo: opciones.estrategiaPeriodo || Periodo.ESTRATEGIA_POR_DEFECTO,
+        longitudCategoriaCie10: opciones.longitudCategoriaCie10 || 3,
+        claseRVC019: opciones.claseRVC019 || null,
+        reportarNoEvaluables: opciones.reportarNoEvaluables !== false,
+        reglas: opciones.reglas || ctx.reglas || null
+      }
+    };
+  }
+
+  // Una regla es evaluable si están todas sus tablas requeridas. En `requiere`
+  // un item con "|" significa "cualquiera de estas sirve".
+  function tablasFaltantes(regla, tablas) {
+    var faltan = [];
+    (regla.requiere || []).forEach(function (req) {
+      var alternativas = String(req).split('|');
+      var alguna = alternativas.some(function (nombre) {
+        return !tablaVacia(tablas[nombre]);
+      });
+      if (!alguna) faltan.push(alternativas.join(' o '));
+    });
+    return faltan;
+  }
+
+  /**
+   * Corre las reglas sobre un paquete RIPS.
+   *
+   * @param {Object} paquete RIPS con la estructura del anexo técnico.
+   * @param {Object} ctx
+   *   ctx.fev       {numFactura, periodo:{inicio,fin}, cobertura} — o ctx.periodo ya calculado
+   *   ctx.tablas    {cups, cupsCie10, cupsPorCobertura, finalidadRestricciones,
+   *                  cupsGrupoServicio, cupsCodServicio}
+   *   ctx.opciones  {estrategiaPeriodo, longitudCategoriaCie10, claseRVC019,
+   *                  reportarNoEvaluables, reglas:[códigos]}
+   * @returns {Object} resultado listo para el reporte
+   */
+  function validar(paquete, ctx) {
+    var c = normalizarContexto(ctx);
+    var seleccion = c.opciones.reglas;
+    var hallazgos = [], evaluadas = [], noEvaluables = [];
+
+    REGLAS.forEach(function (regla) {
+      if (seleccion && seleccion.indexOf(regla.codigo) < 0) return;
+
+      if (regla.requierePeriodo && (!c.periodo || !c.periodo.inicio || !c.periodo.fin)) {
+        noEvaluables.push({
+          codigo: regla.codigo, nombre: regla.nombre,
+          motivo: (c.periodo && c.periodo.motivo) ||
+            'no se pudo determinar el periodo de prestación esperado: falta el InvoicePeriod de la factura electrónica.'
+        });
+        return;
+      }
+      var faltan = tablasFaltantes(regla, c.tablas);
+      if (faltan.length) {
+        noEvaluables.push({
+          codigo: regla.codigo, nombre: regla.nombre,
+          motivo: 'falta la tabla de referencia ' + faltan.join(', ') + ' en el contexto.'
+        });
+        return;
+      }
+      var propios = regla.evaluar(paquete, c) || [];
+      evaluadas.push({ codigo: regla.codigo, nombre: regla.nombre, hallazgos: propios.length });
+      hallazgos = hallazgos.concat(propios);
+    });
+
+    if (c.opciones.reportarNoEvaluables) {
+      noEvaluables.forEach(function (ne) {
+        var regla = REGLAS_POR_CODIGO[ne.codigo];
+        hallazgos.push(hallazgo(regla, NOTIFICACION,
+          'Regla no evaluada localmente: ' + ne.motivo + ' Este paquete puede fallar por ' +
+          ne.codigo + ' en la validación oficial sin que este reporte lo anticipe.',
+          'numFactura', { _regla: ne.codigo, _noEvaluable: true }));
+      });
+      FUERA_DE_ALCANCE.forEach(function (f) {
+        hallazgos.push({
+          Clase: NOTIFICACION, Codigo: f.codigo,
+          Descripcion: 'Regla que depende de bases de datos externas del Ministerio.',
+          Observaciones: 'No evaluable sin conectividad a SISPRO: ' + f.motivo +
+            ' Queda pendiente de la validación oficial.',
+          PathFuente: 'numFactura', _regla: f.codigo, _noEvaluable: true, _fueraDeAlcance: true
+        });
+      });
+    }
+
+    return {
+      paquete: {
+        numDocumentoIdObligado: paquete && paquete.numDocumentoIdObligado,
+        numFactura: paquete && paquete.numFactura,
+        usuarios: (paquete && esArreglo(paquete.usuarios)) ? paquete.usuarios.length : 0,
+        servicios: contarServicios(paquete)
+      },
+      fev: c.fev ? { numFactura: c.fev.numFactura || c.fev.nF || null } : null,
+      periodo: c.periodo,
+      estrategiaPeriodo: (c.periodo && c.periodo.origen === 'manual') ? null : c.opciones.estrategiaPeriodo,
+      hallazgos: hallazgos,
+      reglasEvaluadas: evaluadas,
+      reglasNoEvaluables: noEvaluables,
+      resumen: resumir(hallazgos)
+    };
+  }
+
+  function resumir(hallazgos) {
+    var r = { total: hallazgos.length, rechazados: 0, notificaciones: 0, porRegla: {} };
+    hallazgos.forEach(function (h) {
+      if (h.Clase === RECHAZADO) r.rechazados += 1; else r.notificaciones += 1;
+      var cod = h.Codigo;
+      var e = r.porRegla[cod] || (r.porRegla[cod] = {
+        codigo: cod, total: 0, rechazados: 0, notificaciones: 0,
+        usuarios: {}, registros: {}, nUsuarios: 0, nRegistros: 0
+      });
+      e.total += 1;
+      if (h.Clase === RECHAZADO) e.rechazados += 1; else e.notificaciones += 1;
+      if (h._usuario != null && !e.usuarios[h._usuario]) { e.usuarios[h._usuario] = true; e.nUsuarios += 1; }
+      if (h._registro && !e.registros[h._registro]) { e.registros[h._registro] = true; e.nRegistros += 1; }
+    });
+    return r;
+  }
+
+  /**
+   * Cuántos hallazgos de RVC014 saldrían con cada estrategia de periodo.
+   * Sirve para decidir empíricamente cuál corresponde al contrato, sin tener
+   * que adivinar: se corre sobre un paquete que ya se sabe cómo cerró.
+   */
+  function diagnosticarPeriodo(paquete, periodoFEV) {
+    return Periodo.ESTRATEGIAS.map(function (estrategia) {
+      var res = validar(paquete, {
+        fev: { periodo: periodoFEV },
+        opciones: { estrategiaPeriodo: estrategia, reglas: ['RVC014'], reportarNoEvaluables: false }
+      });
+      var e = res.resumen.porRegla.RVC014;
+      return {
+        estrategia: estrategia,
+        periodo: res.periodo ? { inicio: res.periodo.inicio, fin: res.periodo.fin } : null,
+        hallazgos: res.resumen.total,
+        registros: e ? e.nRegistros : 0,
+        usuarios: e ? e.nUsuarios : 0
+      };
+    });
+  }
+
+  return {
+    RECHAZADO: RECHAZADO,
+    NOTIFICACION: NOTIFICACION,
+    BLOQUES: BLOQUES,
+    REGLAS: REGLAS,
+    REGLAS_POR_CODIGO: REGLAS_POR_CODIGO,
+    FUERA_DE_ALCANCE: FUERA_DE_ALCANCE,
+    Periodo: Periodo,
+    validar: validar,
+    diagnosticarPeriodo: diagnosticarPeriodo,
+    recorrerServicios: recorrerServicios,
+    contarServicios: contarServicios,
+    edadEnFecha: edadEnFecha,
+    rutaServicio: rutaServicio
+  };
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REPORTE "RESULTADOS DE VALIDACIÓN DEL PAQUETE"
+// ═══════════════════════════════════════════════════════════════════════════
+// Presenta los hallazgos del motor con la misma forma que la pantalla oficial
+// del MinSalud: dos pestañas (Rechazados / Notificaciones) y las columnas
+// Clase, Código, Descripción, Observaciones, PathFuente. La idea es que el
+// reporte local se lea igual que el oficial y no haya que traducir nada.
+//
+// Tres salidas del mismo resultado: texto (consola/tests), HTML (para abrir o
+// descargar, con el estilo de la app) y CSV (para pegar en Excel).
+(function (raiz, fabrica) {
+  raiz.RipsReporte = fabrica();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var COLUMNAS = ['Clase', 'Codigo', 'Descripcion', 'Observaciones', 'PathFuente'];
+  var ENCABEZADOS = {
+    Clase: 'Clase', Codigo: 'Código', Descripcion: 'Descripción',
+    Observaciones: 'Observaciones', PathFuente: 'PathFuente'
+  };
+  var RECHAZADO = 'Rechazado';
+
+  function esc(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Solo las cinco columnas oficiales: los campos internos del motor (_regla,
+  // _usuario, …) sirven para agrupar y filtrar, no para el reporte.
+  function fila(h) {
+    var f = {};
+    COLUMNAS.forEach(function (c) { f[c] = h[c] == null ? '' : String(h[c]); });
+    return f;
+  }
+
+  /** Separa los hallazgos en las dos pestañas de la pantalla oficial. */
+  function separarPorClase(resultado) {
+    var rech = [], noti = [];
+    (resultado.hallazgos || []).forEach(function (h) {
+      (h.Clase === RECHAZADO ? rech : noti).push(fila(h));
+    });
+    return { rechazados: rech, notificaciones: noti };
+  }
+
+  function estadoPaquete(resultado) {
+    var r = resultado.resumen || { rechazados: 0, notificaciones: 0 };
+    if (r.rechazados > 0) return { texto: 'RECHAZADO', detalle: r.rechazados + ' hallazgo(s) de rechazo', ok: false };
+    if (r.notificaciones > 0) return { texto: 'ACEPTADO CON NOTIFICACIONES', detalle: r.notificaciones + ' notificación(es)', ok: true };
+    return { texto: 'ACEPTADO', detalle: 'sin hallazgos', ok: true };
+  }
+
+  function lineaPeriodo(resultado) {
+    var p = resultado.periodo;
+    if (!p || !p.inicio) return 'Periodo de prestación esperado: no determinado.';
+    var fev = p.periodoFactura;
+    // El XML de la FEV solo trae el periodo facturado. Decir de dónde salió el
+    // periodo prestado es parte del resultado: derivado es un supuesto sobre el
+    // facturado, fijado a mano es un dato.
+    var fuente = p.origen === 'manual'
+      ? 'fijado a mano'
+      : 'derivado del periodo facturado con la estrategia "' +
+        (p.estrategia || resultado.estrategiaPeriodo) + '"';
+    return 'Periodo facturado en la FEV: ' + (fev ? fev.inicio + ' a ' + fev.fin : '(desconocido)') +
+      ' · Periodo de prestación que debe traer el RIPS: ' + p.inicio + ' a ' + p.fin +
+      ' (' + fuente + ').';
+  }
+
+  // El desfase de numFactura entre RIPS y FEV es normal en capitación; se
+  // muestra como dato, nunca como hallazgo.
+  function lineaFactura(resultado) {
+    var rips = (resultado.paquete && resultado.paquete.numFactura) || '(sin numFactura)';
+    var fev = resultado.fev && resultado.fev.numFactura;
+    if (!fev) return 'numFactura del RIPS: ' + rips + '.';
+    if (String(rips) === String(fev)) return 'numFactura: ' + rips + ' (RIPS y FEV coinciden).';
+    return 'numFactura del RIPS: ' + rips + ' · de la FEV: ' + fev +
+      '. En capitación el desfase es esperado (la FEV va anticipada), no es un hallazgo.';
+  }
+
+  // ── Texto ───────────────────────────────────────────────────────────────
+  function recortar(s, n) {
+    s = String(s == null ? '' : s).replace(/\s+/g, ' ');
+    return s.length <= n ? s : s.slice(0, n - 1) + '…';
+  }
+
+  function tablaTexto(filas, anchos) {
+    if (!filas.length) return '  (ninguno)\n';
+    var sep = '  ' + COLUMNAS.map(function (c) {
+      return new Array(anchos[c] + 1).join('-');
+    }).join('  ') + '\n';
+    var out = '  ' + COLUMNAS.map(function (c) {
+      return (ENCABEZADOS[c] + new Array(anchos[c] + 1).join(' ')).slice(0, anchos[c]);
+    }).join('  ') + '\n' + sep;
+    filas.forEach(function (f) {
+      out += '  ' + COLUMNAS.map(function (c) {
+        return (recortar(f[c], anchos[c]) + new Array(anchos[c] + 1).join(' ')).slice(0, anchos[c]);
+      }).join('  ') + '\n';
+    });
+    return out;
+  }
+
+  function reporteTexto(resultado, opciones) {
+    opciones = opciones || {};
+    var anchos = opciones.anchos || { Clase: 13, Codigo: 7, Descripcion: 38, Observaciones: 70, PathFuente: 46 };
+    var partes = separarPorClase(resultado);
+    var est = estadoPaquete(resultado);
+    var p = resultado.paquete || {};
+    var out = '';
+    out += 'RESULTADOS DE VALIDACIÓN DEL PAQUETE\n';
+    out += '════════════════════════════════════\n';
+    out += 'Obligado: ' + (p.numDocumentoIdObligado || '(sin dato)') + ' · ' +
+      (p.usuarios || 0) + ' usuario(s) · ' + (p.servicios || 0) + ' registro(s) de servicio\n';
+    out += lineaFactura(resultado) + '\n';
+    out += lineaPeriodo(resultado) + '\n';
+    out += 'Estado: ' + est.texto + ' (' + est.detalle + ')\n\n';
+    out += 'RECHAZADOS (' + partes.rechazados.length + ')\n' + tablaTexto(partes.rechazados, anchos) + '\n';
+    out += 'NOTIFICACIONES (' + partes.notificaciones.length + ')\n' + tablaTexto(partes.notificaciones, anchos);
+    var porRegla = (resultado.resumen && resultado.resumen.porRegla) || {};
+    var codigos = Object.keys(porRegla).sort();
+    if (codigos.length) {
+      out += '\nRESUMEN POR REGLA\n';
+      codigos.forEach(function (c) {
+        var e = porRegla[c];
+        out += '  ' + c + ': ' + e.total + ' hallazgo(s)' +
+          (e.nRegistros ? ' en ' + e.nRegistros + ' registro(s) de ' + e.nUsuarios + ' usuario(s)' : '') +
+          ' · ' + e.rechazados + ' rechazo(s), ' + e.notificaciones + ' notificación(es)\n';
+      });
+    }
+    return out;
+  }
+
+  // ── CSV ─────────────────────────────────────────────────────────────────
+  function celdaCsv(v) {
+    var s = String(v == null ? '' : v);
+    return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function reporteCSV(resultado) {
+    // Separador ";" porque Excel en configuración regional es-CO lo espera así.
+    var lineas = [COLUMNAS.map(function (c) { return ENCABEZADOS[c]; }).join(';')];
+    (resultado.hallazgos || []).forEach(function (h) {
+      var f = fila(h);
+      lineas.push(COLUMNAS.map(function (c) { return celdaCsv(f[c]); }).join(';'));
+    });
+    return '﻿' + lineas.join('\r\n') + '\r\n';
+  }
+
+  // ── HTML ────────────────────────────────────────────────────────────────
+  function tablaHTML(filas, vacio) {
+    if (!filas.length) return '<p class="none">' + esc(vacio) + '</p>';
+    var h = '<div class="tw"><table><thead><tr>' + COLUMNAS.map(function (c) {
+      return '<th class="c-' + c + '">' + esc(ENCABEZADOS[c]) + '</th>';
+    }).join('') + '</tr></thead><tbody>';
+    filas.forEach(function (f) {
+      h += '<tr>' + COLUMNAS.map(function (c) {
+        if (c === 'Clase') {
+          var cls = f.Clase === RECHAZADO ? 'tag rech' : 'tag noti';
+          return '<td><span class="' + cls + '">' + esc(f.Clase) + '</span></td>';
+        }
+        if (c === 'Codigo') return '<td><code>' + esc(f.Codigo) + '</code></td>';
+        if (c === 'PathFuente') return '<td><code class="path">' + esc(f.PathFuente) + '</code></td>';
+        return '<td class="c-' + c + '">' + esc(f[c]) + '</td>';
+      }).join('') + '</tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  var CSS =
+    '*{box-sizing:border-box;}body{font-family:"Nunito Sans",Arial,sans-serif;color:#1A2E3D;margin:0;background:#F8FAFC;}' +
+    '.wrap{max-width:1240px;margin:0 auto;padding:24px;}' +
+    'header{background:linear-gradient(100deg,#1E3A8A,#1D4ED8 55%,#2563EB 140%);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px;}' +
+    'header h1{margin:0;font-size:1.2rem;}header p{margin:5px 0 0;opacity:.92;font-size:.8rem;}' +
+    '.estado{display:inline-block;margin-top:10px;padding:5px 12px;border-radius:999px;font-size:.74rem;font-weight:800;letter-spacing:.03em;}' +
+    '.estado.no{background:#FEE2E2;color:#B91C1C;}.estado.si{background:#DCFCE7;color:#15803D;}' +
+    '.meta{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.8rem;line-height:1.6;}' +
+    '.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}' +
+    '.kpi{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:12px 16px;flex:1;min-width:120px;}' +
+    '.kpi b{display:block;font-size:1.5rem;color:#1D4ED8;}.kpi span{font-size:.7rem;color:#6B8599;}' +
+    '.kpi.rech b{color:#B91C1C;}.kpi.noti b{color:#B45309;}' +
+    '.tabs{display:flex;gap:6px;margin-bottom:-1px;}' +
+    '.tab{background:#EDF2F7;border:1px solid #E2EAF0;border-bottom:none;border-radius:9px 9px 0 0;padding:9px 16px;' +
+    'font-family:"Nunito",sans-serif;font-size:.78rem;font-weight:800;color:#64748B;cursor:pointer;}' +
+    '.tab.active{background:#fff;color:#1D4ED8;}' +
+    '.pane{background:#fff;border:1px solid #E2EAF0;border-radius:0 10px 10px 10px;padding:14px 16px;margin-bottom:16px;}' +
+    '.pane.hidden{display:none;}' +
+    '.tw{overflow-x:auto;}' +
+    'table{width:100%;border-collapse:collapse;font-size:.76rem;}' +
+    'th{background:#EFF6FF;color:#1D4ED8;text-align:left;padding:7px 9px;font-size:.66rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}' +
+    'td{padding:7px 9px;border-top:1px solid #F0F4F8;vertical-align:top;}' +
+    '.c-Descripcion{min-width:220px;}.c-Observaciones{min-width:320px;}' +
+    'code{font-family:"Courier New",monospace;background:#F0F4F8;padding:1px 5px;border-radius:4px;font-size:.74rem;}' +
+    'code.path{word-break:break-all;}' +
+    '.tag{border-radius:5px;padding:2px 8px;font-size:.66rem;font-weight:800;white-space:nowrap;}' +
+    '.tag.rech{background:#FEE2E2;color:#B91C1C;}.tag.noti{background:#FEF3C7;color:#92400E;}' +
+    '.none{color:#6B8599;font-size:.8rem;margin:4px 0;}' +
+    'section.res{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:14px 16px;}' +
+    'section.res h2{font-size:.85rem;margin:0 0 8px;color:#1D4ED8;}' +
+    '@media print{body{background:#fff;}.tabs{display:none;}.pane{display:block!important;border-radius:10px;margin-top:10px;}' +
+    'header,.kpi,th,.tag{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
+
+  var JS =
+    "function rvPane(n){var p=['rech','noti'];p.forEach(function(k){" +
+    "document.getElementById('pane-'+k).classList.toggle('hidden',k!==n);" +
+    "document.getElementById('tab-'+k).classList.toggle('active',k===n);});}";
+
+  function reporteHTML(resultado, opciones) {
+    opciones = opciones || {};
+    var partes = separarPorClase(resultado);
+    var est = estadoPaquete(resultado);
+    var p = resultado.paquete || {};
+    var r = resultado.resumen || { total: 0, rechazados: 0, notificaciones: 0 };
+    var fecha = opciones.fecha || new Date().toLocaleString('es-CO');
+    var titulo = opciones.titulo || 'Resultados de Validación del Paquete';
+
+    var porRegla = r.porRegla || {};
+    var codigos = Object.keys(porRegla).sort();
+    var resumen = '';
+    if (codigos.length) {
+      resumen = '<section class="res"><h2>Resumen por regla</h2><div class="tw"><table><thead><tr>' +
+        '<th>Código</th><th>Hallazgos</th><th>Rechazos</th><th>Notificaciones</th>' +
+        '<th>Registros afectados</th><th>Usuarios afectados</th></tr></thead><tbody>';
+      codigos.forEach(function (c) {
+        var e = porRegla[c];
+        resumen += '<tr><td><code>' + esc(c) + '</code></td><td>' + e.total + '</td><td>' + e.rechazados +
+          '</td><td>' + e.notificaciones + '</td><td>' + (e.nRegistros || '—') + '</td><td>' +
+          (e.nUsuarios || '—') + '</td></tr>';
+      });
+      resumen += '</tbody></table></div></section>';
+    }
+
+    var noEval = '';
+    if ((resultado.reglasNoEvaluables || []).length) {
+      noEval = '<div class="meta"><b>Reglas no evaluadas localmente:</b><ul style="margin:6px 0 0 18px;">' +
+        resultado.reglasNoEvaluables.map(function (ne) {
+          return '<li><code>' + esc(ne.codigo) + '</code> — ' + esc(ne.motivo) + '</li>';
+        }).join('') + '</ul></div>';
+    }
+
+    return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>' + esc(titulo) + '</title><style>' + CSS + '</style></head><body><div class="wrap">' +
+      '<header><h1>' + esc(titulo) + '</h1>' +
+      '<p>Validación local previa a SISPRO · Generado el ' + esc(fecha) + '</p>' +
+      '<span class="estado ' + (est.ok ? 'si' : 'no') + '">' + esc(est.texto) + ' · ' + esc(est.detalle) + '</span>' +
+      '</header>' +
+      '<div class="meta">' +
+      '<div>Obligado a facturar: <code>' + esc(p.numDocumentoIdObligado || '(sin dato)') + '</code></div>' +
+      '<div>' + esc(lineaFactura(resultado)) + '</div>' +
+      '<div>' + esc(lineaPeriodo(resultado)) + '</div>' +
+      '</div>' +
+      '<div class="kpis">' +
+      '<div class="kpi"><b>' + (p.usuarios || 0) + '</b><span>Usuarios</span></div>' +
+      '<div class="kpi"><b>' + (p.servicios || 0) + '</b><span>Registros de servicio</span></div>' +
+      '<div class="kpi rech"><b>' + r.rechazados + '</b><span>Rechazados</span></div>' +
+      '<div class="kpi noti"><b>' + r.notificaciones + '</b><span>Notificaciones</span></div>' +
+      '</div>' + noEval +
+      '<div class="tabs">' +
+      '<button class="tab active" id="tab-rech" onclick="rvPane(\'rech\')">Rechazados (' + partes.rechazados.length + ')</button>' +
+      '<button class="tab" id="tab-noti" onclick="rvPane(\'noti\')">Notificaciones (' + partes.notificaciones.length + ')</button>' +
+      '</div>' +
+      '<div class="pane" id="pane-rech">' + tablaHTML(partes.rechazados, 'Sin hallazgos de rechazo.') + '</div>' +
+      '<div class="pane hidden" id="pane-noti">' + tablaHTML(partes.notificaciones, 'Sin notificaciones.') + '</div>' +
+      resumen +
+      '<script>' + JS + '<\/script></div></body></html>';
+  }
+
+  return {
+    COLUMNAS: COLUMNAS,
+    ENCABEZADOS: ENCABEZADOS,
+    fila: fila,
+    separarPorClase: separarPorClase,
+    estadoPaquete: estadoPaquete,
+    reporteTexto: reporteTexto,
+    reporteCSV: reporteCSV,
+    reporteHTML: reporteHTML
+  };
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TABLAS DE REFERENCIA PARA EL MOTOR RVC
+// ═══════════════════════════════════════════════════════════════════════════
+// El motor no trae tablas de referencia adentro: las recibe por contexto. Este
+// archivo arma ese contexto a partir de lo que ya existe en la app y define la
+// forma exacta de las tablas que todavía hay que cargar a mano.
+//
+// Regla de oro: una tabla vacía NO es una tabla que aprueba todo. El motor
+// marca la regla como "no evaluable localmente" y lo dice en el reporte, para
+// que nadie confunda "no lo revisé" con "está bien".
+(function (raiz, fabrica) {
+  raiz.RipsTablas = fabrica();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ── RVC051: restricciones de sexo y edad por finalidad ──────────────────
+  // Forma de cada entrada:
+  //
+  //   '<codFinalidad>': {
+  //     nombre: 'texto que sale en el hallazgo',
+  //     sexos: ['F'],          // sexos admitidos; omitir si no hay restricción
+  //     edadMinAnios: 0,       // inclusive; omitir si no hay mínimo
+  //     edadMaxAnios: 9        // inclusive; omitir si no hay máximo
+  //   }
+  //
+  // Se deja VACÍA a propósito. Los códigos de finalidad de la tecnología en
+  // salud y sus rangos de sexo/edad son datos del anexo técnico vigente, y
+  // cargarlos de memoria produciría falsos rechazos justo en la regla que
+  // menos tolera ruido. Para activar RVC051, copia aquí las filas del anexo
+  // (o pásalas por ctx.tablas.finalidadRestricciones desde el llamador).
+  //
+  // Ejemplo de la forma esperada, con códigos de muestra:
+  //   var RESTRICCIONES_FINALIDAD = {
+  //     '07': { nombre: 'detección temprana - alteraciones del embarazo', sexos: ['F'], edadMinAnios: 10, edadMaxAnios: 54 },
+  //     '05': { nombre: 'detección temprana - alteraciones del crecimiento del menor', edadMaxAnios: 9 }
+  //   };
+  var RESTRICCIONES_FINALIDAD = {};
+
+  // ── RVC017: CUPS habilitados por cobertura / plan de beneficios ─────────
+  // Forma de cada entrada (la clave es el código de COBERTURA_PLAN_BENEFICIOS
+  // que trae la FEV, de dos dígitos):
+  //
+  //   '17': {
+  //     nombre: 'UPC Subsidiado',
+  //     incluidos: { '890203': 1, '230101': 1 },  // o un Set, o un arreglo
+  //     excluidos: { '999999': 1 }                // opcional
+  //   }
+  //
+  // Si `incluidos` está vacío solo se aplican los `excluidos`: sirve para
+  // modelar "todo está incluido salvo esta lista", que es lo habitual en los
+  // contratos de capitación odontológica.
+  var CUPS_POR_COBERTURA = {};
+
+  // ── RVC059: combinaciones válidas por CUPS ──────────────────────────────
+  //   '890203': { grupos: ['01'], finalidades: ['10','15'], causas: ['26'] }
+  // Cada lista vacía u omitida significa "sin restricción por ese campo".
+  var CUPS_GRUPO_SERVICIO = {};
+
+  /** Convierte un arreglo de códigos en un índice para búsqueda por clave. */
+  function indice(codigos) {
+    var out = {};
+    (codigos || []).forEach(function (c) {
+      var k = String(c == null ? '' : c).trim();
+      if (k) out[k] = 1;
+    });
+    return out;
+  }
+
+  /**
+   * Arma el ctx.tablas del motor. Todos los argumentos son opcionales: lo que
+   * no se pase deja su regla como no evaluable.
+   *
+   * En index.html se llama con las tablas que ya están cargadas:
+   *   RipsTablas.construir({ cups: CUPS_DATA, cupsCie10: CUPS_CIE10, cupsCodServicio: CSERV_CUPS })
+   */
+  function construir(fuentes) {
+    fuentes = fuentes || {};
+    return {
+      cups: fuentes.cups || null,
+      cupsCie10: fuentes.cupsCie10 || null,
+      cupsCodServicio: fuentes.cupsCodServicio || null,
+      cupsPorCobertura: fuentes.cupsPorCobertura || CUPS_POR_COBERTURA,
+      cupsGrupoServicio: fuentes.cupsGrupoServicio || CUPS_GRUPO_SERVICIO,
+      finalidadRestricciones: fuentes.finalidadRestricciones || RESTRICCIONES_FINALIDAD
+    };
+  }
+
+  return {
+    RESTRICCIONES_FINALIDAD: RESTRICCIONES_FINALIDAD,
+    CUPS_POR_COBERTURA: CUPS_POR_COBERTURA,
+    CUPS_GRUPO_SERVICIO: CUPS_GRUPO_SERVICIO,
+    indice: indice,
+    construir: construir
+  };
+});
+// ═══ FIN DEL MOTOR DE VALIDACIÓN DE CAPITACIÓN ═══
+
+// ═══ VALIDACIÓN DE CAPITACIÓN (panel) ═══
+// Puente entre la UI y el motor de arriba: el motor no toca el DOM, así
 // que aquí se arma el contexto (periodo de la FEV + tablas de referencia que ya
 // están cargadas en esta página) y se pinta el resultado.
 var capJson=null,capJsonNombre='',capFev=null,capRes=null;

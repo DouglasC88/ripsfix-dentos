@@ -2,7 +2,8 @@
 'use strict';
 var test = require('node:test');
 var assert = require('node:assert/strict');
-var P = require('../periodo.js');
+// El motor se lee de index.html, no de un módulo aparte: la app es un solo archivo.
+var P = require('./cargar-motor.js').RipsPeriodo;
 
 test('mesAnterior: la FEV de agosto exige el RIPS de julio', function () {
   var r = P.calcularPeriodoAnterior({ inicio: '2026-08-01', fin: '2026-08-31' });

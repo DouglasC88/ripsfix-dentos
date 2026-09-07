@@ -7,8 +7,10 @@
 'use strict';
 var test = require('node:test');
 var assert = require('node:assert/strict');
-var Motor = require('../motor-rvc.js');
-var Tablas = require('../tablas-referencia.js');
+// El motor se lee de index.html, no de módulos aparte: la app es un solo archivo.
+var App = require('./cargar-motor.js');
+var Motor = App.RipsMotorRVC;
+var Tablas = App.RipsTablas;
 var Fixture = require('./fixtures/generar-rips-capitacion.js');
 var PAQUETE_57 = require('./fixtures/rips-capitacion-57usuarios.json');
 
@@ -531,7 +533,7 @@ test('un periodo prestado a mano inválido no cae de vuelta en la derivación', 
   assert.ok(r.reglasNoEvaluables.some(function (x) { return x.codigo === 'RVC014'; }));
 });
 
-test('un resultado ya calculado por periodo.js se puede reinyectar sin alterarlo', function () {
+test('un resultado ya calculado por RipsPeriodo se puede reinyectar sin alterarlo', function () {
   var calculado = Motor.Periodo.calcularPeriodoAnterior(Fixture.FEV.periodo);
   var r = Motor.validar(PAQUETE_57, {
     periodo: calculado, tablas: {}, opciones: { reportarNoEvaluables: false }
