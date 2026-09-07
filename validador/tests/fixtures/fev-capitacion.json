@@ -1,0 +1,8 @@
+{
+  "numFactura": "FE10",
+  "InvoicePeriod": {
+    "StartDate": "2026-08-01",
+    "EndDate": "2026-08-31"
+  },
+  "cobertura": "17"
+}

@@ -8,6 +8,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<!-- Motor de validación local de RIPS por capitación. Se carga en este orden
+     porque motor-rvc.js usa RipsPeriodo y el panel usa las tres. -->
+<script src="validador/periodo.js"></script>
+<script src="validador/motor-rvc.js"></script>
+<script src="validador/reporte-validacion.js"></script>
+<script src="validador/tablas-referencia.js"></script>
 
 <style>
 :root{
@@ -319,6 +325,7 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
       <button class="nav-item active" id="nav-proc" onclick="switchTab('proc')"><span class="nav-icon">⚙️</span>RIPS Particulares</button>
       <button class="nav-item" id="nav-convenios" onclick="switchTab('convenios')"><span class="nav-icon">🤝</span>RIPS Convenios</button>
       <button class="nav-item" id="nav-sinfactura" onclick="switchTab('sinfactura')"><span class="nav-icon">📄</span>RIPS sin Factura</button>
+      <button class="nav-item" id="nav-capita" onclick="switchTab('capita')"><span class="nav-icon">🗓️</span>Validar Capitación</button>
       <div class="sidebar-group">Consultas</div>
       <button class="nav-item" id="nav-search" onclick="switchTab('search')"><span class="nav-icon">🔍</span>Buscar Código</button>
     </nav>
@@ -670,6 +677,69 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
     </div>
   </div>
 
+
+  <!-- VALIDAR CAPITACIÓN -->
+  <div class="panel" id="tab-capita">
+    <div class="card">
+      <div class="card-title">🗓️ Validar RIPS de capitación antes de radicar</div>
+      <p class="card-sub">Corre localmente las reglas del MinSalud sobre el RIPS y su factura electrónica, y muestra el resultado con el mismo formato de la pantalla <em>Resultados de Validación del Paquete</em>. En capitación la FEV se emite anticipada para un periodo futuro, pero el RIPS debe traer las atenciones del <strong>periodo anterior</strong>: esa es la regla que más rechazos produce (RVC014).</p>
+
+      <div style="background:var(--blue-light);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:12px;">
+        ℹ️ El <strong>desfase de <code>numFactura</code></strong> entre el RIPS y la FEV es normal en capitación (el RIPS dice “FE8” y la factura es “FE10”): se muestra como dato y nunca como hallazgo.
+      </div>
+
+      <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">1</span>
+          <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Cargar JSON RIPS</span>
+          <span id="cap-s1" style="font-size:.72rem;color:var(--gray-500);">Pendiente</span>
+        </div>
+        <div style="padding:12px 16px;">
+          <div onclick="document.getElementById('cap-i-json').click()" style="border:2px dashed var(--gray-300);border-radius:8px;padding:22px;text-align:center;cursor:pointer;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-300)'">
+            <input type="file" id="cap-i-json" accept=".json" style="display:none" onchange="capCargarJson(this)">
+            <div style="font-size:22px;margin-bottom:5px;">🧾</div>
+            <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> para cargar el JSON del paquete</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">2</span>
+          <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Periodo facturado en la FEV</span>
+          <span id="cap-s2" style="font-size:.72rem;color:var(--gray-500);">Pendiente</span>
+        </div>
+        <div style="padding:12px 16px;">
+          <div onclick="document.getElementById('cap-i-xml').click()" style="border:2px dashed var(--gray-300);border-radius:8px;padding:18px;text-align:center;cursor:pointer;margin-bottom:10px;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-300)'">
+            <input type="file" id="cap-i-xml" accept=".xml" style="display:none" onchange="capCargarXml(this)">
+            <div style="font-size:.8rem;color:var(--gray-500);"><strong style="color:var(--blue);">Haz clic</strong> para cargar el XML de la factura — se lee el <code>InvoicePeriod</code></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:130px;"><label class="form-label">Inicio del periodo facturado</label>
+              <input type="date" id="cap-fev-ini" class="form-input" onchange="capPintarPeriodo()"></div>
+            <div style="flex:1;min-width:130px;"><label class="form-label">Fin del periodo facturado</label>
+              <input type="date" id="cap-fev-fin" class="form-input" onchange="capPintarPeriodo()"></div>
+            <div style="flex:1;min-width:150px;"><label class="form-label">Cómo se calcula el periodo prestado</label>
+              <select id="cap-estrategia" class="form-input" onchange="capPintarPeriodo()">
+                <option value="mesAnterior">Mes calendario anterior</option>
+                <option value="ventanaPrevia">Ventana previa del mismo largo</option>
+              </select></div>
+          </div>
+          <div id="cap-periodo-hint" style="font-size:.74rem;color:var(--gray-500);margin-top:8px;">Carga el XML o escribe el periodo a mano para ver qué fechas de atención se esperan.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+        <button onclick="capValidar()" style="padding:10px 18px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.82rem;font-weight:700;cursor:pointer;">▶️ Validar paquete</button>
+        <button onclick="capAbrirReporte()" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--blue);border-radius:8px;color:var(--blue-dark);font-family:var(--display);font-size:.8rem;font-weight:700;cursor:pointer;">📄 Ver reporte</button>
+        <button onclick="capDescargarReporte()" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--gray-300);border-radius:8px;color:var(--gray-700);font-family:var(--display);font-size:.8rem;font-weight:700;cursor:pointer;">⬇️ HTML</button>
+        <button onclick="capDescargarCsv()" style="padding:10px 16px;background:var(--white);border:1.5px solid var(--gray-300);border-radius:8px;color:var(--gray-700);font-family:var(--display);font-size:.8rem;font-weight:700;cursor:pointer;">⬇️ CSV</button>
+      </div>
+
+      <div id="cap-result"></div>
+    </div>
+  </div>
+
   </div><!-- /content-area -->
   </div><!-- /app-layout -->
 </div>
@@ -944,7 +1014,7 @@ function setProgress(cur,tot){
   document.getElementById('pbar-pct').textContent=p+'%';
 }
 function switchTab(t) {
-  const tabs = ['proc','search','convenios','sinfactura'];
+  const tabs = ['proc','search','convenios','sinfactura','capita'];
   tabs.forEach(id => {
     const nav = document.getElementById('nav-'+id);
     const panel = document.getElementById('tab-'+id);
@@ -2517,8 +2587,204 @@ document.addEventListener('DOMContentLoaded',function(){
     });
   });
 });
+
+// El panel de validación de capitación vive fuera de este módulo y necesita el
+// lector del InvoicePeriod del XML y las dos tablas de referencia que solo
+// existen aquí adentro. Se exponen igual que el resto de la interfaz de este
+// módulo: por window.
+window.RipsRefApp={xmlInfo:cvXmlInfo,cupsCie10Odonto:C10,cupsCodServicio:CSERV_CUPS};
 })();
 // === FIN RIPS CONVENIOS ===
+
+// ═══ VALIDACIÓN DE CAPITACIÓN (motor RVC local) ═══
+// Puente entre la UI y los módulos de validador/: el motor no toca el DOM, así
+// que aquí se arma el contexto (periodo de la FEV + tablas de referencia que ya
+// están cargadas en esta página) y se pinta el resultado.
+var capJson=null,capJsonNombre='',capFev=null,capRes=null;
+
+// Tablas que la app ya tiene en memoria. Las que no están (CUPS por cobertura,
+// restricciones de sexo/edad por finalidad) quedan vacías a propósito: el motor
+// reporta esas reglas como no evaluables en vez de darlas por buenas.
+function capTablas(){
+  var ref=window.RipsRefApp||{};
+  var cie=Object.create(null),k;
+  for(k in CUPS_CIE10)if(Object.prototype.hasOwnProperty.call(CUPS_CIE10,k))cie[k]=CUPS_CIE10[k];
+  // El mapa odontológico de la app es más específico: pisa al genérico donde exista.
+  var odo=ref.cupsCie10Odonto||{};
+  for(k in odo)if(Object.prototype.hasOwnProperty.call(odo,k))cie[k]=odo[k];
+  return RipsTablas.construir({cups:CUPS_DATA,cupsCie10:cie,cupsCodServicio:ref.cupsCodServicio||null});
+}
+
+function capEstado(id,txt,color){
+  var e=document.getElementById(id);
+  if(e){e.textContent=txt;e.style.color=color||'var(--gray-500)';e.style.fontWeight=color?'700':'400';}
+}
+
+function capCargarJson(input){
+  var f=input.files&&input.files[0];if(!f)return;
+  var fr=new FileReader();
+  fr.onload=function(){
+    try{capJson=JSON.parse(fr.result);}
+    catch(e){capJson=null;capEstado('cap-s1','No es un JSON válido','var(--red)');alert('El archivo no es un JSON válido: '+e.message);return;}
+    capJsonNombre=f.name;
+    var nU=(capJson.usuarios&&capJson.usuarios.length)||0;
+    capEstado('cap-s1',f.name+' · '+nU+' usuario(s) · '+RipsMotorRVC.contarServicios(capJson)+' servicio(s)','var(--green)');
+    capPintarPeriodo();
+  };
+  fr.readAsText(f);
+}
+
+function capCargarXml(input){
+  var f=input.files&&input.files[0];if(!f)return;
+  var fr=new FileReader();
+  fr.onload=function(){
+    var lector=(window.RipsRefApp||{}).xmlInfo;
+    if(!lector){capEstado('cap-s2','No se pudo leer el XML: escribe el periodo a mano','var(--red)');return;}
+    var info=lector(String(fr.result));
+    capFev={numFactura:info.nF||null,cobertura:info.cob||null,
+      periodo:{inicio:info.st||null,fin:info.en||null}};
+    if(info.st)document.getElementById('cap-fev-ini').value=String(info.st).slice(0,10);
+    if(info.en)document.getElementById('cap-fev-fin').value=String(info.en).slice(0,10);
+    if(!info.st||!info.en)capEstado('cap-s2','El XML no trae InvoicePeriod: escribe el periodo a mano','var(--yellow)');
+    else capEstado('cap-s2',f.name+' · factura '+(info.nF||'(sin número)'),'var(--green)');
+    capPintarPeriodo();
+  };
+  fr.readAsText(f);
+}
+
+// Periodo facturado tal como quedó en el formulario: lo escrito a mano manda
+// sobre lo leído del XML, para poder corregir un InvoicePeriod mal armado.
+function capPeriodoFev(){
+  var ini=(document.getElementById('cap-fev-ini')||{}).value||'';
+  var fin=(document.getElementById('cap-fev-fin')||{}).value||'';
+  if(ini&&fin)return{inicio:ini,fin:fin};
+  return capFev?capFev.periodo:null;
+}
+
+function capPintarPeriodo(){
+  var hint=document.getElementById('cap-periodo-hint');if(!hint)return;
+  var fev=capPeriodoFev();
+  var est=(document.getElementById('cap-estrategia')||{}).value||'mesAnterior';
+  var r=RipsPeriodo.calcularPeriodoAnterior(fev,{estrategia:est});
+  if(!r.valido){hint.innerHTML='⚠️ '+esc(r.motivo)+' Sin periodo no se puede evaluar RVC014.';hint.style.color='var(--red)';return;}
+  hint.style.color='var(--gray-500)';
+  hint.innerHTML='La FEV cubre <strong>'+esc(r.periodoFactura.inicio)+'</strong> a <strong>'+esc(r.periodoFactura.fin)
+    +'</strong>, así que el RIPS debe traer atenciones entre <strong>'+esc(r.inicio)+'</strong> y <strong>'+esc(r.fin)
+    +'</strong>. Cualquier <code>fechaInicioAtencion</code> fuera de ese rango sale como RVC014.';
+  if(capPeriodoFev())capEstado('cap-s2',r.periodoFactura.inicio+' a '+r.periodoFactura.fin,'var(--green)');
+}
+
+function capValidar(){
+  if(!capJson){alert('Primero carga el JSON del paquete RIPS.');return;}
+  var fev=capPeriodoFev();
+  if(!fev){alert('Falta el periodo facturado: carga el XML de la factura o escríbelo a mano.');return;}
+  capRes=RipsMotorRVC.validar(capJson,{
+    fev:{numFactura:(capFev&&capFev.numFactura)||null,periodo:fev,cobertura:capFev&&capFev.cobertura},
+    tablas:capTablas(),
+    opciones:{estrategiaPeriodo:(document.getElementById('cap-estrategia')||{}).value||'mesAnterior'}
+  });
+  capRender();
+}
+
+// La descripción de la regla es la misma en todas sus filas y ocuparía media
+// pantalla repetida: en la vista dentro de la app se muestra en una línea con
+// el texto completo en el tooltip. El reporte descargable sí la trae entera.
+function capFilaHtml(f){
+  var tag=f.Clase===RipsMotorRVC.RECHAZADO
+    ?'<span class="hl-tag" style="background:#FEE2E2;color:#B91C1C;">Rechazado</span>'
+    :'<span class="hl-tag" style="background:#FEF3C7;color:#92400E;">Notificación</span>';
+  var td='padding:7px 9px;border-top:1px solid var(--gray-100);vertical-align:top;';
+  return '<tr><td style="'+td+'white-space:nowrap;">'+tag+'</td>'
+    +'<td style="'+td+'"><code>'+esc(f.Codigo)+'</code></td>'
+    +'<td style="'+td+'max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gray-500);" title="'+esc(f.Descripcion)+'">'+esc(f.Descripcion)+'</td>'
+    +'<td style="'+td+'min-width:240px;">'+esc(f.Observaciones)+'</td>'
+    +'<td style="'+td+'"><code style="word-break:break-all;">'+esc(f.PathFuente)+'</code></td></tr>';
+}
+
+function capTablaHtml(filas,vacio){
+  if(!filas.length)return '<div style="padding:14px;text-align:center;color:var(--gray-500);font-size:.82rem;">'+esc(vacio)+'</div>';
+  var h='<div style="max-height:420px;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:.74rem;">'
+    +'<thead><tr>'+['Clase','Código','Descripción','Observaciones','PathFuente'].map(function(c){
+      return '<th style="position:sticky;top:0;background:var(--blue-light);color:var(--blue-dark);text-align:left;padding:7px 9px;font-size:.64rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">'+c+'</th>';
+    }).join('')+'</tr></thead><tbody>';
+  filas.forEach(function(f){h+=capFilaHtml(f);});
+  return h+'</tbody></table></div>';
+}
+
+function capRender(){
+  var el=document.getElementById('cap-result');if(!el||!capRes)return;
+  var partes=RipsReporte.separarPorClase(capRes);
+  var est=RipsReporte.estadoPaquete(capRes);
+  var r=capRes.resumen;
+  var h='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'
+    +'<div style="flex:1;min-width:120px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);">'
+    +'<div style="font-size:1.4rem;font-weight:800;color:var(--blue-dark);">'+capRes.paquete.usuarios+'</div><div style="font-size:.7rem;color:var(--gray-500);">Usuarios</div></div>'
+    +'<div style="flex:1;min-width:120px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);">'
+    +'<div style="font-size:1.4rem;font-weight:800;color:var(--blue-dark);">'+capRes.paquete.servicios+'</div><div style="font-size:.7rem;color:var(--gray-500);">Registros de servicio</div></div>'
+    +'<div style="flex:1;min-width:120px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);">'
+    +'<div style="font-size:1.4rem;font-weight:800;color:#B91C1C;">'+r.rechazados+'</div><div style="font-size:.7rem;color:var(--gray-500);">Rechazados</div></div>'
+    +'<div style="flex:1;min-width:120px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);">'
+    +'<div style="font-size:1.4rem;font-weight:800;color:#B45309;">'+r.notificaciones+'</div><div style="font-size:.7rem;color:var(--gray-500);">Notificaciones</div></div>'
+    +'</div>';
+  h+='<div style="padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:.8rem;font-weight:700;'
+    +(est.ok?'background:#DCFCE7;color:#15803D;':'background:#FEE2E2;color:#B91C1C;')+'">'
+    +esc(est.texto)+' · '+esc(est.detalle)+'</div>';
+
+  var e14=r.porRegla.RVC014;
+  if(e14){
+    h+='<div style="background:var(--blue-light);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:10px;">'
+      +'📅 <strong>RVC014</strong>: '+e14.nRegistros+' registro(s) de servicio en '+e14.nUsuarios
+      +' usuario(s) tienen la fecha fuera del periodo prestado ('+esc(capRes.periodo.inicio)+' a '+esc(capRes.periodo.fin)+'). '
+      +'El validador oficial suele señalar solo una muestra: aquí está la lista completa.</div>';
+  }
+
+  h+='<div style="display:flex;gap:6px;margin-bottom:8px;">'
+    +'<button id="cap-tab-rech" onclick="capPane(\'rech\')" class="hl-chip active">Rechazados ('+partes.rechazados.length+')</button>'
+    +'<button id="cap-tab-noti" onclick="capPane(\'noti\')" class="hl-chip">Notificaciones ('+partes.notificaciones.length+')</button>'
+    +'</div>';
+  h+='<div id="cap-pane-rech" style="border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;">'
+    +capTablaHtml(partes.rechazados,'Sin hallazgos de rechazo.')+'</div>';
+  h+='<div id="cap-pane-noti" class="hidden" style="border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;">'
+    +capTablaHtml(partes.notificaciones,'Sin notificaciones.')+'</div>';
+  el.innerHTML=h;
+}
+
+function capPane(n){
+  ['rech','noti'].forEach(function(k){
+    var pane=document.getElementById('cap-pane-'+k),tab=document.getElementById('cap-tab-'+k);
+    if(pane)pane.classList.toggle('hidden',k!==n);
+    if(tab)tab.classList.toggle('active',k===n);
+  });
+}
+
+function capNombreBase(){
+  return (capJsonNombre||'paquete').replace(/\.json$/i,'')+'_validacion';
+}
+
+function capBajar(contenido,tipo,nombre){
+  var b=new Blob([contenido],{type:tipo});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=nombre;a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+}
+
+function capAbrirReporte(){
+  if(!capRes){alert('Primero valida el paquete.');return;}
+  var b=new Blob([RipsReporte.reporteHTML(capRes)],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(b);window.open(url,'_blank');
+  setTimeout(function(){URL.revokeObjectURL(url);},60000);
+}
+
+function capDescargarReporte(){
+  if(!capRes){alert('Primero valida el paquete.');return;}
+  capBajar(RipsReporte.reporteHTML(capRes),'text/html;charset=utf-8',capNombreBase()+'.html');
+}
+
+function capDescargarCsv(){
+  if(!capRes){alert('Primero valida el paquete.');return;}
+  capBajar(RipsReporte.reporteCSV(capRes),'text/csv;charset=utf-8',capNombreBase()+'.csv');
+}
+
 </script>
 </body>
 </html>
