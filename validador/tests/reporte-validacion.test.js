@@ -137,3 +137,16 @@ test('un paquete sin hallazgos se reporta como aceptado y con las tablas vacías
   assert.match(h, /class="estado si"/);
   assert.match(h, /Sin hallazgos de rechazo\./);
 });
+
+test('el reporte dice si el periodo prestado se derivó o se fijó a mano', function () {
+  var derivado = Reporte.reporteTexto(resultado());
+  assert.match(derivado, /derivado del periodo facturado con la estrategia "mesAnterior"/);
+
+  var manual = Reporte.reporteTexto(Motor.validar(PAQUETE_57, {
+    fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    periodo: { inicio: '2026-06-16', fin: '2026-07-15' },
+    tablas: {}, opciones: { reportarNoEvaluables: false }
+  }));
+  assert.match(manual, /debe traer el RIPS: 2026-06-16 a 2026-07-15 \(fijado a mano\)/);
+  assert.doesNotMatch(manual, /estrategia/);
+});

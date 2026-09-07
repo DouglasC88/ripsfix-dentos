@@ -55,9 +55,16 @@
     var p = resultado.periodo;
     if (!p || !p.inicio) return 'Periodo de prestación esperado: no determinado.';
     var fev = p.periodoFactura;
+    // El XML de la FEV solo trae el periodo facturado. Decir de dónde salió el
+    // periodo prestado es parte del resultado: derivado es un supuesto sobre el
+    // facturado, fijado a mano es un dato.
+    var fuente = p.origen === 'manual'
+      ? 'fijado a mano'
+      : 'derivado del periodo facturado con la estrategia "' +
+        (p.estrategia || resultado.estrategiaPeriodo) + '"';
     return 'Periodo facturado en la FEV: ' + (fev ? fev.inicio + ' a ' + fev.fin : '(desconocido)') +
       ' · Periodo de prestación que debe traer el RIPS: ' + p.inicio + ' a ' + p.fin +
-      ' (estrategia "' + (p.estrategia || resultado.estrategiaPeriodo) + '").';
+      ' (' + fuente + ').';
   }
 
   // El desfase de numFactura entre RIPS y FEV es normal en capitación; se

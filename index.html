@@ -725,7 +725,27 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
                 <option value="ventanaPrevia">Ventana previa del mismo largo</option>
               </select></div>
           </div>
-          <div id="cap-periodo-hint" style="font-size:.74rem;color:var(--gray-500);margin-top:8px;">Carga el XML o escribe el periodo a mano para ver qué fechas de atención se esperan.</div>
+          <div id="cap-periodo-hint" style="font-size:.74rem;color:var(--gray-500);margin-top:8px;">Carga el XML o escribe el periodo facturado para ver qué fechas de atención se esperan.</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--gray-200);border-radius:10px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gray-50);border-radius:10px 10px 0 0;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--blue-light);border:1px solid rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);">3</span>
+          <span style="flex:1;font-family:var(--display);font-weight:700;font-size:.85rem;">Periodo prestado <em style="font-weight:400;font-size:.76rem;color:var(--gray-500);">— opcional, solo si lo conoces</em></span>
+          <span id="cap-s3" style="font-size:.72rem;color:var(--gray-500);">Derivado del periodo facturado</span>
+        </div>
+        <div style="padding:12px 16px;">
+          <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#92400E;margin-bottom:10px;">
+            ⚠️ El XML de la factura <strong>no trae el periodo prestado</strong>: solo trae el <code>InvoicePeriod</code>, que es el periodo <strong>facturado</strong>. Mientras dejes esto vacío, el periodo prestado se <strong>deriva</strong> del facturado, y esa derivación es un supuesto. Si sabes de primera mano qué periodo trae el RIPS, escríbelo aquí y manda ese dato.
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:130px;"><label class="form-label">Inicio del periodo prestado</label>
+              <input type="date" id="cap-pre-ini" class="form-input" onchange="capPintarPeriodo()"></div>
+            <div style="flex:1;min-width:130px;"><label class="form-label">Fin del periodo prestado</label>
+              <input type="date" id="cap-pre-fin" class="form-input" onchange="capPintarPeriodo()"></div>
+            <button onclick="capLimpiarPrestado()" style="padding:10px 14px;background:var(--white);border:1.5px solid var(--gray-300);border-radius:8px;color:var(--gray-700);font-family:var(--display);font-size:.78rem;font-weight:700;cursor:pointer;">Volver a derivarlo</button>
+          </div>
         </div>
       </div>
 
@@ -2661,25 +2681,52 @@ function capPeriodoFev(){
   return capFev?capFev.periodo:null;
 }
 
+// Periodo prestado escrito a mano, si está completo. El XML nunca lo trae: solo
+// trae el facturado, así que este es el único camino en el que el periodo es un
+// dato y no una derivación.
+function capPeriodoPrestado(){
+  var ini=(document.getElementById('cap-pre-ini')||{}).value||'';
+  var fin=(document.getElementById('cap-pre-fin')||{}).value||'';
+  return (ini&&fin)?{inicio:ini,fin:fin}:null;
+}
+
+function capLimpiarPrestado(){
+  var a=document.getElementById('cap-pre-ini'),b=document.getElementById('cap-pre-fin');
+  if(a)a.value='';if(b)b.value='';
+  capPintarPeriodo();
+}
+
+// Periodo que se va a usar, con su origen. Es la misma decisión que toma el
+// motor: si hay periodo prestado a mano se respeta, si no se deriva del facturado.
+function capResolverPeriodo(){
+  var prestado=capPeriodoPrestado(),fev=capPeriodoFev();
+  if(prestado)return RipsPeriodo.periodoPrestadoExplicito(prestado,fev);
+  var est=(document.getElementById('cap-estrategia')||{}).value||'mesAnterior';
+  return RipsPeriodo.calcularPeriodoAnterior(fev,{estrategia:est});
+}
+
 function capPintarPeriodo(){
   var hint=document.getElementById('cap-periodo-hint');if(!hint)return;
-  var fev=capPeriodoFev();
-  var est=(document.getElementById('cap-estrategia')||{}).value||'mesAnterior';
-  var r=RipsPeriodo.calcularPeriodoAnterior(fev,{estrategia:est});
+  var r=capResolverPeriodo();
+  var manual=r.origen==='manual';
+  capEstado('cap-s3',manual?'Fijado a mano':'Derivado del periodo facturado',manual?'var(--green)':null);
   if(!r.valido){hint.innerHTML='⚠️ '+esc(r.motivo)+' Sin periodo no se puede evaluar RVC014.';hint.style.color='var(--red)';return;}
   hint.style.color='var(--gray-500)';
-  hint.innerHTML='La FEV cubre <strong>'+esc(r.periodoFactura.inicio)+'</strong> a <strong>'+esc(r.periodoFactura.fin)
-    +'</strong>, así que el RIPS debe traer atenciones entre <strong>'+esc(r.inicio)+'</strong> y <strong>'+esc(r.fin)
-    +'</strong>. Cualquier <code>fechaInicioAtencion</code> fuera de ese rango sale como RVC014.';
-  if(capPeriodoFev())capEstado('cap-s2',r.periodoFactura.inicio+' a '+r.periodoFactura.fin,'var(--green)');
+  var fev=r.periodoFactura;
+  hint.innerHTML=(fev?('La FEV cubre <strong>'+esc(fev.inicio)+'</strong> a <strong>'+esc(fev.fin)+'</strong>. '):'')
+    +'El RIPS debe traer atenciones entre <strong>'+esc(r.inicio)+'</strong> y <strong>'+esc(r.fin)+'</strong> ('
+    +(manual?'periodo prestado fijado a mano':'derivado del periodo facturado')
+    +'). Cualquier <code>fechaInicioAtencion</code> fuera de ese rango sale como RVC014.';
+  if(fev)capEstado('cap-s2',fev.inicio+' a '+fev.fin,'var(--green)');
 }
 
 function capValidar(){
   if(!capJson){alert('Primero carga el JSON del paquete RIPS.');return;}
-  var fev=capPeriodoFev();
-  if(!fev){alert('Falta el periodo facturado: carga el XML de la factura o escríbelo a mano.');return;}
+  var fev=capPeriodoFev(),prestado=capPeriodoPrestado();
+  if(!fev&&!prestado){alert('Falta el periodo: carga el XML de la factura, escribe el periodo facturado, o fija el periodo prestado a mano.');return;}
   capRes=RipsMotorRVC.validar(capJson,{
     fev:{numFactura:(capFev&&capFev.numFactura)||null,periodo:fev,cobertura:capFev&&capFev.cobertura},
+    periodo:prestado,
     tablas:capTablas(),
     opciones:{estrategiaPeriodo:(document.getElementById('cap-estrategia')||{}).value||'mesAnterior'}
   });
@@ -2735,7 +2782,11 @@ function capRender(){
     h+='<div style="background:var(--blue-light);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--blue-dark);margin-bottom:10px;">'
       +'📅 <strong>RVC014</strong>: '+e14.nRegistros+' registro(s) de servicio en '+e14.nUsuarios
       +' usuario(s) tienen la fecha fuera del periodo prestado ('+esc(capRes.periodo.inicio)+' a '+esc(capRes.periodo.fin)+'). '
-      +'El validador oficial suele señalar solo una muestra: aquí está la lista completa.</div>';
+      +'El validador oficial suele señalar solo una muestra: aquí está la lista completa. '
+      +(capRes.periodo.origen==='manual'
+        ?'Ese periodo lo fijaste a mano.'
+        :'Ese periodo se derivó del periodo facturado (estrategia “'+esc(capRes.estrategiaPeriodo)+'”): el XML no trae el prestado.')
+      +'</div>';
   }
 
   h+='<div style="display:flex;gap:6px;margin-bottom:8px;">'

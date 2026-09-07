@@ -99,7 +99,44 @@ documentada ahí) o pásalas por `ctx.tablas`.
 radicada ante la DIAN). Sin conectividad a SISPRO no se pueden evaluar, y el
 motor **no las simula**: las lista como pendientes de la validación oficial.
 
-## Cómo se calcula el periodo de prestación
+## El periodo de prestación no está en el XML
+
+Esto es lo primero que hay que tener claro: **el XML de la FEV no trae el periodo
+prestado.** Lo único que trae es el `InvoicePeriod`, que es el periodo
+**facturado**. El periodo que debe traer el RIPS no está en ningún campo del XML,
+así que solo hay dos formas de saberlo:
+
+| Forma | `periodo.origen` | Qué es |
+|---|---|---|
+| Derivarlo del periodo facturado | `'derivado'` | Un **supuesto** (ver estrategias abajo). |
+| Fijarlo a mano | `'manual'` | Un **dato**, si sabes qué periodo trae el paquete. |
+
+El reporte siempre dice cuál de las dos se usó, para que un rechazo por RVC014
+no se lea como un hecho cuando en realidad depende de una derivación.
+
+### Fijarlo a mano (el camino sin supuestos)
+
+`ctx.periodo` manda sobre cualquier derivación:
+
+```js
+RipsMotorRVC.validar(paquete, {
+  fev: { numFactura: 'FE10', periodo: { inicio: '2026-08-01', fin: '2026-08-31' } },
+  periodo: { inicio: '2026-06-16', fin: '2026-07-15' },  // el prestado, como dato
+  tablas: …
+});
+```
+
+El periodo facturado queda solo como referencia del reporte y **no hace falta**
+para validar. Si lo que pasas a `ctx.periodo` es inválido (incompleto o al
+revés), el motor **no cae de vuelta en la derivación**: marca RVC014 como no
+evaluable y lo dice. Callarse el error y derivar en silencio haría creer que se
+validó contra el periodo que escribiste.
+
+En la app esto es el paso 3 del panel, **Periodo prestado**. Mientras esté vacío
+el periodo se deriva; en cuanto se llena, manda el dato. El botón «Volver a
+derivarlo» lo limpia.
+
+### Derivarlo del periodo facturado (el supuesto)
 
 `calcularPeriodoAnterior(periodoFEV, { estrategia })` acepta dos estrategias:
 
@@ -109,12 +146,14 @@ motor **no las simula**: las lista como pendientes de la validación oficial.
   terminando el día anterior a su inicio. Para quincenas o periodos partidos.
 
 > **Supuesto pendiente de confirmar.** Ningún anexo técnico fija cómo se calcula
-> ese periodo previo; `mesAnterior` es lo que se observa en los paquetes reales
-> de capitación con facturación mensual anticipada. Para una FEV que cubre un mes
-> calendario completo **ambas estrategias dan el mismo resultado**, así que el
-> supuesto solo cambia algo si el contrato factura por quincenas o por periodos
-> que no calzan con el mes. Si aparece el caso, `RipsMotorRVC.diagnosticarPeriodo()`
-> muestra cuántos hallazgos daría cada estrategia sobre un paquete ya conocido:
+> el periodo previo, y el XML no lo dice: `mesAnterior` es lo que se observa en
+> los paquetes reales de capitación con facturación mensual anticipada. Para una
+> FEV que cubre un mes calendario completo ambas estrategias dan el mismo
+> resultado, así que la elección entre ellas solo pesa si el contrato factura por
+> quincenas o por periodos que no calzan con el mes. Lo que sí pesa siempre es
+> que el rango entero sale de una derivación: si lo conoces, fíjalo a mano y
+> deja de depender de ella. `RipsMotorRVC.diagnosticarPeriodo()` muestra cuántos
+> hallazgos daría cada estrategia sobre un paquete ya conocido:
 
 ```js
 RipsMotorRVC.diagnosticarPeriodo(paquete, { inicio: '2026-08-01', fin: '2026-08-31' });
@@ -154,5 +193,8 @@ La pestaña **🗓️ Validar Capitación** de `index.html` carga el JSON del pa
 el XML de la factura, resuelve el periodo, corre el motor con las tablas que la
 página ya tiene en memoria (`CUPS_DATA`, `CUPS_CIE10`, `CSERV_CUPS`) y muestra el
 resultado con las pestañas Rechazados / Notificaciones, más los botones para ver
-o descargar el reporte en HTML y CSV. El periodo facturado se puede escribir a
-mano cuando el XML no trae `InvoicePeriod` o lo trae mal.
+o descargar el reporte en HTML y CSV.
+
+Los dos periodos se pueden escribir a mano: el **facturado** cuando el XML no
+trae `InvoicePeriod` o lo trae mal, y el **prestado** cuando se conoce de primera
+mano. Con el prestado lleno, el facturado deja de ser necesario.

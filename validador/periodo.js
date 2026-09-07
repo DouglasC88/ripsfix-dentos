@@ -120,7 +120,7 @@
       return {
         valido: false,
         motivo: 'La factura electrónica no trae un InvoicePeriod con fecha de inicio y fin válidas.',
-        estrategia: nombre, periodoFactura: null, inicio: null, fin: null
+        origen: 'derivado', estrategia: nombre, periodoFactura: null, inicio: null, fin: null
       };
     }
     var fn = ESTRATEGIAS[nombre];
@@ -128,13 +128,41 @@
       return {
         valido: false,
         motivo: 'Estrategia de periodo desconocida: "' + nombre + '".',
-        estrategia: nombre, periodoFactura: fev, inicio: null, fin: null
+        origen: 'derivado', estrategia: nombre, periodoFactura: fev, inicio: null, fin: null
       };
     }
     var prev = fn(fev);
     return {
-      valido: true, motivo: null, estrategia: nombre, periodoFactura: fev,
+      valido: true, motivo: null, origen: 'derivado', estrategia: nombre, periodoFactura: fev,
       inicio: prev.inicio, fin: prev.fin
+    };
+  }
+
+  /**
+   * Periodo de prestación fijado a mano.
+   *
+   * El XML de la FEV NO trae el periodo prestado: solo trae el InvoicePeriod,
+   * que es el periodo facturado. Todo lo que calcularPeriodoAnterior() devuelve
+   * es una derivación —un supuesto— sobre ese periodo facturado. Cuando se sabe
+   * de primera mano qué periodo trae el RIPS (porque lo dice el contrato o el
+   * área que armó el paquete), este camino lo fija y saca el supuesto del medio.
+   *
+   * @param {Object} entrada        {inicio, fin} del periodo prestado.
+   * @param {Object} [periodoFactura] InvoicePeriod de la FEV, solo informativo.
+   */
+  function periodoPrestadoExplicito(entrada, periodoFactura) {
+    var p = normalizarPeriodoFEV(entrada); // misma normalización de {inicio, fin}
+    var fev = normalizarPeriodoFEV(periodoFactura);
+    if (!p) {
+      return {
+        valido: false, origen: 'manual', estrategia: null, periodoFactura: fev,
+        inicio: null, fin: null,
+        motivo: 'El periodo de prestación indicado a mano no tiene fecha de inicio y fin válidas.'
+      };
+    }
+    return {
+      valido: true, motivo: null, origen: 'manual', estrategia: null,
+      periodoFactura: fev, inicio: p.inicio, fin: p.fin
     };
   }
 
@@ -170,6 +198,7 @@
     mesAnteriorDe: mesAnteriorDe,
     normalizarPeriodoFEV: normalizarPeriodoFEV,
     calcularPeriodoAnterior: calcularPeriodoAnterior,
+    periodoPrestadoExplicito: periodoPrestadoExplicito,
     dentroDelPeriodo: dentroDelPeriodo,
     desfaseEnDias: desfaseEnDias,
     etiqueta: etiqueta

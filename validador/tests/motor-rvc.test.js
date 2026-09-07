@@ -477,3 +477,66 @@ test('un paquete sin usuarios no revienta el motor', function () {
     assert.equal(r.resumen.rechazados, 0, JSON.stringify(paquete));
   });
 });
+
+// ── Periodo prestado como dato, no como derivación ───────────────────────
+test('ctx.periodo manda sobre la derivación del periodo facturado', function () {
+  // Si el periodo prestado fuese agosto (lo que la FEV factura), los registros
+  // de agosto estarían bien y los de julio serían los del hallazgo. Es la
+  // prueba de que el rango lo decide el dato y no el supuesto.
+  var r = Motor.validar(PAQUETE_57, {
+    fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    periodo: { inicio: '2026-08-01', fin: '2026-08-31' },
+    tablas: {}, opciones: { reportarNoEvaluables: false }
+  });
+  assert.equal(r.periodo.origen, 'manual');
+  assert.equal(r.periodo.inicio, '2026-08-01');
+  assert.equal(r.periodo.fin, '2026-08-31');
+  assert.notEqual(hallazgosDe(r, 'RVC014').length, 109, 'otro periodo, otro resultado');
+  // Y la estrategia deja de aplicar: no se derivó nada.
+  assert.equal(r.estrategiaPeriodo, null);
+});
+
+test('con periodo prestado a mano no hace falta el periodo facturado', function () {
+  var r = Motor.validar(PAQUETE_57, {
+    periodo: { inicio: '2026-07-01', fin: '2026-07-31' },
+    tablas: {}, opciones: { reportarNoEvaluables: false }
+  });
+  assert.equal(r.periodo.valido, true);
+  assert.equal(hallazgosDe(r, 'RVC014').length, 109);
+  assert.equal(r.periodo.periodoFactura, null);
+});
+
+test('el periodo facturado se conserva junto al prestado fijado a mano', function () {
+  var r = Motor.validar(PAQUETE_57, {
+    fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    periodo: { inicio: '2026-07-01', fin: '2026-07-31' },
+    tablas: {}, opciones: { reportarNoEvaluables: false }
+  });
+  assert.deepEqual(r.periodo.periodoFactura, Fixture.FEV.periodo);
+  // Mismo rango que la derivación, así que el resultado debe coincidir.
+  assert.equal(hallazgosDe(r, 'RVC014').length, 109);
+});
+
+test('un periodo prestado a mano inválido no cae de vuelta en la derivación', function () {
+  // Callarse el error y derivar en silencio sería lo peor: el usuario creería
+  // que se validó contra el periodo que escribió.
+  var r = Motor.validar(PAQUETE_57, {
+    fev: { numFactura: 'FE10', periodo: Fixture.FEV.periodo },
+    periodo: { inicio: '2026-07-31', fin: '2026-07-01' },
+    tablas: {}
+  });
+  assert.equal(r.periodo.valido, false);
+  assert.equal(r.periodo.origen, 'manual');
+  assert.equal(hallazgosDe(r, 'RVC014').filter(function (h) { return !h._noEvaluable; }).length, 0);
+  assert.ok(r.reglasNoEvaluables.some(function (x) { return x.codigo === 'RVC014'; }));
+});
+
+test('un resultado ya calculado por periodo.js se puede reinyectar sin alterarlo', function () {
+  var calculado = Motor.Periodo.calcularPeriodoAnterior(Fixture.FEV.periodo);
+  var r = Motor.validar(PAQUETE_57, {
+    periodo: calculado, tablas: {}, opciones: { reportarNoEvaluables: false }
+  });
+  assert.equal(r.periodo.origen, 'derivado');
+  assert.equal(r.periodo.inicio, '2026-07-01');
+  assert.equal(hallazgosDe(r, 'RVC014').length, 109);
+});

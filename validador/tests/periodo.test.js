@@ -89,3 +89,50 @@ test('aDia normaliza las formas de fecha que aparecen en los RIPS reales', funct
   assert.equal(P.aDia(''), null);
   assert.equal(P.aDia(null), null);
 });
+
+// ── El XML solo trae el periodo facturado ────────────────────────────────
+// El InvoicePeriod de la FEV es el periodo FACTURADO. El periodo prestado no
+// está en ningún campo del XML: o se deriva (supuesto) o se fija a mano (dato).
+test('el periodo derivado queda marcado como derivado, no como dato', function () {
+  var r = P.calcularPeriodoAnterior({ inicio: '2026-08-01', fin: '2026-08-31' });
+  assert.equal(r.origen, 'derivado');
+  assert.equal(r.estrategia, 'mesAnterior');
+});
+
+test('el periodo prestado fijado a mano se respeta tal cual y queda marcado', function () {
+  var r = P.periodoPrestadoExplicito({ inicio: '2026-06-16', fin: '2026-07-15' },
+    { inicio: '2026-08-01', fin: '2026-08-31' });
+  assert.equal(r.valido, true);
+  assert.equal(r.origen, 'manual');
+  assert.equal(r.estrategia, null, 'un dato no viene de ninguna estrategia');
+  assert.equal(r.inicio, '2026-06-16');
+  assert.equal(r.fin, '2026-07-15');
+  // El periodo facturado se conserva, pero solo como referencia del reporte.
+  assert.deepEqual(r.periodoFactura, { inicio: '2026-08-01', fin: '2026-08-31' });
+});
+
+test('el periodo prestado a mano no necesita el periodo facturado', function () {
+  var r = P.periodoPrestadoExplicito({ inicio: '2026-07-01', fin: '2026-07-31' }, null);
+  assert.equal(r.valido, true);
+  assert.equal(r.periodoFactura, null);
+});
+
+test('un periodo prestado a mano incompleto o al revés se rechaza', function () {
+  [null, {}, { inicio: '2026-07-01' }, { inicio: '2026-07-31', fin: '2026-07-01' }
+  ].forEach(function (entrada) {
+    var r = P.periodoPrestadoExplicito(entrada, null);
+    assert.equal(r.valido, false, JSON.stringify(entrada));
+    assert.equal(r.origen, 'manual');
+    assert.ok(r.motivo);
+  });
+});
+
+test('el periodo prestado a mano puede no tener nada que ver con el facturado', function () {
+  // Nada obliga a que el prestado sea el mes anterior: si el contrato dice otra
+  // cosa, el dato manda sobre cualquier derivación.
+  var r = P.periodoPrestadoExplicito({ inicio: '2025-11-01', fin: '2026-01-31' },
+    { inicio: '2026-08-01', fin: '2026-08-31' });
+  assert.equal(r.valido, true);
+  assert.equal(r.inicio, '2025-11-01');
+  assert.equal(r.fin, '2026-01-31');
+});

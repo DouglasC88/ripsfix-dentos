@@ -471,14 +471,23 @@
   function normalizarContexto(ctx) {
     ctx = ctx || {};
     var opciones = ctx.opciones || {};
+    var fev = ctx.fev ? (ctx.fev.periodo || ctx.fev.invoicePeriod || ctx.fev) : null;
     var periodo = ctx.periodo;
-    // El periodo se puede pasar ya calculado o dejar que el motor lo derive
-    // del InvoicePeriod de la FEV.
-    if (!periodo && ctx.fev) {
-      var fev = ctx.fev.periodo || ctx.fev.invoicePeriod || ctx.fev;
+    // Dos formas de saber qué periodo debe traer el RIPS, y la diferencia
+    // importa: el XML de la FEV solo trae el periodo FACTURADO, nunca el
+    // prestado. Si ctx.periodo viene, es un dato: se usa tal cual. Si no, se
+    // DERIVA del periodo facturado, y esa derivación es un supuesto (ver
+    // periodo.js). El resultado lleva `origen` para que el reporte lo diga.
+    if (periodo) {
+      // Un periodo ya resuelto por periodo.js se respeta; un {inicio, fin}
+      // suelto se normaliza y valida antes de usarlo.
+      if (periodo.origen == null) periodo = Periodo.periodoPrestadoExplicito(periodo, fev);
+      else if (periodo.periodoFactura == null && fev) {
+        periodo = Periodo.periodoPrestadoExplicito(periodo, fev);
+      }
+    } else if (fev) {
       periodo = Periodo.calcularPeriodoAnterior(fev, { estrategia: opciones.estrategiaPeriodo });
     }
-    if (periodo && periodo.valido === false) periodo = periodo; // se conserva el motivo
     return {
       periodo: periodo || null,
       fev: ctx.fev || null,
@@ -578,7 +587,7 @@
       },
       fev: c.fev ? { numFactura: c.fev.numFactura || c.fev.nF || null } : null,
       periodo: c.periodo,
-      estrategiaPeriodo: c.opciones.estrategiaPeriodo,
+      estrategiaPeriodo: (c.periodo && c.periodo.origen === 'manual') ? null : c.opciones.estrategiaPeriodo,
       hallazgos: hallazgos,
       reglasEvaluadas: evaluadas,
       reglasNoEvaluables: noEvaluables,
