@@ -647,6 +647,10 @@ body.dark #cv-result,body.dark #cc-result{background:#13251a!important;border-co
             <input type="checkbox" id="rv-fix" checked style="margin-top:2px;">
             <span><strong>Aplicar correcciones automáticas</strong> y dejar el JSON listo para descargar.<br><span style="font-size:.72rem;color:var(--gray-400);">Si lo desactivas, solo se audita: todo se reporta como error o advertencia y no se modifica nada.</span></span>
           </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:.8rem;color:var(--gray-700);cursor:pointer;">
+            <input type="checkbox" id="rv-quitar-rec" style="margin-top:2px;">
+            <span><strong>Quitar del JSON los copagos que la factura no declara</strong> (RVG09).<br><span style="font-size:.72rem;color:var(--gray-400);">Úsalo solo si el cliente lo autoriza: el paquete pasa el validador, pero la factura sigue cobrando el 100 % y la entidad puede glosar el valor de esos copagos. Lo correcto es corregir el contrato en DentOS y volver a expedir la factura con el &lt;PrepaidPayment&gt;. Requiere las correcciones automáticas activadas.</span></span>
+          </label>
         </div>
       </div>
 
@@ -2334,16 +2338,18 @@ function rvAudit(json,xml,cfg){
           add('error','Cruce con XML',L0,'valorPagoModerador',msg+' La factura no trae <PrepaidPayment> con schemeID "'+c+'" y los pagos que sí trae ('+xmlPendiente.map(function(o){return conEtq(o)+' '+fm(vX[o]);}).join(' · ')+') no cuadran con el RIPS: revisa a qué servicios corresponde cada pago.',vJ[c],vX[c]);
           return;
         }
-        // Si el paciente hubiera pagado, el pago saldría en la factura. Como la FEV no lo declara, el
-        // servicio no tuvo recaudo y queda como lo pide la norma (RVC060): concepto 05,
+        // La FEV no declara el recaudo. Si el paciente pagó, lo que está mal es la factura (contrato mal
+        // configurado en DentOS): poner el RIPS en 0 pasa el validador, pero la factura sigue cobrando el
+        // 100 % y la entidad glosa los copagos. Por eso solo se quita si el usuario lo pide expresamente;
+        // en ese caso cada servicio queda como lo pide la norma sin recaudo (RVC060): concepto 05,
         // valorPagoModerador 0 y numFEVPagoModerador null.
         var srv=recSrv[c]||[];
-        if(fix){
+        if(fix&&cfg.quitarRec){
           srv.forEach(function(it){it.s.conceptoRecaudo='05';it.s.valorPagoModerador=0;it.s.numFEVPagoModerador=null;});
           limpiarHallazgos(srv,RV_CAMPOS_REC);
-          add('corregido','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no registra ningún pago del paciente con schemeID "'+c+'", así que se quitó el recaudo de los '+nSrv+' servicio(s) que lo reportaban: quedaron con conceptoRecaudo 05 (No aplica), valorPagoModerador 0 y numFEVPagoModerador null.',vJ[c],vX[c]);
+          add('corregido','Cruce con XML',L0,'valorPagoModerador',msg+' Como lo pediste, se quitó el recaudo de los '+nSrv+' servicio(s) que lo reportaban: quedaron con conceptoRecaudo 05 (No aplica), valorPagoModerador 0 y numFEVPagoModerador null. El paquete pasa el validador, pero la factura sigue cobrando el 100 %: la entidad puede glosar esos '+fm(vJ[c])+'.',vJ[c],vX[c]);
         }
-        else add('error','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no registra ningún pago del paciente con schemeID "'+c+'" y el validador rechaza el paquete. Con "Aplicar correcciones automáticas" activado, la app deja esos '+nSrv+' servicio(s) en conceptoRecaudo 05, valorPagoModerador 0 y numFEVPagoModerador null.',vJ[c],vX[c]);
+        else add('error','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no declara ningún <PrepaidPayment> con schemeID "'+c+'" y el validador rechaza el paquete. Si los pacientes pagaron, el error está en la factura: revisa el contrato del convenio en DentOS (Modalidad de Copago y Tipo Recaudo Cobertura Dian) y vuelve a expedirla con nota crédito, con el PrepaidPayment "'+c+'" por '+fm(vJ[c])+' y el total a pagar descontado. No se modificó el JSON'+(fix?'; si el cliente autoriza quitar esos copagos, marca "Quitar del JSON los copagos que la factura no declara".':'.'),vJ[c],vX[c]);
         return;
       }
       if(vJ[c]===0){
@@ -2452,6 +2458,7 @@ window.rvAnalizar=function(){
   var prof=g('rv-prof'),mun=g('rv-mun'),numFactRips=g('rv-numfact');
   var prest12=/^\d{12}$/.test(prestRaw)?prestRaw:'';
   var conForzar=!!(document.getElementById('rv-con-forzar')||{}).checked;
+  var quitarRec=!!(document.getElementById('rv-quitar-rec')||{}).checked;
   rvRes=validos.map(function(f){
     var xml=rvMatchXml(f);
     var xcp=(xml&&xml.cp)?String(xml.cp).replace(/\D/g,''):'';
@@ -2462,7 +2469,7 @@ window.rvAnalizar=function(){
     var mpNom=modSel?(MODALIDAD_PAGO[modSel]||''):((xml&&xml.mpNom)||MODALIDAD_PAGO[mp]||'');
     var avisoMod=mp?'':((xml?'El XML no declara MODALIDAD_PAGO':'No cargaste el XML')+': se asume pago por evento y se exige valor mayor que cero en cada servicio. Si el contrato es por cápita, PGP o conjunto integral, elígelo arriba — en esas modalidades el valor debe ir en cero.');
     var cfg={fix:base.fix,tu:cv.tu,con:cc.con||'05',conContrato:cc.contrato,conFuente:cc.fuente,
-      conForzar:conForzar&&cc.contrato,conv:cv.conv,avisoConv:cv.aviso,
+      conForzar:conForzar&&cc.contrato,quitarRec:quitarRec,conv:cv.conv,avisoConv:cv.aviso,
       avisoCon:(conForzar&&!cc.contrato)?'Marcaste “exigirlo en todos los servicios”, pero no hay un concepto de recaudo respaldado por el contrato: elige el Tipo Recaudo Cobertura Dian del convenio arriba. No se sobrescribió ningún concepto.':'',
       mp:mp||MODALIDAD_EVENTO,mpNom:mpNom,avisoMod:avisoMod,prof:prof,mun:mun,numFactRips:numFactRips,
       prest12:prest12,sede:prest12?prest12.slice(10):'',
@@ -2660,6 +2667,8 @@ document.addEventListener('DOMContentLoaded',function(){
       rd.readAsText(f);
     });
   });
+  var iq=document.getElementById('rv-quitar-rec');
+  if(iq)iq.addEventListener('change',rvReanalizar);
   var ix=document.getElementById('rvi-xml');
   if(ix)ix.addEventListener('change',function(){
     var files=this.files;if(!files||!files.length)return;
