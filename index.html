@@ -1473,7 +1473,19 @@ function cvXmlInfo(txt){
   while((m2=rId.exec(txt))!==null)aId.push(m2[1].trim());
   while((m2=rNm.exec(txt))!==null)aNm.push(m2[1].trim());
   var cp=rx1(/<Name>CODIGO_PRESTADOR<\/Name>\s*<Value[^>]*>([^<]+)/,txt);
-  return{nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null,
+  // Totales de la factura (LegalMonetaryTotal) y todos los campos adicionales del sector salud
+  // (<Name>X</Name><Value>Y</Value>), para mostrarle al usuario TODO lo que dice la FEV.
+  var lmS=inv.search(/<(?:\w+:)?LegalMonetaryTotal[\s>]/),lm=lmS>-1?inv.slice(lmS,lmS+3000):'';
+  function monto(n){var v=rx1(new RegExp('<(?:\\w+:)?'+n+'[^>]*>([^<]+)'),lm);return v===''?null:(parseFloat(v)||0);}
+  var campos=[],vistosC={},rC=/<(?:\w+:)?Name>\s*([^<]*?)\s*<\/(?:\w+:)?Name>\s*<(?:\w+:)?Value([^>]*)>([^<]*)</g,mc;
+  while((mc=rC.exec(inv))!==null){
+    var sch=mc[2].match(/schemeID\s*=\s*"([^"]*)"/i),cv={n:mc[1].trim(),cod:sch?sch[1].trim():'',v:String(mc[3]).trim()};
+    var kc=cv.n+'|'+cv.cod+'|'+cv.v;
+    if(cv.n&&!vistosC[kc]){vistosC[kc]=1;campos.push(cv);}
+  }
+  return{cufe:rx1(/<(?:\w+:)?UUID[^>]*>([^<]+)/,inv),fEm:rx1(/<(?:\w+:)?IssueDate[^>]*>([^<]+)/,inv),
+    vBruto:monto('LineExtensionAmount'),vSinImp:monto('TaxExclusiveAmount'),vConImp:monto('TaxInclusiveAmount'),
+    vAnticipos:monto('PrepaidAmount'),campos:campos,nF:nF,py:py,st:st,en:en,nP:aId[0]||null,nC:aId[1]||null,sNm:aNm[0]||null,cNm:aNm[1]||null,cp:cp||null,
     mp:mp.cod,mpNom:mp.nom,cob:cob.cod,cobNom:cob.nom,pp:pre.pp,ppTot:pre.ppTot,cust:cust};
 }
 // Modalidades de pago de la FEV en salud (tabla salud_modalidad_pago.gc de SISPRO).
@@ -1922,6 +1934,169 @@ function rvRecaudoTxt(rx){
   if(rx.con)return 'recaudo del XML: '+c+conEtq(rx.con);
   if(rx.conceptos.length)return 'recaudo del XML: '+c+'varios conceptos ('+rx.conceptos.join(', ')+')';
   return 'recaudo del XML: '+c+'sin concepto de recaudo real';
+}
+// Qué significa cada CustomizationID (tipo de operación) de la FEV del sector salud.
+var FEV_CUST_NOM={'SS-SinAporte':'Sin aporte del usuario: no hubo copago, cuota moderadora ni pagos compartidos',
+  'SS-CUFE':'Con aporte del usuario, soportado con factura electrónica (CUFE)',
+  'SS-CUDE':'Con aporte del usuario, soportado con documento equivalente electrónico (CUDE)',
+  'SS-POS':'Con aporte del usuario, soportado con tiquete POS',
+  'SS-SNum':'Con aporte del usuario, soportado con documento sin numeración',
+  'SS-Reporte':'Con aporte del usuario, reportado en la factura'};
+function rvCustNom(c){return c?(c+' · '+(FEV_CUST_NOM[c]||'no es un tipo de operación de salud')):'no declarado';}
+// Resumen de un RIPS para compararlo contra la factura: factura, NIT, fechas, valores y lo recaudado
+// por concepto. Se calcula sobre el JSON tal como llegó y sobre el JSON corregido.
+var RV_SERV_REC=[['consultas','fechaInicioAtencion'],['procedimientos','fechaInicioAtencion'],['medicamentos','fechaDispensAdmon'],['otrosServicios','fechaSuministroTecnologia']];
+function rvResumenRips(json){
+  var r={nf:json.numFactura==null?'':String(json.numFactura).trim(),nit:json.numDocumentoIdObligado==null?'':String(json.numDocumentoIdObligado).trim(),
+    nUsr:0,nServ:0,vr:0,nVr:0,rec:{},nRec:0,vRec:0,sinFEV:0,fMin:'',fMax:'',tu:{}};
+  (json.usuarios||[]).forEach(function(u){
+    r.nUsr++;var tu=pad2(u.tipoUsuario)||'(vacío)';r.tu[tu]=(r.tu[tu]||0)+1;
+    var sv=u.servicios||{};
+    RV_SERV_REC.forEach(function(b){
+      if(!Array.isArray(sv[b[0]]))return;
+      sv[b[0]].forEach(function(s){
+        r.nServ++;
+        var vr=rvNum(s.vrServicio)||0;if(vr>0){r.vr+=vr;r.nVr++;}
+        var d=rvDia(s[b[1]]);if(d){if(!r.fMin||d<r.fMin)r.fMin=d;if(!r.fMax||d>r.fMax)r.fMax=d;}
+        var v=rvNum(s.valorPagoModerador)||0;
+        if(v>0){
+          var c=pad2(s.conceptoRecaudo)||'(vacío)';
+          if(!r.rec[c])r.rec[c]={v:0,n:0};
+          r.rec[c].v+=v;r.rec[c].n++;r.nRec++;r.vRec+=v;
+          if(s.numFEVPagoModerador==null||String(s.numFEVPagoModerador).trim()==='')r.sinFEV++;
+        }
+      });
+    });
+  });
+  return r;
+}
+// Cruza el JSON (como llegó y como queda corregido) contra la factura. Devuelve las filas de la tabla
+// "Factura vs JSON" y las alertas que el usuario tiene que ver ANTES de descargar el JSON.
+function rvCruce(orig,fin,xml,rx,mp,esEvento){
+  var F=[],A=[];
+  function fila(dato,x,o,f,st,nota){F.push({dato:dato,x:x,o:o,f:f,st:st,nota:nota||''});}
+  function alerta(sev,msg){A.push({sev:sev,msg:msg});}
+  var esCap=mp==='03';
+  // Factura y prestador
+  var stNf=orig.nf===xml.nF?'ok':(fin.nf===xml.nF?'corregido':(esCap?'info':'error'));
+  fila('Número de factura',xml.nF||'—',orig.nf||'(vacío)',fin.nf||'(vacío)',stNf,esCap&&stNf==='info'?'En capitación el RIPS lleva la factura del período anterior.':'');
+  var nitO=limpiarNit(orig.nit),nitF=limpiarNit(fin.nit);
+  fila('NIT del prestador',xml.nP||'—',orig.nit||'(vacío)',fin.nit||'(vacío)',!xml.nP?'info':(nitF!==xml.nP?'error':(orig.nit===fin.nit?'ok':'corregido')));
+  if(xml.nP&&nitF!==xml.nP)alerta('error','El NIT del JSON ('+(orig.nit||'vacío')+') no es el del prestador en la factura ('+xml.nP+').');
+  // Período y valores
+  var dentro=function(r){return xml.st&&xml.en&&r.fMin&&r.fMin>=xml.st&&r.fMax<=xml.en;};
+  fila('Período facturado',(xml.st||'?')+' a '+(xml.en||'?'),(orig.fMin||'?')+' a '+(orig.fMax||'?'),(fin.fMin||'?')+' a '+(fin.fMax||'?'),
+    !(xml.st&&xml.en)?'info':(dentro(fin)?(dentro(orig)?'ok':'corregido'):'aviso'),'Fechas de atención de los servicios del JSON.');
+  var stMod;
+  if(esEvento)stMod=fin.nVr===fin.nServ?(orig.nVr===orig.nServ?'ok':'corregido'):'error';
+  else stMod=fin.nVr===0?(orig.nVr===0?'ok':'corregido'):'error';
+  fila('Modalidad de pago',xml.mp?(xml.mp+' · '+(MODALIDAD_PAGO[pad2(xml.mp)]||xml.mpNom||'')):'no declarada (se asume evento)',
+    orig.nVr+' de '+orig.nServ+' servicio(s) con valor',fin.nVr+' de '+fin.nServ+' servicio(s) con valor',stMod,
+    esEvento?'En pago por evento cada servicio lleva su valor.':'En esta modalidad vrServicio va en cero: el valor se cobra en la factura.');
+  var stVal=esEvento&&xml.py>0?(Math.abs(fin.vr-xml.py)<1?(Math.abs(orig.vr-xml.py)<1?'ok':'corregido'):'aviso'):'info';
+  fila('Valor a pagar de la factura',fm(xml.py),fm(orig.vr)+' (suma de servicios)',fm(fin.vr)+' (suma de servicios)',stVal);
+  var tuTxt=function(r){return Object.keys(r.tu).sort().map(function(k){return k+' ('+r.tu[k]+')';}).join(', ')||'—';};
+  fila('Cobertura / tipo de usuario',xml.cob?(xml.cob+(xml.cobNom?' · '+xml.cobNom:'')):'no declarada',tuTxt(orig),tuTxt(fin),'info');
+  // Recaudo: tipo de operación y concepto por concepto
+  var recTxt=function(r){return r.nRec?(r.nRec+' servicio(s) con pago moderador · '+fm(r.vRec)):'ningún servicio con pago moderador';};
+  fila('Tipo de operación (CustomizationID)',rvCustNom(xml.cust),recTxt(orig),recTxt(fin),
+    rx.sinAporte?(fin.nRec?'error':(orig.nRec?'corregido':'ok')):'info');
+  var ppTot=xml.ppTot||{},cods={},k;
+  for(k in ppTot)cods[k]=1;for(k in orig.rec)cods[k]=1;for(k in fin.rec)cods[k]=1;
+  var cust=xml.cust?' ('+xml.cust+')':'';
+  var red=function(v){return Math.round(v*100)/100;};
+  // ¿Se cambió el concepto de lo recaudado al único que declara la factura?
+  var post=[];
+  var huboReclas=!!rx.con&&Object.keys(orig.rec).some(function(k){return k!==rx.con&&orig.rec[k].v>0&&!((fin.rec[k]||{}).v>0);});
+  var nomTxt=function(c){return c==='(vacío)'?'pago moderador sin concepto':(c==='05'?'pago moderador con concepto 05 (No aplica)':conNom(c).toLowerCase());};
+  Object.keys(cods).sort().forEach(function(c){
+    var xv=red(ppTot[c]||0),o=orig.rec[c]||{v:0,n:0},f=fin.rec[c]||{v:0,n:0};
+    var srv=function(q){return q.n?(fm(q.v)+' en '+q.n+' servicio(s)'):'$0';};
+    var st;
+    if(c==='04')st='info';
+    else if(Math.abs(f.v-xv)<1)st=Math.abs(o.v-xv)<1?'ok':'corregido';
+    else st='error';
+    fila('Recaudo '+(c==='(vacío)'?'sin concepto':conEtq(c)),c in ppTot?fm(xv):'no lo declara',srv(o),srv(f),st,
+      c==='04'?'Los anticipos solo van en la factura, nunca en el RIPS.':'');
+    if(c==='04')return;
+    if(o.v>0&&!(xv>0)){
+      // El JSON trae un recaudo que la factura no tiene.
+      var cab='El JSON trae '+fm(o.v)+' de '+nomTxt(c)+' en '+o.n+' servicio(s)';
+      if(rx.sinAporte)alerta(f.v>0?'error':'corregido',cab+' y la factura electrónica'+cust+(xml.cust==='SS-SinAporte'?' es SIN aporte del usuario':' no trae ningún PrepaidPayment')+': no tiene copago, cuota moderadora ni pagos compartidos. '+(f.v>0?'Sigue en el JSON corregido: revísalo.':'En el JSON corregido quedó en $0.'));
+      else if(rx.con&&!(f.v>0))alerta('corregido',cab+' y la factura electrónica'+cust+' lo declara como '+conEtq(rx.con)+'. En el JSON corregido se cambió el concepto a '+rx.con+'.');
+      else alerta(f.v>0?'error':'corregido',cab+' y la factura electrónica'+cust+' NO declara ese recaudo. '+(f.v>0?'Sigue en el JSON corregido: corrígelo en el origen.':'En el JSON corregido quedó en $0.'));
+    }
+    else if(huboReclas&&c===rx.con){
+      // Ya se avisó la reclasificación; aquí solo importa si el valor cuadra después de corregir.
+      if(Math.abs(f.v-xv)>=1)post.push({sev:'error',msg:'Después de corregir el concepto, el JSON suma '+fm(f.v)+' de '+nomTxt(c)+' y la factura '+fm(xv)+': diferencia de '+fm(red(f.v-xv))+'. El valor que pagó cada paciente se corrige en el origen.'});
+    }
+    else if(xv>0&&!(o.v>0)){
+      alerta(Math.abs(f.v-xv)<1?'corregido':'error','La factura electrónica declara '+nomTxt(c)+' por '+fm(xv)+' y el JSON no trae '+nomTxt(c)+'. '
+        +(Math.abs(f.v-xv)<1?'En el JSON corregido quedó asignado según la factura.':'No se inventa a qué servicios corresponde: corrígelo en el origen.'));
+    }
+    else if(xv>0&&Math.abs(o.v-xv)>=1){
+      alerta(Math.abs(f.v-xv)<1?'corregido':'error','El JSON suma '+fm(o.v)+' de '+nomTxt(c)+' y la factura '+fm(xv)+': diferencia de '+fm(red(o.v-xv))+'.');
+    }
+  });
+  A=A.concat(post);
+  if(!rx.sinAporte&&rx.conceptos.length>1)alerta('aviso','La factura declara varios conceptos de recaudo ('+rx.conceptos.map(conEtq).join(', ')+'): no se adivina cuál va en cada servicio; se respeta el del JSON si es uno de ellos.');
+  fila('Número de la factura del pago moderador','—',orig.sinFEV?(orig.sinFEV+' servicio(s) con pago y sin número'):'completo',
+    fin.sinFEV?(fin.sinFEV+' servicio(s) con pago y sin número'):'completo',fin.sinFEV?'error':(orig.sinFEV?'corregido':'ok'),'numFEVPagoModerador');
+  if(fin.sinFEV)alerta('error',fin.sinFEV+' servicio(s) tienen pago moderador y no traen el número de la factura que lo soporta (numFEVPagoModerador). Ese dato no se inventa: corrígelo en el origen.');
+  return{filas:F,alertas:A};
+}
+var RV_ST={ok:['✅','Coincide','#15803D','#F0FDF4'],corregido:['🔧','Corregido','#15803D','#DCFCE7'],error:['⛔','Error','#B91C1C','#FEE2E2'],
+  aviso:['⚠️','Revisar','#92400E','#FEF3C7'],info:['ℹ️','Dato','#1D4ED8','#EFF6FF']};
+// Todos los datos de la factura electrónica. HTML con estilos en línea: sirve en la app y en el reporte.
+function rvPanelXml(x){
+  var cel=function(t,v,mono){return '<div style="background:#fff;border:1px solid #E2EAF0;border-radius:7px;padding:6px 9px;"><div style="font-size:.62rem;font-weight:700;color:#6B8599;text-transform:uppercase;letter-spacing:.04em;">'+esc(t)+'</div><div style="font-size:.78rem;color:#1A2E3D;font-weight:600;word-break:break-all;'+(mono?'font-family:monospace;':'')+'">'+esc(v==null||v===''?'—':v)+'</div></div>';};
+  var mon=function(v){return v==null?'—':fm(v);};
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;">'
+    +cel('Factura',x.nF,1)+cel('Fecha de emisión',x.fEm,1)+cel('CUFE',x.cufe,1)
+    +cel('Tipo de operación',rvCustNom(x.cust))
+    +cel('Prestador',(x.sNm||'—')+(x.nP?' · NIT '+x.nP:''))+cel('Código prestador',x.cp,1)
+    +cel('Pagador (EPS)',(x.cNm||'—')+(x.nC?' · NIT '+x.nC:''))
+    +cel('Período facturado',(x.st||'?')+' a '+(x.en||'?'),1)
+    +cel('Modalidad de pago',x.mp?(x.mp+' · '+(MODALIDAD_PAGO[pad2(x.mp)]||x.mpNom||'')):'no declarada')
+    +cel('Cobertura',x.cob?(x.cob+(x.cobNom?' · '+x.cobNom:'')):'no declarada')
+    +cel('Valor bruto',mon(x.vBruto))+cel('Total con impuestos',mon(x.vConImp))
+    +cel('Pagos del usuario / anticipos',mon(x.vAnticipos))+cel('Valor a pagar',fm(x.py))
+    +'</div>';
+  h+='<div style="margin-top:8px;font-size:.7rem;font-weight:700;color:#6B8599;text-transform:uppercase;letter-spacing:.04em;">Recaudos declarados (PrepaidPayment)</div>';
+  if(!(x.pp||[]).length)h+='<div style="font-size:.78rem;color:#42596B;margin-top:3px;">Ninguno: la factura no trae copago, cuota moderadora, pagos compartidos ni anticipos.</div>';
+  else h+='<table style="width:100%;border-collapse:collapse;font-size:.76rem;margin-top:3px;"><tr><th style="text-align:left;padding:4px 7px;background:#EFF6FF;color:#1D4ED8;">Concepto</th><th style="text-align:left;padding:4px 7px;background:#EFF6FF;color:#1D4ED8;">ID</th><th style="text-align:right;padding:4px 7px;background:#EFF6FF;color:#1D4ED8;">Valor</th></tr>'
+    +x.pp.map(function(p){return '<tr><td style="padding:4px 7px;border-top:1px solid #F0F4F8;">'+esc(p.cod?conEtq(p.cod):'sin concepto')+'</td><td style="padding:4px 7px;border-top:1px solid #F0F4F8;font-family:monospace;">'+esc(p.id||'—')+'</td><td style="padding:4px 7px;border-top:1px solid #F0F4F8;text-align:right;font-weight:700;">'+esc(fm(p.val))+'</td></tr>';}).join('')+'</table>';
+  if((x.campos||[]).length){
+    h+='<div style="margin-top:8px;font-size:.7rem;font-weight:700;color:#6B8599;text-transform:uppercase;letter-spacing:.04em;">Campos del sector salud en la factura</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;">'
+      +x.campos.map(function(c){return '<span style="background:#F0F4F8;border-radius:6px;padding:3px 8px;font-size:.72rem;"><b>'+esc(c.n)+'</b>: '+esc(c.v||'—')+(c.cod&&c.cod!==c.v?' <span style="color:#6B8599;">('+esc(c.cod)+')</span>':'')+'</span>';}).join('')+'</div>';
+  }
+  return h;
+}
+// Alertas y tabla "Factura vs JSON" de un archivo ya analizado.
+function rvPanelCruce(r){
+  if(!r.cruce)return '<div style="font-size:.78rem;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px 11px;">Sin XML de la factura: este JSON no se cruzó contra la FEV y el recaudo se resolvió según el contrato.</div>';
+  var c=r.cruce,h='';
+  var malas=c.alertas.filter(function(a){return a.sev!=='corregido';});
+  if(!c.alertas.length)h+='<div style="font-size:.8rem;color:#15803D;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 11px;margin-bottom:8px;">✅ El recaudo y los datos del JSON coinciden con la factura electrónica.</div>';
+  else{
+    h+='<div style="border:1.5px solid '+(malas.length?'#FCA5A5':'#FDE68A')+';background:'+(malas.length?'#FEF2F2':'#FFFBEB')+';border-radius:8px;padding:9px 12px;margin-bottom:8px;">'
+      +'<div style="font-size:.82rem;font-weight:800;color:'+(malas.length?'#B91C1C':'#92400E')+';margin-bottom:4px;">⚠️ Diferencias entre el JSON y la factura electrónica</div>';
+    c.alertas.forEach(function(a){
+      var ic=a.sev==='corregido'?'🔧':a.sev==='error'?'⛔':'⚠️';
+      h+='<div style="font-size:.78rem;color:#1A2E3D;margin-top:3px;">'+ic+' '+esc(a.msg)+'</div>';
+    });
+    h+='</div>';
+  }
+  var td='padding:5px 8px;border-top:1px solid #F0F4F8;vertical-align:top;',th='text-align:left;padding:5px 8px;background:#EFF6FF;color:#1D4ED8;font-size:.66rem;text-transform:uppercase;';
+  h+='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.76rem;background:#fff;"><tr><th style="'+th+'">Dato</th><th style="'+th+'">Factura (XML)</th><th style="'+th+'">JSON cargado</th><th style="'+th+'">'+(r.fix?'JSON corregido':'JSON si se corrige')+'</th><th style="'+th+'">Estado</th></tr>';
+  c.filas.forEach(function(f){
+    var s=RV_ST[f.st]||RV_ST.info;
+    h+='<tr><td style="'+td+'font-weight:700;">'+esc(f.dato)+(f.nota?'<div style="font-weight:400;font-size:.68rem;color:#6B8599;">'+esc(f.nota)+'</div>':'')+'</td>'
+      +'<td style="'+td+'">'+esc(f.x)+'</td><td style="'+td+'">'+esc(f.o)+'</td><td style="'+td+'">'+esc(f.f)+'</td>'
+      +'<td style="'+td+'white-space:nowrap;"><span style="background:'+s[3]+';color:'+s[2]+';border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700;">'+s[0]+' '+s[1]+'</span></td></tr>';
+  });
+  return h+'</table></div>';
 }
 window.rvModPagoChange=function(){
   var hint=document.getElementById('rv-modpago-hint');
@@ -2438,7 +2613,8 @@ function rvRenderXml(){
           +' · prestador '+esc(x.info.cp||'?')+' · pago '+esc(x.info.mp?(x.info.mp+' '+(MODALIDAD_PAGO[pad2(x.info.mp)]||'')):'no declarado')
           +' · cobertura '+esc(x.info.cob||'no declarada')
           +' · '+esc(x.info.cust||'sin CustomizationID')
-          +' · recaudos '+esc(rvPPTxt(x.info))+'</span></div>';
+          +' · recaudos '+esc(rvPPTxt(x.info))+'</span></div>'
+          +'<details style="margin:0 0 4px 12px;"><summary style="cursor:pointer;font-size:.74rem;font-weight:700;color:var(--blue-dark);">Ver todos los datos de '+esc(x.name)+'</summary><div style="margin-top:6px;">'+rvPanelXml(x.info)+'</div></details>';
       });
       h+='</div>';
     }
@@ -2500,7 +2676,11 @@ window.rvAnalizar=function(){
       prest12:prest12,sede:prest12?prest12.slice(10):'',
       prest10:prest12?prest12.slice(0,10):(/^\d{10}$/.test(prestRaw)?prestRaw:xcp.slice(0,10))};
     var r=rvAudit(JSON.parse(JSON.stringify(f.json)),xml,cfg);
-    return{name:f.name,json:r.json,h:r.h,tot:r.tot,nServ:r.nServ,xml:xml,fix:base.fix,
+    // El cruce contra la factura compara el JSON como llegó con el que queda corregido. En modo
+    // auditoría se corrige una copia aparte solo para mostrar cómo quedaría.
+    var rFin=cfg.fix?r:rvAudit(JSON.parse(JSON.stringify(f.json)),xml,Object.assign({},cfg,{fix:true}));
+    var cruce=xml?rvCruce(rvResumenRips(f.json),rvResumenRips(rFin.json),xml,rx,cfg.mp,esPagoPorEvento(cfg.mp,mpNom)):null;
+    return{name:f.name,json:r.json,h:r.h,tot:r.tot,nServ:r.nServ,xml:xml,fix:base.fix,cruce:cruce,
       conv:cv.conv,tu:cv.tu,mp:cfg.mp,mpNom:mpNom||MODALIDAD_PAGO[cfg.mp]||cfg.mp,recTxt:rvRecaudoTxt(rx),
       esEvento:esPagoPorEvento(cfg.mp,mpNom)};
   });
@@ -2538,6 +2718,15 @@ function rvRender(){
     +'<div class="stat"><div class="stat-icon">⚠️</div><div class="stat-num yellow">'+nAdv+'</div><div class="stat-label">Advertencias</div></div>'
     +'<div class="stat"><div class="stat-icon">🔧</div><div class="stat-num '+(modoAud?'purple':'green')+'">'+nAuto+'</div><div class="stat-label">'+(modoAud?'Corregibles':'Corregidos')+'</div></div>'
     +'</div>';
+  // Lo que dice la factura y cómo se compara con el JSON, ANTES de los botones de descarga.
+  rvRes.forEach(function(r){
+    var nAl=r.cruce?r.cruce.alertas.length:0;
+    h+='<details'+(rvRes.length===1||nAl?' open':'')+' style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:10px 12px;margin-bottom:10px;">'
+      +'<summary style="cursor:pointer;font-family:var(--display);font-weight:700;font-size:.85rem;color:var(--blue-dark);">🧾 '+esc(r.name)+' — factura electrónica vs JSON'+(nAl?' · <span style="color:var(--red);">'+nAl+' diferencia(s)</span>':'')+'</summary>'
+      +'<div style="margin-top:8px;">'+rvPanelCruce(r)+'</div>'
+      +(r.xml?'<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:.78rem;font-weight:700;color:var(--gray-700);">📄 Todos los datos de la factura (XML)</summary><div style="margin-top:6px;">'+rvPanelXml(r.xml)+'</div></details>':'')
+      +'</details>';
+  });
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
     +'<button onclick="rvAbrirReporte()" style="padding:9px 16px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--display);font-size:.78rem;font-weight:700;cursor:pointer;">📄 Ver reporte de errores</button>'
     +'<button onclick="rvDescargarReporte()" style="padding:9px 16px;background:var(--white);border:1.5px solid var(--blue);border-radius:8px;color:var(--blue-dark);font-family:var(--display);font-size:.78rem;font-weight:700;cursor:pointer;">⬇️ Descargar reporte HTML</button>'
@@ -2616,6 +2805,8 @@ function rvReporteHTML(){
   rvRes.forEach(function(r){
     body+='<section><h2>🧾 '+esc(r.name)+'</h2>';
     body+='<p class="meta">Factura <b>'+esc(r.json.numFactura||'?')+'</b> · '+r.json.usuarios.length+' usuario(s) · '+r.nServ+' servicio(s)'+(r.esEvento?(' · total '+esc(fm(r.tot))):'')+(r.xml?(' · XML '+esc(r.xml.nF||'?')+' ('+esc(fm(r.xml.py))+')'):' · sin XML de referencia')+'<br>Convenio: <b>'+esc(r.conv)+'</b>'+(r.tu?(' · tipoUsuario '+esc(r.tu)):'')+' · Modalidad de pago: <b>'+esc(r.mp+' · '+r.mpNom)+'</b><br>Tipo de recaudo: <b>'+esc(r.recTxt)+'</b></p>';
+    body+='<h3 style="font-size:.8rem;margin:10px 0 6px;">Factura electrónica vs JSON</h3>'+rvPanelCruce(r);
+    if(r.xml)body+='<h3 style="font-size:.8rem;margin:12px 0 6px;">Datos de la factura (XML)</h3>'+rvPanelXml(r.xml)+'<h3 style="font-size:.8rem;margin:12px 0 6px;">Hallazgos</h3>';
     if(!r.h.length)body+='<p class="none">Sin hallazgos: cumple todas las validaciones revisadas.</p>';
     else{
       body+='<table><thead><tr><th>Severidad</th><th>Tipo</th><th>Ubicación</th><th>Campo</th><th>Antes</th><th>Después</th><th>Detalle</th></tr></thead><tbody>';
