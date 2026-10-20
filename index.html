@@ -2297,32 +2297,60 @@ function rvAudit(json,xml,cfg){
   // y el 05 (no aplica) no es recaudo, así que ninguno entra en el cruce.
   var RVG09_COD=['01','02','03'];
   if(xml){
-    var ppTot=xml.ppTot||{};
-    var cods=RVG09_COD.filter(function(c){return recJson[c]||ppTot[c];});
+    var ppTot=xml.ppTot||{},r2=function(v){return Math.round((v||0)*100)/100;};
+    var cods=RVG09_COD.filter(function(c){return recJson[c]||ppTot[c];}),vJ={},vX={};
+    cods.forEach(function(c){vJ[c]=r2(recJson[c]);vX[c]=r2(ppTot[c]);});
+    var RV_CAMPOS_REC=['conceptoRecaudo','valorPagoModerador','numFEVPagoModerador'];
+    // Los hallazgos de recaudo ya anotados en servicios que el cruce vuelve a ajustar quedan sin objeto.
+    function limpiarHallazgos(srv,campos){
+      var locs={};srv.forEach(function(it){locs[it.loc]=1;});
+      H=H.filter(function(x){return !(locs[x.loc]&&campos.indexOf(x.campo)>=0);});
+    }
+    var msgDe=function(c){return 'RVG09: JSON reporta '+fm(vJ[c])+' en código '+conEtq(c)+' / XML reporta '+fm(vX[c])+'.';};
+    // Si el paciente pagó, el pago sale en la factura. Cuando la FEV trae el mismo valor que el RIPS pero
+    // con otro código, el pago es real y solo está mal codificado en el RIPS: se pasa al código de la
+    // factura y se conservan los valores.
     cods.forEach(function(c){
-      var vJ=Math.round((recJson[c]||0)*100)/100,vX=Math.round((ppTot[c]||0)*100)/100;
-      if(Math.abs(vJ-vX)<1)return;
-      var nSrv=recN[c]||0;
-      var msg='RVG09: JSON reporta '+fm(vJ)+' en código '+conEtq(c)+' / XML reporta '+fm(vX)+'.';
-      if(vX===0){
-        // La FEV ya emitida no declara este recaudo, así que el RIPS no puede reportarlo: la factura manda.
-        // Se deja cada servicio como lo pide la norma para un servicio sin recaudo (RVC060): concepto 05,
-        // valorPagoModerador 0 y numFEVPagoModerador null.
-        var srv=recSrv[c]||[],locs={};
-        if(fix){
-          srv.forEach(function(it){it.s.conceptoRecaudo='05';it.s.valorPagoModerador=0;it.s.numFEVPagoModerador=null;locs[it.loc]=1;});
-          // Los hallazgos de recaudo que ya se habían anotado en esos servicios quedan sin objeto.
-          H=H.filter(function(x){return !(locs[x.loc]&&['conceptoRecaudo','valorPagoModerador','numFEVPagoModerador'].indexOf(x.campo)>=0);});
-          add('corregido','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no trae ningún <PrepaidPayment> con schemeID "'+c+'", así que se quitó el recaudo de los '+nSrv+' servicio(s) que lo reportaban: quedaron con conceptoRecaudo 05 (No aplica), valorPagoModerador 0 y numFEVPagoModerador null. Si el paciente sí pagó, lo que hay que corregir es la factura.',vJ,vX);
+      if(!(vJ[c]>0&&vX[c]===0))return;
+      var d=cods.filter(function(o){return o!==c&&vX[o]>0&&vJ[o]===0&&Math.abs(vX[o]-vJ[c])<1;})[0];
+      if(!d)return;
+      var srv=recSrv[c]||[],msg=msgDe(c)+' La factura sí trae ese pago, pero con código '+conEtq(d)+' ('+fm(vX[d])+' en <PrepaidPayment> schemeID "'+d+'")';
+      if(fix){
+        srv.forEach(function(it){it.s.conceptoRecaudo=d;});
+        limpiarHallazgos(srv,['conceptoRecaudo']);
+        add('corregido','Cruce con XML',L0,'conceptoRecaudo',msg+': se cambió el concepto de los '+srv.length+' servicio(s) a '+d+' y se conservaron sus valores.',c,d);
+      }
+      else add('error','Cruce con XML',L0,'conceptoRecaudo',msg+': el concepto de esos '+srv.length+' servicio(s) debe ser '+d+'. Con "Aplicar correcciones automáticas" activado, la app lo cambia y conserva los valores.',c,d);
+      vJ[d]=vJ[c];vJ[c]=0;
+    });
+    // Códigos de la factura con pago que el RIPS todavía no cuadra: si existen, no se sabe a qué
+    // servicios corresponde el recaudo sobrante y no se borra nada.
+    var xmlPendiente=cods.filter(function(o){return vX[o]>0&&Math.abs(vJ[o]-vX[o])>=1;});
+    cods.forEach(function(c){
+      if(Math.abs(vJ[c]-vX[c])<1)return;
+      var nSrv=recN[c]||0,msg=msgDe(c);
+      if(vX[c]===0){
+        if(xmlPendiente.length){
+          add('error','Cruce con XML',L0,'valorPagoModerador',msg+' La factura no trae <PrepaidPayment> con schemeID "'+c+'" y los pagos que sí trae ('+xmlPendiente.map(function(o){return conEtq(o)+' '+fm(vX[o]);}).join(' · ')+') no cuadran con el RIPS: revisa a qué servicios corresponde cada pago.',vJ[c],vX[c]);
+          return;
         }
-        else add('error','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no trae ningún <PrepaidPayment> con schemeID "'+c+'" y el validador rechaza el paquete. Con "Aplicar correcciones automáticas" activado, la app deja esos '+nSrv+' servicio(s) en conceptoRecaudo 05, valorPagoModerador 0 y numFEVPagoModerador null.',vJ,vX);
+        // Si el paciente hubiera pagado, el pago saldría en la factura. Como la FEV no lo declara, el
+        // servicio no tuvo recaudo y queda como lo pide la norma (RVC060): concepto 05,
+        // valorPagoModerador 0 y numFEVPagoModerador null.
+        var srv=recSrv[c]||[];
+        if(fix){
+          srv.forEach(function(it){it.s.conceptoRecaudo='05';it.s.valorPagoModerador=0;it.s.numFEVPagoModerador=null;});
+          limpiarHallazgos(srv,RV_CAMPOS_REC);
+          add('corregido','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no registra ningún pago del paciente con schemeID "'+c+'", así que se quitó el recaudo de los '+nSrv+' servicio(s) que lo reportaban: quedaron con conceptoRecaudo 05 (No aplica), valorPagoModerador 0 y numFEVPagoModerador null.',vJ[c],vX[c]);
+        }
+        else add('error','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no registra ningún pago del paciente con schemeID "'+c+'" y el validador rechaza el paquete. Con "Aplicar correcciones automáticas" activado, la app deja esos '+nSrv+' servicio(s) en conceptoRecaudo 05, valorPagoModerador 0 y numFEVPagoModerador null.',vJ[c],vX[c]);
         return;
       }
-      if(vJ===0){
-        add('error','Cruce con XML',L0,'valorPagoModerador',msg+' Ningún servicio del RIPS reporta ese recaudo: los servicios que generaron el pago deben llevar conceptoRecaudo "'+c+'" con su valorPagoModerador.',vJ,vX);
+      if(vJ[c]===0){
+        add('error','Cruce con XML',L0,'valorPagoModerador',msg+' Ningún servicio del RIPS reporta ese recaudo: los servicios que generaron el pago deben llevar conceptoRecaudo "'+c+'" con su valorPagoModerador.',vJ[c],vX[c]);
         return;
       }
-      add('error','Cruce con XML',L0,'valorPagoModerador',msg+' Diferencia de '+fm(Math.round((vJ-vX)*100)/100)+' en '+nSrv+' servicio(s): con este descuadre el validador rechaza el paquete.',vJ,vX);
+      add('error','Cruce con XML',L0,'valorPagoModerador',msg+' Diferencia de '+fm(r2(vJ[c]-vX[c]))+' en '+nSrv+' servicio(s): con este descuadre el validador rechaza el paquete.',vJ[c],vX[c]);
     });
   }
   else{
