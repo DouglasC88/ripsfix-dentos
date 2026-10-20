@@ -1788,7 +1788,7 @@ window.cvLimpiar=function(){
 // Audita un JSON ya generado (p. ej. exportado desde Dentos) contra la
 // Res. 948/2026 (Doc. Técnico 1), corrige lo corregible y reporta el resto.
 // ═══════════════════════════════════════════════════════════════
-var rvJ=[],rvX=[],rvRes=[],rvConv=null;
+var rvJ=[],rvX=[],rvXErr=[],rvRes=[],rvConv=null;
 var RV_TDOC=['CC','CE','CD','PA','RC','TI','CN','SC','PE','PT','DE','AS','MS','NV','NI','NIT'];
 var RV_TU=['01','02','03','04','05','06','07','08','09','10','11','12','13'];
 var RV_CON=['01','02','03','05'];
@@ -1926,8 +1926,9 @@ function rvNum(v){
 function rvAudit(json,xml,cfg){
   var H=[],fix=cfg.fix,hoy=new Date().toISOString().slice(0,10),totServ=0,nServ=0;
   // Recaudos del JSON agrupados por conceptoRecaudo, para el cruce RVG09 contra los PrepaidPayment
-  // de la FEV. recJson: {código: suma de valorPagoModerador}; recN: cuántos servicios lo reportan.
-  var recJson={},recN={};
+  // de la FEV. recJson: {código: suma de valorPagoModerador}; recN: cuántos servicios lo reportan;
+  // recSrv: los servicios de cada código, para poder quitarles el recaudo si la FEV no lo declara.
+  var recJson={},recN={},recSrv={};
   var mod=cfg.mp||MODALIDAD_EVENTO,modNom=cfg.mpNom||MODALIDAD_PAGO[mod]||('modalidad '+mod);
   var esEvento=esPagoPorEvento(mod,modNom);
   var esCapita=/capitaci/i.test(modNom||'')||mod==='03';
@@ -2222,6 +2223,7 @@ function rvAudit(json,xml,cfg){
         if(vpmF>0){
           recJson[crF]=(recJson[crF]||0)+vpmF;
           recN[crF]=(recN[crF]||0)+1;
+          (recSrv[crF]=recSrv[crF]||[]).push({s:s,loc:SL});
           // Plata reportada bajo 05 (No aplica) que la FEV no puede respaldar con ningún PrepaidPayment.
           if(crF==='05')add('error','Concepto recaudo',SL,'conceptoRecaudo','Hay un recaudo de '+fm(vpmF)+' con concepto 05 (No aplica): si el paciente pagó, el concepto tiene que ser el del contrato (01 copago, 02 cuota moderadora o 03 pagos compartidos), porque la factura no puede respaldar ese valor con ningún PrepaidPayment.',crF,null);
         }
@@ -2290,29 +2292,42 @@ function rvAudit(json,xml,cfg){
   // El total recaudado por cada concepto en el RIPS (suma de valorPagoModerador agrupada por
   // conceptoRecaudo) debe coincidir con lo que la FEV declara en el PrepaidPayment del mismo
   // schemeID. Si no cuadra, el Mecanismo Único de Validación rechaza el paquete.
+  // Solo se comparan los recaudos reales (01, 02, 03), tomando los que aparezcan en cualquiera de los
+  // dos lados: un código sin PrepaidPayment en la FEV vale 0. El 04 (anticipos) solo existe en la FEV
+  // y el 05 (no aplica) no es recaudo, así que ninguno entra en el cruce.
+  var RVG09_COD=['01','02','03'];
   if(xml){
-    var ppTot=xml.ppTot||{},codigos={},k;
-    // El 04 (anticipos) es legítimo en la FEV y no se le exige contrapartida en el RIPS.
-    for(k in ppTot)if(k!=='04'&&ppTot[k])codigos[k]=1;
-    // Del lado del RIPS se excluyen el 05 (no aplica, no es recaudo) y el 04 (que ya tiene su propio
-    // hallazgo de estructura): ninguno de los dos puede tener contrapartida en la FEV.
-    for(k in recJson)if(k!=='05'&&k!=='04'&&recJson[k])codigos[k]=1;
-    var cods=Object.keys(codigos).sort(),huboPP=(xml.pp||[]).length>0;
+    var ppTot=xml.ppTot||{};
+    var cods=RVG09_COD.filter(function(c){return recJson[c]||ppTot[c];});
     cods.forEach(function(c){
       var vJ=Math.round((recJson[c]||0)*100)/100,vX=Math.round((ppTot[c]||0)*100)/100;
-      var dif=Math.round((vJ-vX)*100)/100;
-      if(Math.abs(dif)<1)return;
+      if(Math.abs(vJ-vX)<1)return;
       var nSrv=recN[c]||0;
+      var msg='RVG09: JSON reporta '+fm(vJ)+' en código '+conEtq(c)+' / XML reporta '+fm(vX)+'.';
       if(vX===0){
-        add('error','Cruce con XML',L0,'valorPagoModerador','RVG09: el RIPS reporta '+fm(vJ)+' en concepto '+conEtq(c)+' ('+nSrv+' servicio(s)) y la factura electrónica no declara ningún <PrepaidPayment> con schemeID "'+c+'"'+(huboPP?'.':': la factura no trae ningún pago anticipado.')+' El validador rechaza el paquete porque el recaudo del RIPS no está soportado en la FEV: corrige el concepto en el RIPS o pide la factura con el PrepaidPayment que falta.',vJ,vX);
+        // La FEV ya emitida no declara este recaudo, así que el RIPS no puede reportarlo: la factura manda.
+        // Se deja cada servicio como lo pide la norma para un servicio sin recaudo (RVC060): concepto 05,
+        // valorPagoModerador 0 y numFEVPagoModerador null.
+        var srv=recSrv[c]||[],locs={};
+        if(fix){
+          srv.forEach(function(it){it.s.conceptoRecaudo='05';it.s.valorPagoModerador=0;it.s.numFEVPagoModerador=null;locs[it.loc]=1;});
+          // Los hallazgos de recaudo que ya se habían anotado en esos servicios quedan sin objeto.
+          H=H.filter(function(x){return !(locs[x.loc]&&['conceptoRecaudo','valorPagoModerador','numFEVPagoModerador'].indexOf(x.campo)>=0);});
+          add('corregido','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no trae ningún <PrepaidPayment> con schemeID "'+c+'", así que se quitó el recaudo de los '+nSrv+' servicio(s) que lo reportaban: quedaron con conceptoRecaudo 05 (No aplica), valorPagoModerador 0 y numFEVPagoModerador null. Si el paciente sí pagó, lo que hay que corregir es la factura.',vJ,vX);
+        }
+        else add('error','Cruce con XML',L0,'valorPagoModerador',msg+' La factura electrónica no trae ningún <PrepaidPayment> con schemeID "'+c+'" y el validador rechaza el paquete. Con "Aplicar correcciones automáticas" activado, la app deja esos '+nSrv+' servicio(s) en conceptoRecaudo 05, valorPagoModerador 0 y numFEVPagoModerador null.',vJ,vX);
         return;
       }
       if(vJ===0){
-        add('error','Cruce con XML',L0,'valorPagoModerador','RVG09: la factura electrónica declara '+fm(vX)+' en concepto '+conEtq(c)+' (PrepaidPayment schemeID "'+c+'") y ningún servicio del RIPS reporta ese recaudo. El validador rechaza el paquete: los servicios que generaron ese pago deben llevar conceptoRecaudo "'+c+'" con su valorPagoModerador.',vJ,vX);
+        add('error','Cruce con XML',L0,'valorPagoModerador',msg+' Ningún servicio del RIPS reporta ese recaudo: los servicios que generaron el pago deben llevar conceptoRecaudo "'+c+'" con su valorPagoModerador.',vJ,vX);
         return;
       }
-      add('error','Cruce con XML',L0,'valorPagoModerador','RVG09: el RIPS reporta '+fm(vJ)+' en concepto '+conEtq(c)+' ('+nSrv+' servicio(s)) y la factura electrónica reporta '+fm(vX)+' en el mismo concepto (PrepaidPayment schemeID "'+c+'"). Diferencia de '+fm(dif)+': con este descuadre el validador rechaza el paquete.',vJ,vX);
+      add('error','Cruce con XML',L0,'valorPagoModerador',msg+' Diferencia de '+fm(Math.round((vJ-vX)*100)/100)+' en '+nSrv+' servicio(s): con este descuadre el validador rechaza el paquete.',vJ,vX);
     });
+  }
+  else{
+    var sinCruce=RVG09_COD.filter(function(c){return recJson[c];});
+    if(sinCruce.length)add('advertencia','Cruce con XML',L0,'valorPagoModerador','RVG09 sin verificar: el JSON reporta recaudos ('+sinCruce.map(function(c){return conEtq(c)+' '+fm(recJson[c]);}).join(' · ')+') y no hay XML de la factura emparejado. Carga el XML: si la factura no declara esos pagos en <PrepaidPayment>, el validador rechaza el paquete.',null,null);
   }
   return{json:json,h:H,tot:totServ,nServ:nServ,rec:recJson};
 }
@@ -2356,7 +2371,7 @@ function rvRenderXml(){
   var el=document.getElementById('rv-xml-list');
   if(el){
     var h='';
-    if(rvX.length){
+    if(rvX.length||rvXErr.length){
       h='<div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;">';
       rvX.forEach(function(x){
         h+='<div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:7px 12px;font-size:.78rem;">'
@@ -2366,6 +2381,11 @@ function rvRenderXml(){
           +' · cobertura '+esc(x.info.cob||'no declarada')
           +' · recaudos '+esc(rvPPTxt(x.info))+'</span></div>';
       });
+      rvXErr.forEach(function(n){
+        h+='<div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:7px 12px;font-size:.78rem;">'
+          +'<span>⛔</span><span style="flex:1;font-family:var(--mono);font-weight:700;color:var(--gray-700);">'+esc(n)+'</span>'
+          +'<span style="color:var(--red);font-size:.72rem;">No se pudo leer el XML: no se usará en el cruce</span></div>';
+      });
       h+='</div>';
     }
     el.innerHTML=h;
@@ -2374,6 +2394,11 @@ function rvRenderXml(){
   // No se autocompleta el código: el XML trae 10 dígitos y el RIPS exige los 12 con la sede.
   var pi=document.getElementById('rv-prest');
   if(pi&&!pi.value.trim()&&rvX.length&&rvX[0].info.cp)pi.placeholder='Ej: '+rvX[0].info.cp+'01  (los 10 del XML + tu sede)';
+}
+// Si ya hay un análisis en pantalla y se carga (o cambia) el JSON o el XML, se vuelve a analizar:
+// cargar el XML después de analizar el JSON no puede dejar el resultado viejo, sin el cruce RVG09.
+function rvReanalizar(){
+  if(rvRes.length&&rvJ.some(function(f){return f.json;}))window.rvAnalizar();
 }
 function rvMatchXml(item){
   if(!rvX.length)return null;
@@ -2583,7 +2608,7 @@ window.rvAbrirReporte=function(){
 };
 window.rvDescargarReporte=function(){rvBaja('reporte_errores_rips_convenios_'+new Date().toISOString().slice(0,10)+'.html',rvReporteHTML(),'text/html;charset=utf-8');};
 window.rvLimpiar=function(){
-  rvJ=[];rvX=[];rvRes=[];
+  rvJ=[];rvX=[];rvXErr=[];rvRes=[];
   ['rv-json-list','rv-xml-list'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
   ['rvi-json','rvi-xml'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
   rvsok(1,'Pendiente',false);rvsok(2,'Opcional',false);
@@ -2601,23 +2626,23 @@ document.addEventListener('DOMContentLoaded',function(){
       rd.onload=function(e){
         try{rvJ.push({name:f.name,json:JSON.parse(e.target.result)});}
         catch(er){rvJ.push({name:f.name,error:'JSON inválido: '+er.message});}
-        if(--pend===0)rvRenderFiles();
+        if(--pend===0){rvRenderFiles();rvReanalizar();}
       };
-      rd.onerror=function(){rvJ.push({name:f.name,error:'No se pudo leer el archivo'});if(--pend===0)rvRenderFiles();};
+      rd.onerror=function(){rvJ.push({name:f.name,error:'No se pudo leer el archivo'});if(--pend===0){rvRenderFiles();rvReanalizar();}};
       rd.readAsText(f);
     });
   });
   var ix=document.getElementById('rvi-xml');
   if(ix)ix.addEventListener('change',function(){
     var files=this.files;if(!files||!files.length)return;
-    rvX=[];var pend=files.length;
+    rvX=[];rvXErr=[];var pend=files.length;
     Array.prototype.forEach.call(files,function(f){
       var rd=new FileReader();
       rd.onload=function(e){
-        try{rvX.push({name:f.name,info:cvXmlInfo(e.target.result)});}catch(er){}
-        if(--pend===0)rvRenderXml();
+        try{rvX.push({name:f.name,info:cvXmlInfo(e.target.result)});}catch(er){rvXErr.push(f.name);}
+        if(--pend===0){rvRenderXml();rvReanalizar();}
       };
-      rd.onerror=function(){if(--pend===0)rvRenderXml();};
+      rd.onerror=function(){rvXErr.push(f.name);if(--pend===0){rvRenderXml();rvReanalizar();}};
       rd.readAsText(f);
     });
   });
